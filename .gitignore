@@ -1,5 +1,3 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
 # dependencies
 /node_modules
 /.pnp
@@ -8,9 +6,17 @@
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# Node / Next.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+.pnp.*
+.next/
+out/
+dist/
 
 # production
 /build
@@ -25,12 +31,19 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
-.env*.local
 .env
-
-# vercel
-.vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python / Django
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.sqlite3
+.env
+.venv/
+venv/
+env/
