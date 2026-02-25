@@ -1,2 +1,18 @@
 # Dev files
-/DevReadMe.md
+dev_docs/
+
+# Next js
+**/.next/
+*.tsbuildinfo
+next-env.d.ts
+node_modules/
+
+
+
+# Env files
+.env
+
+# venv 
+venv/
+.venv/
+
