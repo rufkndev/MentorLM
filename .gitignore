@@ -6,8 +6,7 @@ dev_docs/
 *.tsbuildinfo
 next-env.d.ts
 node_modules/
-
-
+.DS_Store
 
 # Env files
 .env
@@ -16,3 +15,5 @@ node_modules/
 venv/
 .venv/
 
+# vscode
+.vscode/

@@ -1,0 +1,15 @@
+services:
+  frontend:
+    container_name: frontend
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports: 
+      - "3000:3000"
+    volumes:
+      - ../frontend/mentorlm:/app 
+      - node_modules:/app/node_modules
+  
+volumes:
+  node_modules:
+    driver: local

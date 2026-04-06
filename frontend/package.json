@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "@clerk/nextjs": "^6.38.2",
-    "@supabase/supabase-js": "^2.97.0"
-  }
-}
