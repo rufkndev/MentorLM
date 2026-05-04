@@ -1,26 +1,503 @@
 @import "tailwindcss";
 
+/* ─────────────────────────  design tokens ───────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --brand-paper: #f6f7fb;
+  --brand-paper-2: #eceff6;
+  --brand-ink: #090f1f;
+  --brand-ink-soft: #1b2437;
+  --brand-muted: #6a7285;
+  --brand-line: #dce2ee;
+
+  --brand-primary: #1746f5;
+  --brand-primary-hover: #0e35c9;
+  --brand-primary-soft: #e7edff;
+
+  --brand-blue-deep: #071b4d;
+  --brand-blue-soft: #bfd8ff;
+  --brand-ice: #ddebff;
+  --brand-violet: #7b61ff;
+  --brand-warm: #fff6e7;
+
+  --brand-focus: #56d9ff;
+
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 1px 2px rgba(9, 15, 31, 0.04), 0 8px 24px rgba(9, 15, 31, 0.06);
+  --shadow-lift: 0 24px 60px -20px rgba(7, 27, 77, 0.25);
+
+  /* apple-style liquid glass shadow stack */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
+    inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    inset -1px 0 0 rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 1px 2px rgba(9, 15, 31, 0.04),
+    0 24px 60px -20px rgba(7, 27, 77, 0.18);
+
+  --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* ───────────────────  tailwind theme bridge  ─────────────────── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-paper: var(--brand-paper);
+  --color-paper-2: var(--brand-paper-2);
+  --color-ink: var(--brand-ink);
+  --color-ink-soft: var(--brand-ink-soft);
+  --color-muted: var(--brand-muted);
+  --color-line: var(--brand-line);
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-primary-soft: var(--brand-primary-soft);
+  --color-blue-deep: var(--brand-blue-deep);
+  --color-blue-soft: var(--brand-blue-soft);
+  --color-ice: var(--brand-ice);
+  --color-violet: var(--brand-violet);
+  --color-warm: var(--brand-warm);
+  --color-focus: var(--brand-focus);
+
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-pill: 999px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ───────────────────────────  base  ─────────────────────────── */
+* {
+  border-color: var(--brand-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+html {
+  /*
+   * Когда фон задан только на html (а body без фона), браузер пропагирует
+   * его на viewport — это даёт «зафиксированный» к экрану градиент без
+   * position:fixed и без проблем со стэкинг-контекстом. Идеально для liquid
+   * glass: glass-элементы блюрят ЭТУ цветную сцену независимо от скролла.
+   */
+  background:
+    radial-gradient(
+      42% 32% at 12% 6%,
+      rgba(191, 216, 255, 0.95) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      36% 28% at 88% 18%,
+      rgba(123, 97, 255, 0.55) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      48% 36% at 50% 60%,
+      rgba(86, 217, 255, 0.4) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      40% 30% at 92% 88%,
+      rgba(23, 70, 245, 0.32) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      36% 28% at 8% 96%,
+      rgba(255, 246, 231, 0.85) 0%,
+      transparent 65%
+    ),
+    var(--brand-paper);
+  color: var(--brand-ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--brand-primary);
+  color: #ffffff;
+}
+
+/* ────────────────────────  typography  ──────────────────────── */
+.text-display {
+  font-feature-settings: "ss01", "ss02";
+  letter-spacing: -0.035em;
+  line-height: 0.98;
+}
+
+.text-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--brand-muted);
+}
+
+/*
+ * editorial italic accent.
+ * inline-block + padding-inline-end + negative margin: даёт italic-глифу
+ * место "выехать" вправо, чтобы bg-clip-text не обрезал хвост последней буквы.
+ * визуально макет почти не сдвигается: padding компенсируется отрицательным margin.
+ */
+.font-editorial {
+  font-feature-settings: "ss01", "ss02", "cv11";
+  font-style: italic;
+  font-weight: 400;
+  display: inline-block;
+  padding-inline-end: 0.16em;
+  margin-inline-end: -0.06em;
+}
+
+.text-gradient {
+  background: linear-gradient(
+    100deg,
+    var(--brand-blue-deep) 0%,
+    var(--brand-primary) 45%,
+    var(--brand-violet) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* gradient тоже растягиваем чуть шире, чтобы покрасить italic-хвост */
+  padding-inline-end: 0.04em;
+}
+
+/* ──────────────────────  liquid glass · apple ─────────────────────
+ * Многослойная подача:
+ * 1. фон   — двухстоповый светлый градиент с прозрачностью;
+ * 2. blur  — высокий backdrop-filter с saturate для насыщения цвета сцены;
+ * 3. rim   — inset shadow по периметру, имитирует преломление света
+ *            на фасках стекла (top — самый яркий, bottom — мягкая подсветка);
+ * 4. ::before — radial spec highlight в верхнем-левом и нижне-правом углу;
+ * 5. ::after  — мышь-зависимый specular (динамика).
+ */
+.glass,
+.glass-strong,
+.glass-card {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.glass {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.65) 0%,
+    rgba(255, 255, 255, 0.32) 100%
+  );
+  backdrop-filter: blur(36px) saturate(200%);
+  -webkit-backdrop-filter: blur(36px) saturate(200%);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+
+.glass-strong {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.82) 0%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  backdrop-filter: blur(40px) saturate(220%);
+  -webkit-backdrop-filter: blur(40px) saturate(220%);
+  box-shadow: var(--glass-rim), 0 1px 2px rgba(9, 15, 31, 0.04),
+    0 18px 50px -16px rgba(7, 27, 77, 0.22);
+}
+
+.glass-card {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.42) 100%
+  );
+  backdrop-filter: blur(36px) saturate(210%);
+  -webkit-backdrop-filter: blur(36px) saturate(210%);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+  transition: transform 320ms var(--ease-spring),
+    box-shadow 320ms var(--ease-spring);
+}
+
+/* спекулярные блики (статичные) */
+.glass::before,
+.glass-strong::before,
+.glass-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+      120% 80% at 0% 0%,
+      rgba(255, 255, 255, 0.7) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      80% 50% at 100% 100%,
+      rgba(86, 217, 255, 0.18) 0%,
+      transparent 60%
+    );
+  mix-blend-mode: screen;
+  z-index: 0;
+}
+
+/* mouse-tracked spec highlight (на glass-card) */
+.glass-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: inherit;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0) 60%
+  );
+  opacity: 0;
+  transition: opacity 320ms ease;
+  mix-blend-mode: screen;
+  z-index: 1;
+}
+
+.glass-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glass-rim), var(--shadow-lift),
+    0 1px 2px rgba(9, 15, 31, 0.06);
+}
+
+.glass-card:hover::after {
+  opacity: 1;
+}
+
+/* контент карточек поверх ::before/::after */
+.glass > *,
+.glass-strong > *,
+.glass-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+.glass-dark {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    rgba(7, 27, 77, 0.7) 0%,
+    rgba(7, 27, 77, 0.5) 100%
+  );
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.hairline {
+  box-shadow: 0 0 0 1px var(--brand-line);
+}
+
+/* hero-локальная aurora — поверх глобального фона, более яркая */
+.aurora {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+}
+
+.aurora::before {
+  width: 720px;
+  height: 720px;
+  top: -260px;
+  left: -180px;
+  background: radial-gradient(
+    closest-side,
+    var(--brand-blue-soft) 0%,
+    rgba(191, 216, 255, 0) 70%
+  );
+  animation: drift 26s ease-in-out infinite alternate;
+}
+
+.aurora::after {
+  width: 640px;
+  height: 640px;
+  right: -200px;
+  top: 5%;
+  background: radial-gradient(
+    closest-side,
+    rgba(123, 97, 255, 0.4) 0%,
+    rgba(123, 97, 255, 0) 70%
+  );
+  animation: drift 22s ease-in-out -10s infinite alternate-reverse;
+}
+
+.grid-paper {
+  background-image: linear-gradient(var(--brand-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--brand-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  background-position: -1px -1px;
+  mask-image: radial-gradient(ellipse at center, #000 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 70%);
+}
+
+.noise {
+  position: relative;
+}
+
+.noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+}
+
+/* ─────────────────────────  keyframes  ───────────────────────── */
+@keyframes drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(40px, -20px, 0) scale(1.06);
+  }
+  100% {
+    transform: translate3d(-30px, 30px, 0) scale(0.98);
+  }
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(0.6deg);
+  }
+}
+
+@keyframes orb-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.thinking-dot {
+  animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+.animate-marquee {
+  animation: marquee 32s linear infinite;
+}
+
+.animate-float {
+  animation: float 7s ease-in-out infinite;
+}
+
+.animate-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: shine 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.lift {
+  transition: transform 320ms var(--ease-spring),
+    box-shadow 320ms var(--ease-spring);
+}
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+}
+
+.mask-fade-x {
+  mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 12%,
+    #000 88%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    #000 12%,
+    #000 88%,
+    transparent 100%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }
