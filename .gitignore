@@ -22,3 +22,6 @@ venv/
 
 # clerk
 .clerk/
+
+# pnpm
+.pnpm-store/
