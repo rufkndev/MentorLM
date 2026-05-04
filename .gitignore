@@ -25,3 +25,4 @@ venv/
 
 # pnpm
 .pnpm-store/
+.pnpm-store/v10/projects/
