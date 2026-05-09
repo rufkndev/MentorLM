@@ -5,10 +5,10 @@ export const brand = {
 
 export const nav = {
   links: [
-    { href: "#features", label: "Возможности" },
-    { href: "#workflow", label: "Как это работает" },
-    { href: "#faq", label: "Отзывы" },
-    { href: "#pricing", label: "Тарифы" },
+    { href: "/#features", label: "Возможности" },
+    { href: "/#workflow", label: "Как это работает" },
+    { href: "/#faq", label: "Отзывы" },
+    { href: "/#pricing", label: "Тарифы" },
   ],
   ctaPrimary: { href: "/sign-in", label: "Войти / Зарегистрироваться" },
   ctaAuthed: { href: "/chat", label: "Открыть Mentor LM" },
@@ -198,25 +198,25 @@ export const footer = {
     {
       title: "Продукт",
       links: [
-        { label: "Возможности", href: "#features" },
-        { label: "Как работает", href: "#workflow" },
-        { label: "Тарифы", href: "#pricing" },
+        { label: "Возможности", href: "/#features" },
+        { label: "Как работает", href: "/#workflow" },
+        { label: "Тарифы", href: "/#pricing" },
       ],
     },
     {
       title: "Компания",
       links: [
-        { label: "О проекте", href: "#" },
-        { label: "Блог", href: "#" },
-        { label: "Контакты", href: "mailto:hello@mentorlm.ru" },
+        { label: "О проекте", href: "/about" },
+        { label: "Блог", href: "/blog" },
+        { label: "Контакты", href: "/contacts" },
       ],
     },
     {
       title: "Юридическое",
       links: [
         { label: "Условия использования", href: "/legal/terms" },
-        { label: "Политика конфиденциальности", href: "/legal/privacy" },
-        { label: "Файлы cookie", href: "/legal/cookies" },
+        { label: "Публичная оферта", href: "/legal/offer" },
+        { label: "Политика обработки персональных данных", href: "/legal/privacy" },
       ],
     },
   ],

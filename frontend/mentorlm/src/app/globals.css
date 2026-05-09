@@ -507,6 +507,64 @@ body {
   );
 }
 
+/* ─────────────────────  doc / legal prose  ───────────────────── */
+.doc-prose {
+  color: var(--brand-ink-soft);
+  font-size: 16px;
+  line-height: 1.75;
+}
+.doc-prose > * + * {
+  margin-top: 1.1em;
+}
+.doc-prose h2 {
+  margin-top: 2.4em;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--brand-ink);
+}
+.doc-prose h3 {
+  margin-top: 1.8em;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--brand-ink);
+}
+.doc-prose p {
+  color: var(--brand-ink-soft);
+}
+.doc-prose ul,
+.doc-prose ol {
+  padding-left: 1.4em;
+}
+.doc-prose ul {
+  list-style: disc;
+}
+.doc-prose ol {
+  list-style: decimal;
+}
+.doc-prose li + li {
+  margin-top: 0.4em;
+}
+.doc-prose strong {
+  color: var(--brand-ink);
+  font-weight: 600;
+}
+.doc-prose a {
+  color: var(--brand-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color 0.2s var(--ease-spring);
+}
+.doc-prose a:hover {
+  color: var(--brand-primary-hover);
+}
+.doc-prose hr {
+  margin: 2.4em 0;
+  border: 0;
+  border-top: 1px solid var(--brand-line);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
