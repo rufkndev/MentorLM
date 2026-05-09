@@ -24,7 +24,7 @@ export function PricingSection() {
 
         <div className="mt-14 grid items-stretch gap-5 lg:grid-cols-3">
           {pricing.plans.map((plan, i) => (
-            <Reveal key={plan.name} delay={0.07 * (i + 1)}>
+            <Reveal key={plan.name} delay={0.07 * (i + 1)} className="h-full">
               {plan.featured ? (
                 <FeaturedPlan plan={plan} />
               ) : (
@@ -48,7 +48,7 @@ function PlainPlan({ plan }: { plan: Plan }) {
     >
       <PlanHead plan={plan} />
       <PlanFeatures plan={plan} />
-      <div className="mt-8">
+      <div className="mt-auto pt-8">
         <Button
           href={plan.cta.href}
           variant="secondary"
@@ -63,30 +63,24 @@ function PlainPlan({ plan }: { plan: Plan }) {
 
 function FeaturedPlan({ plan }: { plan: Plan }) {
   return (
-    <div className="relative h-full pt-3">
-      <span className="absolute left-7 top-0 z-10 inline-flex items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-3 py-1 text-[11px] font-medium uppercase tracking-widest text-white shadow-[0_8px_20px_-6px_rgba(23,70,245,0.6)]">
+    <article
+      className="lift relative flex h-full flex-col rounded-[var(--radius-lg)] p-7 text-white shadow-[0_30px_80px_-30px_rgba(7,27,77,0.55)]"
+      style={{
+        background:
+          "radial-gradient(120% 80% at 0% 0%, rgba(86,217,255,0.4) 0%, transparent 50%), radial-gradient(120% 80% at 100% 100%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0E1F58 100%)",
+      }}
+    >
+      <span className="absolute left-7 top-0 z-10 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-3 py-1 text-[11px] font-medium uppercase tracking-widest text-white shadow-[0_8px_20px_-6px_rgba(23,70,245,0.6)]">
         Рекомендуем
       </span>
-      <article
-        className="lift relative flex h-full flex-col overflow-hidden rounded-[var(--radius-lg)] p-7 text-white shadow-[0_30px_80px_-30px_rgba(7,27,77,0.55)]"
-        style={{
-          background:
-            "radial-gradient(120% 80% at 0% 0%, rgba(86,217,255,0.4) 0%, transparent 50%), radial-gradient(120% 80% at 100% 100%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0E1F58 100%)",
-        }}
-      >
-        <PlanHead plan={plan} featured />
-        <PlanFeatures plan={plan} featured />
-        <div className="mt-8">
-          <Button
-            href={plan.cta.href}
-            variant="primary"
-            className="w-full"
-          >
-            {plan.cta.label}
-          </Button>
-        </div>
-      </article>
-    </div>
+      <PlanHead plan={plan} featured />
+      <PlanFeatures plan={plan} featured />
+      <div className="mt-auto pt-8">
+        <Button href={plan.cta.href} variant="primary" className="w-full">
+          {plan.cta.label}
+        </Button>
+      </div>
+    </article>
   );
 }
 

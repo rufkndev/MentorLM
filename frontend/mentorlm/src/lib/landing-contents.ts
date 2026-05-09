@@ -7,10 +7,11 @@ export const nav = {
   links: [
     { href: "#features", label: "Возможности" },
     { href: "#workflow", label: "Как это работает" },
-    { href: "#pricing", label: "Тарифы" },
     { href: "#faq", label: "Отзывы" },
+    { href: "#pricing", label: "Тарифы" },
   ],
-  ctaPrimary: { href: "/sign-up", label: "Войти / Зарегистрироваться" },
+  ctaPrimary: { href: "/sign-in", label: "Войти / Зарегистрироваться" },
+  ctaAuthed: { href: "/chat", label: "Открыть Mentor LM" },
 } as const;
 
 export const hero = {

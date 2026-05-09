@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/Button";
+import { LandingChatTeaser } from "@/components/landing/LandingChatTeaser";
 import { Reveal } from "@/components/ui/Reveal";
 import { cta } from "@/lib/landing-contents";
 
@@ -48,13 +48,8 @@ export function CTASection() {
               {cta.description}
             </p>
 
-            <div className="relative mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Button href={cta.primary.href} size="lg">
-                {cta.primary.label}
-              </Button>
-              <Button href={cta.secondary.href} variant="glass" size="lg">
-                {cta.secondary.label}
-              </Button>
+            <div className="relative mt-10">
+              <LandingChatTeaser />
             </div>
           </div>
         </Reveal>

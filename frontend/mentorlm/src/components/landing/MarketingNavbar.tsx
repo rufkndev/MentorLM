@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";
@@ -11,6 +12,8 @@ import { nav } from "@/lib/landing-contents";
 export function MarketingNavbar() {
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
+  const { isLoaded, isSignedIn } = useAuth();
+  const cta = isLoaded && isSignedIn ? nav.ctaAuthed : nav.ctaPrimary;
 
   useMotionValueEvent(scrollY, "change", (v) => {
     setScrolled(v > 8);
@@ -49,8 +52,8 @@ export function MarketingNavbar() {
         </ul>
 
         <div className="flex items-center">
-          <Button href={nav.ctaPrimary.href} size="sm">
-            {nav.ctaPrimary.label}
+          <Button href={cta.href} size="sm">
+            {cta.label}
           </Button>
         </div>
       </motion.nav>

@@ -1,6 +1,12 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
 import { chatScenarios } from "@/lib/mainapp-contents";
@@ -18,6 +24,7 @@ type Props = {
   variant?: "hero" | "dock";
   disabled?: boolean;
   placeholder?: string;
+  initialText?: string;
 };
 
 export function ChatComposer({
@@ -25,13 +32,25 @@ export function ChatComposer({
   variant = "dock",
   disabled,
   placeholder = "Спросите что угодно по учёбе…",
+  initialText = "",
 }: Props) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [thinking, setThinking] = useState(false);
   const [scenarioId, setScenarioId] = useState<string>(chatScenarios[0].id);
   const [files, setFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // подгоняем высоту textarea под предзаполненный черновик из лендинга
+  useEffect(() => {
+    if (!initialText) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }, [initialText]);
 
   const canSend = !disabled && text.trim().length > 0;
 

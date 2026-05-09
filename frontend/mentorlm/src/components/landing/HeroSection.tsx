@@ -158,7 +158,7 @@ function Line({
   delay?: number;
 }) {
   return (
-    <span className="block overflow-hidden">
+    <span className="line-mask block">
       <motion.span
         initial={{ y: "115%" }}
         animate={{ y: 0 }}

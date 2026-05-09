@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMotionValue, useMotionValueEvent, useSpring } from "motion/react";
 import { useRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -8,7 +9,9 @@ type Variant = "primary" | "secondary" | "ghost" | "glass";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "relative inline-flex items-center justify-center gap-2 font-medium tracking-tight rounded-full select-none transition-[transform,background-color,color,box-shadow] duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand-paper)] disabled:opacity-50 disabled:pointer-events-none will-change-transform";
+  "relative inline-flex items-center justify-center gap-2 font-medium tracking-tight rounded-full select-none transition-[background-color,color,box-shadow] duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand-paper)] disabled:opacity-50 disabled:pointer-events-none will-change-transform";
+
+const springConfig = { stiffness: 180, damping: 22, mass: 0.5 } as const;
 
 const sizes: Record<Size, string> = {
   sm: "h-9 px-4 text-sm",
@@ -50,21 +53,35 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
   } = props;
   const ref = useRef<HTMLAnchorElement & HTMLButtonElement>(null);
 
+  const tx = useMotionValue(0);
+  const ty = useMotionValue(0);
+  const sx = useSpring(tx, springConfig);
+  const sy = useSpring(ty, springConfig);
+
+  useMotionValueEvent(sx, "change", (v) => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = `translate(${v}px, ${sy.get()}px)`;
+  });
+  useMotionValueEvent(sy, "change", (v) => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.transform = `translate(${sx.get()}px, ${v}px)`;
+  });
+
   const onMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     if (!magnetic) return;
     const el = ref.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const x = e.clientX - r.left - r.width / 2;
-    const y = e.clientY - r.top - r.height / 2;
-    el.style.transform = `translate(${x * 0.18}px, ${y * 0.22}px)`;
+    tx.set((e.clientX - r.left - r.width / 2) * 0.18);
+    ty.set((e.clientY - r.top - r.height / 2) * 0.22);
   };
 
   const onMouseLeave = () => {
     if (!magnetic) return;
-    const el = ref.current;
-    if (!el) return;
-    el.style.transform = "translate(0, 0)";
+    tx.set(0);
+    ty.set(0);
   };
 
   const classes = cn(base, sizes[size], variants[variant], className);

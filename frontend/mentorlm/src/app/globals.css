@@ -146,17 +146,25 @@ body {
 
 /*
  * editorial italic accent.
- * inline-block + padding-inline-end + negative margin: даёт italic-глифу
- * место "выехать" вправо, чтобы bg-clip-text не обрезал хвост последней буквы.
- * визуально макет почти не сдвигается: padding компенсируется отрицательным margin.
+ * bg-clip-text красит фоном только то, что внутри бокса элемента.
+ * italic-глифы выходят за пределы advance width вправо, а descender'ы (д, у, р)
+ * могут уходить под линию (особенно когда родитель имеет line-height < 1).
+ * Поэтому выдаём боксу запас по всем сторонам через padding, а layout
+ * компенсируем отрицательными margin'ами.
  */
 .font-editorial {
   font-feature-settings: "ss01", "ss02", "cv11";
   font-style: italic;
   font-weight: 400;
   display: inline-block;
-  padding-inline-end: 0.16em;
-  margin-inline-end: -0.06em;
+  line-height: 1.25;
+  padding-inline-end: 0.55em;
+  padding-inline-start: 0.05em;
+  padding-block: 0.15em 0.3em;
+  margin-inline-end: -0.25em;
+  margin-inline-start: -0.05em;
+  margin-block: -0.15em -0.3em;
+  vertical-align: baseline;
 }
 
 .text-gradient {
@@ -169,8 +177,15 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  /* gradient тоже растягиваем чуть шире, чтобы покрасить italic-хвост */
-  padding-inline-end: 0.04em;
+}
+
+/*
+ * mask для построчной анимации: обрезает по Y (чтобы текст "вылетал" снизу),
+ * но оставляет ink overflow по X — иначе italic-хвост последнего слова режется.
+ */
+.line-mask {
+  overflow: clip;
+  overflow-clip-margin: 0.5em;
 }
 
 /* ──────────────────────  liquid glass · apple ─────────────────────

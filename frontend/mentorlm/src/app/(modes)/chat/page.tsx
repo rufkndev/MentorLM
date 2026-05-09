@@ -9,9 +9,24 @@ import {
 import { ChatEmpty, PromptSuggestions } from "@/components/mainapp/ChatEmpty";
 import { ChatMessage, type Message } from "@/components/mainapp/ChatMessage";
 
+const DRAFT_KEY = "mentorlm:draft";
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
   const threadRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const d = sessionStorage.getItem(DRAFT_KEY);
+      if (d) {
+        setDraft(d);
+        sessionStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {
+      /* sessionStorage недоступен — игнорируем */
+    }
+  }, []);
 
   useEffect(() => {
     threadRef.current?.scrollTo({
@@ -76,6 +91,7 @@ export default function ChatPage() {
                 variant="hero"
                 onSubmit={handleSubmit}
                 placeholder="Спросите что угодно по учёбе…"
+                initialText={draft}
               />
             </div>
             <PromptSuggestions
