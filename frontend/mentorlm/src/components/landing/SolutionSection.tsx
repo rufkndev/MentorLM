@@ -1,21 +1,9 @@
 "use client";
 
-import { motion } from "motion/react";
-import { useState } from "react";
 import { Reveal } from "@/components/ui/Reveal";
-import { cn } from "@/lib/cn";
 import { solution } from "@/lib/landing-contents";
 
-const modes = [
-  { key: "Chat", hint: "поясни тему по моим лекциям" },
-  { key: "Code", hint: "почему этот алгоритм O(n log n)" },
-  { key: "Library", hint: "найди определение в моих PDF" },
-  { key: "Notes", hint: "сделай конспект из ответа" },
-];
-
 export function SolutionSection() {
-  const [active, setActive] = useState(0);
-
   return (
     <section className="relative py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-6">
@@ -46,7 +34,7 @@ export function SolutionSection() {
           </Reveal>
 
           <Reveal delay={0.15}>
-            <SolutionVisual active={active} setActive={setActive} />
+            <SolutionVideoSlot />
           </Reveal>
         </div>
       </div>
@@ -54,83 +42,62 @@ export function SolutionSection() {
   );
 }
 
-function SolutionVisual({
-  active,
-  setActive,
-}: {
-  active: number;
-  setActive: (i: number) => void;
-}) {
+/* ────────────────────────────────────────────────────────────────
+ * SolutionVideoSlot — заглушка под видео-демо мейн-аппа.
+ *
+ * Пока вместо видео — стеклянная карточка с рамкой-градиентом и
+ * подсказкой. Чтобы вставить ролик: положи файл в /public/video/
+ * (например, mainapp.mp4 + mainapp.webm) и замени блок-placeholder
+ * на тег <video> ниже — пример раскомментирован в коде.
+ * ──────────────────────────────────────────────────────────────── */
+
+function SolutionVideoSlot() {
   return (
-    <div className="relative aspect-[4/5] w-full max-w-md justify-self-center lg:justify-self-end">
+    <div className="relative aspect-video w-full justify-self-center lg:justify-self-end">
       <div
         aria-hidden
-        className="absolute inset-0 rounded-[36px]"
+        className="absolute inset-0 rounded-[28px]"
         style={{
           background:
-            "radial-gradient(120% 80% at 30% 20%, var(--brand-blue-soft) 0%, transparent 60%), radial-gradient(120% 80% at 80% 90%, rgba(123,97,255,0.45) 0%, transparent 60%), linear-gradient(180deg, var(--brand-paper-2), var(--brand-paper))",
+            "radial-gradient(120% 80% at 15% 10%, var(--brand-blue-soft) 0%, transparent 55%), radial-gradient(120% 80% at 95% 95%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, var(--brand-paper-2), var(--brand-paper))",
         }}
       />
-      <div className="absolute inset-6 glass-strong flex flex-col gap-3 rounded-[28px] p-5">
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-[var(--brand-primary)]" />
-          <div className="h-2 w-2 rounded-full bg-[var(--brand-violet)]" />
-          <div className="h-2 w-2 rounded-full bg-[var(--brand-focus)]" />
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted">
-            mentor · workspace
+
+      <div className="glass-strong absolute inset-3 flex items-center justify-center overflow-hidden rounded-[22px]">
+        {/* ───── когда видео будет готово, замени блок ниже на:
+        <video
+          src="/video/mainapp.mp4"
+          poster="/video/mainapp-poster.jpg"
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="h-full w-full object-cover"
+        />
+        ───── */}
+        <div className="flex flex-col items-center gap-3 px-6 text-center">
+          <span className="grid h-12 w-12 place-items-center rounded-full bg-white/70 text-[var(--brand-primary)]">
+            <PlayIcon />
           </span>
-        </div>
-
-        <div className="space-y-2">
-          {modes.map((m, i) => (
-            <button
-              key={m.key}
-              onClick={() => setActive(i)}
-              className={cn(
-                "relative flex w-full items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors",
-                i === active
-                  ? "border-transparent text-white"
-                  : "border-line bg-white/60 text-ink-soft hover:bg-white/80"
-              )}
-            >
-              {i === active && (
-                <motion.span
-                  layoutId="solution-active"
-                  className="absolute inset-0 -z-0 rounded-xl bg-[var(--brand-primary)]"
-                  transition={{ type: "spring", stiffness: 280, damping: 28 }}
-                />
-              )}
-              <span className="relative">{m.key}</span>
-              <span className="relative font-mono text-[10px] opacity-70">
-                {i === active ? "active" : "—"}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-auto rounded-2xl border border-line bg-white/70 p-3">
-          <motion.p
-            key={active}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="text-[12px] text-muted"
-          >
-            {modes[active].hint}
-          </motion.p>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]" />
-            <span
-              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]"
-              style={{ animationDelay: "0.2s" }}
-            />
-            <span
-              className="thinking-dot h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]"
-              style={{ animationDelay: "0.4s" }}
-            />
-          </div>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+            демо · скоро
+          </p>
+          <p className="max-w-[260px] text-[13px] leading-relaxed text-ink-soft">
+            Здесь будет короткое видео работы с Mentor LM.
+          </p>
         </div>
       </div>
     </div>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M5 3.5l7 4.5-7 4.5v-9z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
