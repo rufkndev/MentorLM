@@ -2,33 +2,78 @@
 
 import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { motion } from "motion/react";
+import {
+  ArrowUp,
+  BookOpen,
+  CheckCheck,
+  Code2,
+  Columns2,
+  FileCode2,
+  FileSearch,
+  GraduationCap,
+  ListChecks,
+  MessageCircle,
+  Microscope,
+  Paperclip,
+  RefreshCw,
+  ShieldCheck,
+  Type,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/cn";
-import { chatScenarios } from "@/lib/mainapp-contents";
+import type { Scenario, ScenarioIconId } from "@/lib/mainapp-contents";
 
 export type ComposerSubmit = {
   text: string;
   scenarioId: string;
-  thinking: boolean;
   files: File[];
 };
 
 type Props = {
   onSubmit: (payload: ComposerSubmit) => void;
+  scenarios: readonly Scenario[];
+  defaultScenarioId: string;
   /** "hero" — большой по центру (empty state); "dock" — снизу в трэде. */
   variant?: "hero" | "dock";
   disabled?: boolean;
   placeholder?: string;
 };
 
+/**
+ * Соответствие id сценария → компоненту иконки lucide.
+ * Сами иконки берём из библиотеки, чтобы они были согласованы по сетке и
+ * толщине штриха. Кастомные нужны были бы только под брендовые символы.
+ */
+const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
+  book: BookOpen,
+  wrench: Wrench,
+  text: Type,
+  chat: MessageCircle,
+  "write-code": Code2,
+  refactor: RefreshCw,
+  explain: FileCode2,
+  review: CheckCheck,
+  teach: GraduationCap,
+  tests: ListChecks,
+  sources: FileSearch,
+  deep: Microscope,
+  overview: Zap,
+  compare: Columns2,
+  facts: ShieldCheck,
+};
+
 export function ChatComposer({
   onSubmit,
+  scenarios,
+  defaultScenarioId,
   variant = "dock",
   disabled,
   placeholder = "Спросите что угодно по учёбе…",
 }: Props) {
   const [text, setText] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [scenarioId, setScenarioId] = useState<string>(chatScenarios[0].id);
+  const [scenarioId, setScenarioId] = useState<string>(defaultScenarioId);
   const [files, setFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -37,7 +82,7 @@ export function ChatComposer({
 
   const handleSubmit = () => {
     if (!canSend) return;
-    onSubmit({ text: text.trim(), scenarioId, thinking, files });
+    onSubmit({ text: text.trim(), scenarioId, files });
     setText("");
     setFiles([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -115,17 +160,7 @@ export function ChatComposer({
             label="Прикрепить файл"
             onClick={() => fileRef.current?.click()}
           >
-            <ClipIcon />
-          </ToolButton>
-          <ToolButton
-            label="Режим thinking"
-            onClick={() => setThinking((v) => !v)}
-            active={thinking}
-          >
-            <BrainIcon />
-            <span className="hidden text-[12px] font-medium sm:inline">
-              Thinking
-            </span>
+            <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.7} />
           </ToolButton>
 
           <div className="ml-auto flex items-center gap-1.5">
@@ -135,6 +170,7 @@ export function ChatComposer({
       </div>
 
       <ScenarioRow
+        scenarios={scenarios}
         active={scenarioId}
         onChange={setScenarioId}
         className="mt-2.5"
@@ -144,21 +180,26 @@ export function ChatComposer({
 }
 
 function ScenarioRow({
+  scenarios,
   active,
   onChange,
   className,
 }: {
+  scenarios: readonly Scenario[];
   active: string;
   onChange: (id: string) => void;
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      <span className="px-2 font-mono text-[10px] uppercase tracking-widest text-muted">
-        Сценарий
-      </span>
-      {chatScenarios.map((s) => {
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-center gap-1.5",
+        className
+      )}
+    >
+      {scenarios.map((s) => {
         const isActive = s.id === active;
+        const Icon = SCENARIO_ICONS[s.icon];
         return (
           <button
             key={s.id}
@@ -166,13 +207,14 @@ function ScenarioRow({
             onClick={() => onChange(s.id)}
             title={s.description}
             className={cn(
-              "relative rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
+              "relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
               isActive
                 ? "bg-[var(--brand-ink)] text-white"
                 : "bg-white/55 text-ink-soft hover:bg-white/80 hover:text-ink"
             )}
           >
-            {s.label}
+            <Icon className="h-[14px] w-[14px]" strokeWidth={1.7} />
+            <span>{s.label}</span>
           </button>
         );
       })}
@@ -196,8 +238,9 @@ function ToolButton({
       type="button"
       onClick={onClick}
       aria-label={label}
+      title={label}
       className={cn(
-        "flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors",
+        "flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors",
         active
           ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
           : "text-ink-soft hover:bg-white/60 hover:text-ink"
@@ -228,7 +271,7 @@ function SendButton({
           : "bg-[var(--brand-primary)] text-white shadow-[0_10px_24px_-10px_rgba(23,70,245,0.6)] hover:bg-[var(--brand-primary-hover)]"
       )}
     >
-      <ArrowUp />
+      <ArrowUp className="h-[15px] w-[15px]" strokeWidth={2} />
     </button>
   );
 }
@@ -236,7 +279,7 @@ function SendButton({
 function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <span className="flex items-center gap-1.5 rounded-full bg-white/60 px-2.5 py-1 text-[12px] text-ink-soft">
-      <ClipIcon />
+      <Paperclip className="h-[13px] w-[13px]" strokeWidth={1.7} />
       <span className="max-w-[160px] truncate">{file.name}</span>
       <button
         type="button"
@@ -247,48 +290,5 @@ function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
         ×
       </button>
     </span>
-  );
-}
-
-/* — icons — */
-
-function ClipIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M11.5 7.5l-4.2 4.2a2.4 2.4 0 01-3.4-3.4l5-5a1.6 1.6 0 012.3 2.3l-4.7 4.7a.8.8 0 11-1.1-1.1l4-4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function BrainIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M5.5 3a2 2 0 00-2 2v.4A2 2 0 002.5 7.4 2 2 0 003 11a2 2 0 002 2 2 2 0 002 2h.5V3.5A.5.5 0 007 3H5.5zM10.5 3a2 2 0 012 2v.4a2 2 0 011 2 2 2 0 01-.5 3.6 2 2 0 01-2 2 2 2 0 01-2 2H8.5V3.5a.5.5 0 01.5-.5h1.5z"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ArrowUp() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M8 13V3m0 0L4 7m4-4l4 4"
-        stroke="currentColor"
-        strokeWidth="1.7"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

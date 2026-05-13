@@ -2,6 +2,7 @@
 
 import { UserButton } from "@clerk/nextjs";
 import { usePathname } from "next/navigation";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";
 import { modes } from "@/lib/mainapp-contents";
@@ -29,7 +30,11 @@ export function AppNavbar({ onToggleSidebar, sidebarOpen }: Props) {
             aria-label={sidebarOpen ? "Скрыть сайдбар" : "Показать сайдбар"}
             className="grid h-8 w-8 place-items-center rounded-full text-ink-soft transition-colors hover:bg-white/55 hover:text-ink"
           >
-            <SidebarIcon open={sidebarOpen ?? true} />
+            {sidebarOpen ?? true ? (
+              <PanelLeftClose className="h-4 w-4" strokeWidth={1.7} />
+            ) : (
+              <PanelLeft className="h-4 w-4" strokeWidth={1.7} />
+            )}
           </button>
           <Logo className="hidden sm:inline-flex" />
         </div>
@@ -82,27 +87,3 @@ function PlanBadge({ plan }: { plan: "Free" | "Pro" | "Premium" }) {
   );
 }
 
-function SidebarIcon({ open }: { open: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <rect
-        x="2"
-        y="3"
-        width="12"
-        height="10"
-        rx="2.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <line
-        x1="6.5"
-        y1="3"
-        x2="6.5"
-        y2="13"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeOpacity={open ? 1 : 0.4}
-      />
-    </svg>
-  );
-}

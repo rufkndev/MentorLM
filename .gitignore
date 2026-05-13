@@ -12,6 +12,7 @@ node_modules/
 # Env files
 .env
 .end.dev
+.env.local
 
 # venv 
 venv/

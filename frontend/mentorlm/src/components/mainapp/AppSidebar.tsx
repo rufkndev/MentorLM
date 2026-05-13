@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { Plus, Search, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   groupChatsByDate,
@@ -33,12 +34,20 @@ export function AppSidebar({ open }: Props) {
       {open && (
         <motion.aside
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 288, opacity: 1 }}
+          animate={{ width: 300, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
           className="relative z-30 shrink-0 overflow-hidden"
         >
-          <div className="sticky top-3 ml-3 flex h-[calc(100vh-1.5rem)] w-72 flex-col rounded-3xl glass-strong">
+          <div
+            className="sticky top-3 ml-3 flex h-[calc(100vh-1.5rem)] w-72 flex-col rounded-3xl glass-strong"
+            style={{
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.78) 100%)",
+              boxShadow:
+                "var(--glass-rim), 0 1px 2px rgba(9,15,31,0.04)",
+            }}
+          >
             <ModeSwitcher pathname={pathname} />
 
             <div className="px-3 pt-2">
@@ -69,7 +78,7 @@ export function AppSidebar({ open }: Props) {
 function ModeSwitcher({ pathname }: { pathname: string | null }) {
   return (
     <div className="px-3 pt-3">
-      <div className="grid grid-cols-3 gap-1 rounded-2xl bg-white/45 p-1">
+      <div className="flex flex-col gap-0.5 rounded-2xl bg-white/45 p-1">
         {modes.map((mode) => {
           const active = pathname?.startsWith(mode.href);
           return (
@@ -77,7 +86,7 @@ function ModeSwitcher({ pathname }: { pathname: string | null }) {
               key={mode.id}
               href={mode.href}
               className={cn(
-                "relative grid place-items-center rounded-xl px-2 py-2 text-[13px] font-medium transition-colors",
+                "relative flex h-9 items-center rounded-xl px-3 text-[13.5px] font-medium transition-colors",
                 active
                   ? "text-white"
                   : "text-ink-soft hover:bg-white/60 hover:text-ink"
@@ -105,7 +114,7 @@ function NewChatButton() {
       href="/chat"
       className="group flex h-10 w-full items-center gap-2 rounded-2xl bg-[var(--brand-ink)] px-3 text-[14px] font-medium text-white transition-transform duration-300 ease-out hover:translate-y-[-1px] hover:bg-[var(--brand-ink-soft)]"
     >
-      <PlusIcon />
+      <Plus className="h-[14px] w-[14px]" strokeWidth={2} />
       Новый чат
       <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-white/55">
         ⌘K
@@ -123,7 +132,7 @@ function SearchInput({
 }) {
   return (
     <div className="mt-2 flex h-9 items-center gap-2 rounded-xl bg-white/55 px-3">
-      <SearchIcon />
+      <Search className="h-[14px] w-[14px] text-muted" strokeWidth={1.7} />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -164,12 +173,12 @@ function ChatGroup({
 
 function SidebarFooter() {
   return (
-    <div className="border-t border-white/40 p-3">
+    <div className="p-3">
       <Link
         href="/settings"
         className="flex h-10 items-center gap-2 rounded-2xl px-3 text-[13.5px] text-ink-soft transition-colors hover:bg-white/55 hover:text-ink"
       >
-        <SettingsIcon />
+        <Settings className="h-[14px] w-[14px]" strokeWidth={1.7} />
         Настройки
       </Link>
       <Link
@@ -177,7 +186,7 @@ function SidebarFooter() {
         className="mt-1 flex h-10 items-center justify-between gap-2 rounded-2xl bg-[var(--brand-primary-soft)] px-3 text-[13.5px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-soft)]/80"
       >
         <span className="flex items-center gap-2">
-          <SparkleIcon />
+          <Sparkles className="h-[14px] w-[14px]" strokeWidth={1.7} />
           Перейти на Pro
         </span>
         <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]/70">
@@ -188,56 +197,3 @@ function SidebarFooter() {
   );
 }
 
-/* — icons — */
-
-function PlusIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M8 3v10M3 8h10"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M11 11l3 3"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5L3.4 3.4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function SparkleIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M8 1.5l1.4 4.1 4.1 1.4-4.1 1.4-1.4 4.1-1.4-4.1-4.1-1.4 4.1-1.4L8 1.5z"
-        fill="currentColor"
-      />
-    </svg>
-  );
-}
