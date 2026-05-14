@@ -163,7 +163,7 @@ export const pricing = {
         "Приоритетная очередь",
         "Экспорт конспектов",
       ],
-      cta: { label: "Перейти на Pro", href: "/sign-up?plan=pro" },
+      cta: { label: "Перейти на Pro", href: "/billing" },
       featured: true,
     },
     {

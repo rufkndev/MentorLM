@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   Bell,
@@ -479,12 +480,12 @@ function SubscriptionTab() {
             <span className="text-[18px] font-semibold">490 ₽</span>
             <span className="text-muted"> / месяц</span>
           </p>
-          <button
-            type="button"
+          <Link
+            href="/billing"
             className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)]"
           >
             Перейти на Pro
-          </button>
+          </Link>
         </div>
       </div>
 
