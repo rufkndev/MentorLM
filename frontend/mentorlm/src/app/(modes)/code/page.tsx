@@ -1,11 +1,14 @@
-import { ModePlaceholder } from "@/components/mainapp/ModePlaceholder";
+"use client";
+
+import { ChatScreen } from "@/components/mainapp/ChatScreen";
+import { codeScenarios, codeDefaultScenarioId } from "@/lib/mainapp-contents";
 
 export default function CodePage() {
   return (
-    <ModePlaceholder
-      title="Режим «Код»"
-      description="Разбор задач, объяснение кода, моноширинный композер с подсветкой и снипетами. Скоро появится."
-      tag="Code"
+    <ChatScreen
+      scenarios={codeScenarios}
+      defaultScenarioId={codeDefaultScenarioId}
+      placeholder="Вставьте код или опишите задачу…"
     />
   );
 }

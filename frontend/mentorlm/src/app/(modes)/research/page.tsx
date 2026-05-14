@@ -1,11 +1,17 @@
-import { ModePlaceholder } from "@/components/mainapp/ModePlaceholder";
+"use client";
+
+import { ChatScreen } from "@/components/mainapp/ChatScreen";
+import {
+  researchScenarios,
+  researchDefaultScenarioId,
+} from "@/lib/mainapp-contents";
 
 export default function ResearchPage() {
   return (
-    <ModePlaceholder
-      title="Режим «Исследовать»"
-      description="Гибридный поиск по вашим материалам и веб-источникам с цитатами. Скоро появится."
-      tag="Research"
+    <ChatScreen
+      scenarios={researchScenarios}
+      defaultScenarioId={researchDefaultScenarioId}
+      placeholder="Что нужно исследовать?"
     />
   );
 }
