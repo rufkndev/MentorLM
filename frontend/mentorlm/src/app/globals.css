@@ -129,6 +129,83 @@ body {
   color: #ffffff;
 }
 
+/* ───────────────────────  range slider  ─────────────────────── */
+/*
+ * Кастомизация native <input type="range">.
+ * Базовый фон трека (linear-gradient с brand-primary заливкой слева от
+ * thumb) задаётся inline-стилем из React-компонента, поэтому здесь только
+ * базовая высота, скругление и стили thumb.
+ *
+ * Firefox имеет отдельный ::-moz-range-track — но он перекроет нашу
+ * градиентную заливку, поэтому делаем его прозрачным.
+ */
+.range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+/* WebKit: thumb */
+.range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--brand-primary);
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22),
+    0 0 0 0 rgba(23, 70, 245, 0);
+  transition: box-shadow 160ms ease, transform 120ms ease;
+  cursor: grab;
+  margin-top: -6px; /* центрируем относительно 6px-трека */
+}
+.range-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22),
+    0 0 0 6px rgba(23, 70, 245, 0.1);
+}
+.range-slider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.12);
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22),
+    0 0 0 8px rgba(23, 70, 245, 0.14);
+}
+.range-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22),
+    0 0 0 4px rgba(23, 70, 245, 0.25);
+}
+
+/* Firefox: track + thumb */
+.range-slider::-moz-range-track {
+  height: 6px;
+  background: transparent; /* inline gradient на input рисует заливку */
+  border-radius: 999px;
+}
+.range-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--brand-primary);
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22);
+  transition: box-shadow 160ms ease, transform 120ms ease;
+  cursor: grab;
+}
+.range-slider:hover::-moz-range-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 1px 3px rgba(9, 15, 31, 0.22),
+    0 0 0 6px rgba(23, 70, 245, 0.1);
+}
+.range-slider:active::-moz-range-thumb {
+  cursor: grabbing;
+  transform: scale(1.12);
+}
+
 /* ────────────────────────  typography  ──────────────────────── */
 .text-display {
   font-feature-settings: "ss01", "ss02";

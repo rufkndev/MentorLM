@@ -67,7 +67,7 @@ export function ChatScreen({
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex h-[calc(100vh-1.5rem-3rem)] flex-col">
+    <div className="flex h-[calc(100vh-1.5rem)] flex-col">
       <AnimatePresence mode="wait">
         {isEmpty ? (
           <motion.section

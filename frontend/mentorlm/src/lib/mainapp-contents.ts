@@ -198,17 +198,16 @@ export type ChatPreview = {
 };
 
 /**
- * Мок последних чатов — будет заменён на реальные данные из БД.
- * Группировка по дате считается во время рендера в сайдбаре.
+ * Список последних чатов пользователя.
+ *
+ * Сейчас пустой — это точка интеграции с бэкендом. В будущем тут будет
+ * запрос к Supabase (Server Action / API route), отдающий чаты текущего
+ * пользователя из таблицы `chats`, отсортированные по `updated_at desc`.
+ *
+ * Логика группировки (`groupChatsByDate` ниже) и UI-фолбэк «Чатов пока нет»
+ * в `AppSidebar` уже готовы — достаточно подменить массив на реальные данные.
  */
-export const mockChats: readonly ChatPreview[] = [
-  { id: "c1", title: "Производная сложной функции", updatedAt: isoDaysAgo(0) },
-  { id: "c2", title: "Конспект по линейной алгебре", updatedAt: isoDaysAgo(0) },
-  { id: "c3", title: "Разбор задачи по физике", updatedAt: isoDaysAgo(1) },
-  { id: "c4", title: "План диплома: введение", updatedAt: isoDaysAgo(2) },
-  { id: "c5", title: "Алгоритм Дейкстры на Python", updatedAt: isoDaysAgo(6) },
-  { id: "c6", title: "Английский: грамматика perfect", updatedAt: isoDaysAgo(12) },
-] as const;
+export const recentChats: readonly ChatPreview[] = [] as const;
 
 export const promptSuggestions = [
   "Объясни тему производной с примерами",
@@ -216,12 +215,6 @@ export const promptSuggestions = [
   "Сделай конспект из этого PDF",
   "Подготовь меня к экзамену по дискретной математике",
 ] as const;
-
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString();
-}
 
 /**
  * Группировка чатов в сайдбаре: сегодня / вчера / последние 7 дней / раньше.

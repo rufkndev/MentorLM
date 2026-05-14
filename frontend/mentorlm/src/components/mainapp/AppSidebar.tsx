@@ -4,27 +4,36 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Plus, Search, Settings, Sparkles } from "lucide-react";
+import {
+  PanelLeftClose,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+} from "lucide-react";
+import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";
 import {
   groupChatsByDate,
-  mockChats,
   modes,
+  recentChats,
   type ChatPreview,
 } from "@/lib/mainapp-contents";
 
 type Props = {
   open: boolean;
+  onToggle: () => void;
+  onOpenSettings: () => void;
 };
 
-export function AppSidebar({ open }: Props) {
+export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
   const pathname = usePathname();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo<readonly ChatPreview[]>(() => {
-    if (!query.trim()) return mockChats;
+    if (!query.trim()) return recentChats;
     const q = query.toLowerCase();
-    return mockChats.filter((c) => c.title.toLowerCase().includes(q));
+    return recentChats.filter((c) => c.title.toLowerCase().includes(q));
   }, [query]);
 
   const grouped = useMemo(() => groupChatsByDate(filtered), [filtered]);
@@ -48,6 +57,7 @@ export function AppSidebar({ open }: Props) {
                 "var(--glass-rim), 0 1px 2px rgba(9,15,31,0.04)",
             }}
           >
+            <SidebarHeader onCollapse={onToggle} />
             <ModeSwitcher pathname={pathname} />
 
             <div className="px-3 pt-2">
@@ -67,7 +77,7 @@ export function AppSidebar({ open }: Props) {
               )}
             </nav>
 
-            <SidebarFooter />
+            <SidebarFooter onOpenSettings={onOpenSettings} />
           </div>
         </motion.aside>
       )}
@@ -75,9 +85,32 @@ export function AppSidebar({ open }: Props) {
   );
 }
 
+function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-3 pt-3 pb-1">
+      <Link
+        href="/chat"
+        aria-label="На главную"
+        className="rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
+      >
+        <Logo />
+      </Link>
+      <button
+        type="button"
+        onClick={onCollapse}
+        aria-label="Свернуть сайдбар"
+        title="Свернуть сайдбар"
+        className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-white/60 hover:text-ink"
+      >
+        <PanelLeftClose className="h-4 w-4" strokeWidth={1.7} />
+      </button>
+    </div>
+  );
+}
+
 function ModeSwitcher({ pathname }: { pathname: string | null }) {
   return (
-    <div className="px-3 pt-3">
+    <div className="px-3 pt-2">
       <div className="flex flex-col gap-0.5 rounded-2xl bg-white/45 p-1">
         {modes.map((mode) => {
           const active = pathname?.startsWith(mode.href);
@@ -171,16 +204,17 @@ function ChatGroup({
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <div className="p-3">
-      <Link
-        href="/settings"
-        className="flex h-10 items-center gap-2 rounded-2xl px-3 text-[13.5px] text-ink-soft transition-colors hover:bg-white/55 hover:text-ink"
+      <button
+        type="button"
+        onClick={onOpenSettings}
+        className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-white/55 hover:text-ink"
       >
         <Settings className="h-[14px] w-[14px]" strokeWidth={1.7} />
         Настройки
-      </Link>
+      </button>
       <Link
         href="/billing"
         className="mt-1 flex h-10 items-center justify-between gap-2 rounded-2xl bg-[var(--brand-primary-soft)] px-3 text-[13.5px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-soft)]/80"
