@@ -15,7 +15,7 @@ export default function BillingPage() {
   );
 }
 
-/* ═════════════════════════ hero ═════════════════════════ */
+/*  hero  */
 
 function HeroSection() {
   return (
@@ -55,7 +55,7 @@ function HeroSection() {
   );
 }
 
-/* ═════════════════════════ plans ═════════════════════════ */
+/*  plans  */
 
 function PlansSection() {
   return (
@@ -77,7 +77,7 @@ function PlansSection() {
   );
 }
 
-/* ───────────────────  единая карточка для всех планов ─────────────────── */
+/*   единая карточка для всех планов  */
 
 function PlanCard({ plan }: { plan: BillingPlan }) {
   const featured = !!plan.featured;

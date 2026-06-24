@@ -1,0 +1,15 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: mentorlm-backend-dev
+    env_file:
+      - ./env/.env
+    environment:
+      DEBUG: "True"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/mentorlm:/app
+    restart: unless-stopped

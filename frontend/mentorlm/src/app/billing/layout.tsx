@@ -10,10 +10,7 @@ export default function BillingLayout({
 }) {
   const router = useRouter();
 
-  /*
-   * Кнопка «Назад»: пробуем браузерный back, если истории нет — на /chat.
-   * Это плавающий минималистичный pill в углу, а не sticky-навбар.
-   */
+  /* Кнопка "Назад" */
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();

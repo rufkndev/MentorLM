@@ -10,33 +10,64 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
+from urllib.parse import urlparse
+
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load env vars from a .env file if present (no-op when running under Docker,
+# where compose already injects the environment). Looks in the project root
+# and the repo's infra/env/.env.
+load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR.parent.parent / 'infra' / 'env' / '.env')
+
+
+def env_bool(name: str, default: bool) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in ('1', 'true', 'yes', 'on')
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wjout$wum05ks$lmj8nawffg8zl-$=uh089$)^u6dv8^02)%ib'
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-wjout$wum05ks$lmj8nawffg8zl-$=uh089$)^u6dv8^02)%ib',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env_bool('DEBUG', True)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if h.strip()
+]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    # Django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Third-party
+    'rest_framework',
+
+    # Local apps
+    'apps.core',
 ]
 
 MIDDLEWARE = [
@@ -71,11 +102,14 @@ WSGI_APPLICATION = 'mentorlm_api.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("SUPABASE_NAME"),
+        "USER": os.environ.get("SUPABASE_USER"),
+        "PASSWORD": os.environ.get("SUPABASE_PASSWORD"),
+        "HOST": os.environ.get("SUPABASE_HOST"),
+        "PORT": os.environ.get("SUPABASE_PORT"),
     }
 }
 

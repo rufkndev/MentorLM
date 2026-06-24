@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ─────────────────────────  design tokens ───────────────────────── */
+/* design tokens */
 :root {
   --brand-paper: #f1f2f5;
   --brand-paper-2: #e6e8ee;
@@ -42,7 +42,7 @@
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ───────────────────  tailwind theme bridge  ─────────────────── */
+/* tailwind theme bridge */
 @theme inline {
   --color-paper: var(--brand-paper);
   --color-paper-2: var(--brand-paper-2);
@@ -67,7 +67,7 @@
   --radius-pill: 999px;
 }
 
-/* ───────────────────────────  base  ─────────────────────────── */
+/* base */
 * {
   border-color: var(--brand-line);
 }
@@ -77,12 +77,6 @@ html {
 }
 
 html {
-  /*
-   * Когда фон задан только на html (а body без фона), браузер пропагирует
-   * его на viewport — это даёт «зафиксированный» к экрану градиент без
-   * position:fixed и без проблем со стэкинг-контекстом. Идеально для liquid
-   * glass: glass-элементы блюрят ЭТУ цветную сцену независимо от скролла.
-   */
   background:
     radial-gradient(
       42% 32% at 12% 6%,
@@ -129,16 +123,7 @@ body {
   color: #ffffff;
 }
 
-/* ───────────────────────  range slider  ─────────────────────── */
-/*
- * Кастомизация native <input type="range">.
- * Базовый фон трека (linear-gradient с brand-primary заливкой слева от
- * thumb) задаётся inline-стилем из React-компонента, поэтому здесь только
- * базовая высота, скругление и стили thumb.
- *
- * Firefox имеет отдельный ::-moz-range-track — но он перекроет нашу
- * градиентную заливку, поэтому делаем его прозрачным.
- */
+/* range slider */
 .range-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -149,7 +134,6 @@ body {
   cursor: pointer;
 }
 
-/* WebKit: thumb */
 .range-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -162,7 +146,7 @@ body {
     0 0 0 0 rgba(23, 70, 245, 0);
   transition: box-shadow 160ms ease, transform 120ms ease;
   cursor: grab;
-  margin-top: -6px; /* центрируем относительно 6px-трека */
+  margin-top: -6px; 
 }
 .range-slider:hover::-webkit-slider-thumb {
   transform: scale(1.08);
@@ -180,10 +164,9 @@ body {
     0 0 0 4px rgba(23, 70, 245, 0.25);
 }
 
-/* Firefox: track + thumb */
 .range-slider::-moz-range-track {
   height: 6px;
-  background: transparent; /* inline gradient на input рисует заливку */
+  background: transparent; 
   border-radius: 999px;
 }
 .range-slider::-moz-range-thumb {
@@ -206,7 +189,7 @@ body {
   transform: scale(1.12);
 }
 
-/* ────────────────────────  typography  ──────────────────────── */
+/* typography */
 .text-display {
   font-feature-settings: "ss01", "ss02";
   letter-spacing: -0.035em;
@@ -221,14 +204,6 @@ body {
   color: var(--brand-muted);
 }
 
-/*
- * editorial italic accent.
- * inline-block с padding-* — это «поле под градиент»: bg-clip: text красит
- * только внутри border-box, а italic-глифы имеют правый overhang («м» -
- * хвост вправо) и нижний descender («у» уходит под baseline). Без запаса
- * по padding эти части не закрашиваются и выглядят обрезанными.
- * Отрицательные margin компенсируют padding, чтобы соседний текст не сдвигался.
- */
 .font-editorial {
   font-feature-settings: "ss01", "ss02", "cv11";
   font-style: italic;
@@ -251,22 +226,9 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  /*
-   * Запас под italic-overhang и descender задаётся в .font-editorial.
-   * Здесь padding специально не выставляем, чтобы не перекрывать его
-   * (комбинация .font-editorial.text-gradient — почти все use-кейсы).
-   */
 }
 
-/* ──────────────────────  liquid glass · apple ─────────────────────
- * Многослойная подача:
- * 1. фон   — двухстоповый светлый градиент с прозрачностью;
- * 2. blur  — высокий backdrop-filter с saturate для насыщения цвета сцены;
- * 3. rim   — inset shadow по периметру, имитирует преломление света
- *            на фасках стекла (top — самый яркий, bottom — мягкая подсветка);
- * 4. ::before — radial spec highlight в верхнем-левом и нижне-правом углу;
- * 5. ::after  — мышь-зависимый specular (динамика).
- */
+/* liquid glass (apple) */
 .glass,
 .glass-strong,
 .glass-card {
@@ -312,7 +274,7 @@ body {
     box-shadow 320ms var(--ease-spring);
 }
 
-/* спекулярные блики (статичные) */
+/* specular highlights (static) */
 .glass::before,
 .glass-strong::before,
 .glass-card::before {
@@ -334,7 +296,7 @@ body {
   z-index: 0;
 }
 
-/* mouse-tracked spec highlight (на glass-card) */
+/* mouse-tracked spec highlight (on glass-card) */
 .glass-card::after {
   content: "";
   position: absolute;
@@ -362,7 +324,7 @@ body {
   opacity: 1;
 }
 
-/* контент карточек поверх ::before/::after */
+/* content of cards on ::before/::after */
 .glass > *,
 .glass-strong > *,
 .glass-card > * {
@@ -389,7 +351,7 @@ body {
   box-shadow: 0 0 0 1px var(--brand-line);
 }
 
-/* hero-локальная aurora — поверх глобального фона, более яркая */
+/* hero-local aurora — on top of global background, more bright */
 .aurora {
   position: absolute;
   inset: 0;
@@ -457,7 +419,7 @@ body {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
 }
 
-/* ─────────────────────────  keyframes  ───────────────────────── */
+/* keyframes (animations) */
 @keyframes drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -575,14 +537,4 @@ body {
     #000 88%,
     transparent 100%
   );
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
 }
