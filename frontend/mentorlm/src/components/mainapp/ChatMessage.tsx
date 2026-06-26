@@ -27,7 +27,7 @@ export function ChatMessage({ message }: { message: Message }) {
 
       <div
         className={cn(
-          "max-w-[78%] whitespace-pre-wrap rounded-3xl px-4 py-3 text-[15px] leading-relaxed",
+          "chat-text max-w-[78%] whitespace-pre-wrap rounded-3xl px-4 py-3",
           isUser
             ? "bg-[var(--brand-primary)] text-white shadow-[0_12px_28px_-14px_rgba(23,70,245,0.55)]"
             : "text-ink"

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* dark-вариант завязан на data-theme="dark" (а не prefers-color-scheme),
+   чтобы утилиты `dark:*` совпадали с нашим переключателем темы. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
 /* design tokens */
 :root {
   --brand-paper: #f1f2f5;
@@ -8,6 +12,10 @@
   --brand-ink-soft: #1b2437;
   --brand-muted: #6a7285;
   --brand-line: #dce2ee;
+
+  /* приподнятая поверхность (диалоги, карточки, поля ввода) */
+  --brand-surface: #ffffff;
+  --brand-surface-2: #f6f7fb;
 
   --brand-primary: #1746f5;
   --brand-primary-hover: #0e35c9;
@@ -40,6 +48,48 @@
     0 24px 60px -20px rgba(7, 27, 77, 0.18);
 
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* масштаб текста сообщений в чате (управляется data-font-size) */
+  --chat-scale: 1;
+}
+
+/*
+ * Тёмная тема — функциональная: переопределяем доменные --brand-* токены и
+ * стеклянные поверхности. Активируется атрибутом data-theme="dark" на <html>
+ * (его ставит SettingsProvider / анти-FOUC скрипт). Светлая — по умолчанию.
+ */
+:root[data-theme="dark"] {
+  --brand-paper: #0b1020;
+  --brand-paper-2: #151b2e;
+  --brand-ink: #eef1f7;
+  --brand-ink-soft: #c4ccdc;
+  --brand-muted: #8b93a7;
+  --brand-line: #28324c;
+
+  /* приподнятая поверхность темнее фона, но светлее paper-2 — даёт «слой» */
+  --brand-surface: #1b2236;
+  --brand-surface-2: #222b42;
+
+  --brand-primary: #4a74ff;
+  --brand-primary-hover: #6a8cff;
+  --brand-primary-soft: #1a2444; /* dark cobalt tint */
+
+  --brand-blue-soft: #2a3b66;
+  --brand-warm: #1c1b22;
+
+  /* стеклянная «кромка» и тени под тёмный фон */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 24px 60px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* размер шрифта в чате — шкала, потребляемая .chat-text */
+:root[data-font-size="sm"] {
+  --chat-scale: 0.9;
+}
+:root[data-font-size="lg"] {
+  --chat-scale: 1.12;
 }
 
 /* tailwind theme bridge */
@@ -50,6 +100,8 @@
   --color-ink-soft: var(--brand-ink-soft);
   --color-muted: var(--brand-muted);
   --color-line: var(--brand-line);
+  --color-surface: var(--brand-surface);
+  --color-surface-2: var(--brand-surface-2);
   --color-primary: var(--brand-primary);
   --color-primary-hover: var(--brand-primary-hover);
   --color-primary-soft: var(--brand-primary-soft);
@@ -105,6 +157,23 @@ html {
     ),
     var(--brand-paper);
   color: var(--brand-ink);
+}
+
+/* тёмный фон: приглушаем цветные пятна, держим глубокий navy */
+:root[data-theme="dark"] html,
+html[data-theme="dark"] {
+  background:
+    radial-gradient(42% 32% at 12% 6%, rgba(40, 60, 110, 0.35) 0%, transparent 60%),
+    radial-gradient(36% 28% at 88% 18%, rgba(70, 55, 110, 0.28) 0%, transparent 62%),
+    radial-gradient(48% 36% at 50% 60%, rgba(30, 50, 80, 0.25) 0%, transparent 60%),
+    var(--brand-paper);
+  color: var(--brand-ink);
+}
+
+/* размер текста сообщений в чате (масштабируется var(--chat-scale)) */
+.chat-text {
+  font-size: calc(14.5px * var(--chat-scale));
+  line-height: 1.6;
 }
 
 body {
@@ -272,6 +341,35 @@ body {
   box-shadow: var(--glass-rim), var(--glass-shadow);
   transition: transform 320ms var(--ease-spring),
     box-shadow 320ms var(--ease-spring);
+}
+
+/* тёмная тема: стекло становится тёмным полупрозрачным, без белых заливок */
+:root[data-theme="dark"] .glass {
+  background: linear-gradient(
+    180deg,
+    rgba(21, 27, 46, 0.72) 0%,
+    rgba(11, 16, 32, 0.55) 100%
+  );
+}
+:root[data-theme="dark"] .glass-strong {
+  background: linear-gradient(
+    180deg,
+    rgba(25, 32, 54, 0.9) 0%,
+    rgba(15, 20, 38, 0.72) 100%
+  );
+}
+:root[data-theme="dark"] .glass-card {
+  background: linear-gradient(
+    180deg,
+    rgba(21, 27, 46, 0.78) 0%,
+    rgba(11, 16, 32, 0.5) 100%
+  );
+}
+/* приглушаем белые specular-блики на тёмном фоне */
+:root[data-theme="dark"] .glass::before,
+:root[data-theme="dark"] .glass-strong::before,
+:root[data-theme="dark"] .glass-card::before {
+  opacity: 0.18;
 }
 
 /* specular highlights (static) */

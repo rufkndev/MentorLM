@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  Bell,
   Brain,
   Check,
   ChevronDown,
@@ -12,7 +11,6 @@ import {
   Cpu,
   CreditCard,
   Database,
-  Keyboard,
   Monitor,
   Moon,
   Sparkles,
@@ -22,22 +20,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import {
-  chatScenarios,
-  codeScenarios,
-  researchScenarios,
-  type Scenario,
-} from "@/lib/mainapp-contents";
+import { useApi } from "@/lib/api";
+import { useSettings } from "@/components/mainapp/SettingsProvider";
 
-type TabId =
-  | "general"
-  | "model"
-  | "memory"
-  | "scenarios"
-  | "notifications"
-  | "subscription"
-  | "data"
-  | "shortcuts";
+type TabId = "general" | "model" | "memory" | "subscription" | "data";
 
 type Props = {
   open: boolean;
@@ -48,11 +34,8 @@ const TABS: { id: TabId; label: string; icon: LucideIcon }[] = [
   { id: "general", label: "Общие", icon: Cog },
   { id: "model", label: "Модель ИИ", icon: Cpu },
   { id: "memory", label: "Память", icon: Brain },
-  { id: "scenarios", label: "Сценарии", icon: Sparkles },
-  { id: "notifications", label: "Уведомления", icon: Bell },
   { id: "subscription", label: "Подписка", icon: CreditCard },
   { id: "data", label: "Данные", icon: Database },
-  { id: "shortcuts", label: "Горячие клавиши", icon: Keyboard },
 ];
 
 export function SettingsDialog({ open, onClose }: Props) {
@@ -100,7 +83,7 @@ export function SettingsDialog({ open, onClose }: Props) {
             role="dialog"
             aria-modal="true"
             aria-label="Настройки"
-            className="relative flex h-[620px] w-[860px] max-h-[92vh] max-w-full overflow-hidden rounded-2xl bg-white shadow-[0_24px_80px_-24px_rgba(7,27,77,0.4)]"
+            className="relative flex h-[620px] w-[860px] max-h-[92vh] max-w-full overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_80px_-24px_rgba(7,27,77,0.4)]"
           >
             <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-paper-2/40 p-3">
               <h2 className="px-2 pb-3 pt-1 text-[15px] font-semibold text-ink">
@@ -119,7 +102,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                         "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] transition-colors",
                         active
                           ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
-                          : "text-ink-soft hover:bg-black/[0.04] hover:text-ink"
+                          : "text-ink-soft hover:bg-ink/[0.06] hover:text-ink"
                       )}
                     >
                       <Icon className="h-4 w-4" strokeWidth={1.7} />
@@ -135,7 +118,7 @@ export function SettingsDialog({ open, onClose }: Props) {
                 type="button"
                 onClick={onClose}
                 aria-label="Закрыть"
-                className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-black/[0.05] hover:text-ink"
+                className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink"
               >
                 <X className="h-4 w-4" strokeWidth={1.7} />
               </button>
@@ -144,11 +127,8 @@ export function SettingsDialog({ open, onClose }: Props) {
                 {tab === "general" && <GeneralTab />}
                 {tab === "model" && <ModelTab />}
                 {tab === "memory" && <MemoryTab />}
-                {tab === "scenarios" && <ScenariosTab />}
-                {tab === "notifications" && <NotificationsTab />}
                 {tab === "subscription" && <SubscriptionTab />}
                 {tab === "data" && <DataTab />}
-                {tab === "shortcuts" && <ShortcutsTab />}
               </div>
             </div>
           </motion.div>
@@ -161,18 +141,14 @@ export function SettingsDialog({ open, onClose }: Props) {
 /* ═══════════════════════════ tabs ═══════════════════════════ */
 
 function GeneralTab() {
-  const [theme, setTheme] = useState<"system" | "light" | "dark">("system");
-  const [lang, setLang] = useState<"ru" | "en">("ru");
-  const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
-  const [showSuggestions, setShowSuggestions] = useState(true);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const { settings, update } = useSettings();
 
   return (
     <Section title="Общие">
       <Row label="Тема" hint="Светлая, тёмная или как в системе">
         <SegmentedControl
-          value={theme}
-          onChange={setTheme}
+          value={settings.theme}
+          onChange={(theme) => update({ theme })}
           options={[
             { value: "system", label: "Системная", icon: Monitor },
             { value: "light", label: "Светлая", icon: Sun },
@@ -180,20 +156,10 @@ function GeneralTab() {
           ]}
         />
       </Row>
-      <Row label="Язык интерфейса">
-        <SelectBox
-          value={lang}
-          onChange={(v) => setLang(v as typeof lang)}
-          options={[
-            { value: "ru", label: "Русский" },
-            { value: "en", label: "English" },
-          ]}
-        />
-      </Row>
       <Row label="Размер шрифта в чате">
         <SegmentedControl
-          value={fontSize}
-          onChange={setFontSize}
+          value={settings.font_size}
+          onChange={(font_size) => update({ font_size })}
           options={[
             { value: "sm", label: "Мелкий" },
             { value: "md", label: "Средний" },
@@ -205,27 +171,17 @@ function GeneralTab() {
         label="Подсказки промптов"
         hint="Показывать примеры запросов на пустом экране"
       >
-        <Toggle checked={showSuggestions} onChange={setShowSuggestions} />
-      </Row>
-      <Row
-        label="Автопрокрутка"
-        hint="Прокручивать вниз при появлении новых сообщений"
-      >
-        <Toggle checked={autoScroll} onChange={setAutoScroll} />
+        <Toggle
+          checked={settings.show_suggestions}
+          onChange={(show_suggestions) => update({ show_suggestions })}
+        />
       </Row>
     </Section>
   );
 }
 
 function ModelTab() {
-  const [model, setModel] = useState("mentor-pro");
-  const [length, setLength] = useState<"short" | "balanced" | "detailed">(
-    "balanced"
-  );
-  const [temperature, setTemperature] = useState(0.7);
-  const [contextSize, setContextSize] = useState("20");
-  const [streaming, setStreaming] = useState(true);
-  const [webSearch, setWebSearch] = useState(false);
+  const { settings, update } = useSettings();
 
   return (
     <Section
@@ -234,8 +190,8 @@ function ModelTab() {
     >
       <Row label="Модель по умолчанию" hint="Используется во всех режимах">
         <SelectBox
-          value={model}
-          onChange={setModel}
+          value={settings.default_model}
+          onChange={(default_model) => update({ default_model })}
           options={[
             { value: "mentor-pro", label: "Mentor Pro — умная, медленнее" },
             { value: "mentor-lite", label: "Mentor Lite — быстрая" },
@@ -245,8 +201,8 @@ function ModelTab() {
       </Row>
       <Row label="Длина ответов">
         <SegmentedControl
-          value={length}
-          onChange={setLength}
+          value={settings.response_length}
+          onChange={(response_length) => update({ response_length })}
           options={[
             { value: "short", label: "Короткие" },
             { value: "balanced", label: "Средние" },
@@ -259,18 +215,18 @@ function ModelTab() {
         hint="0 — точные предсказуемые ответы; 1 — свободные и творческие"
       >
         <Slider
-          value={temperature}
+          value={settings.temperature}
           min={0}
           max={1}
           step={0.1}
-          onChange={setTemperature}
+          onChange={(temperature) => update({ temperature })}
           format={(v) => v.toFixed(1)}
         />
       </Row>
       <Row label="Длина контекста" hint="Сколько прошлых сообщений учитывать">
         <SelectBox
-          value={contextSize}
-          onChange={setContextSize}
+          value={settings.context_size}
+          onChange={(context_size) => update({ context_size })}
           options={[
             { value: "5", label: "5 сообщений" },
             { value: "10", label: "10 сообщений" },
@@ -284,35 +240,53 @@ function ModelTab() {
         label="Потоковая выдача"
         hint="Печатать ответ постепенно, как только модель его генерирует"
       >
-        <Toggle checked={streaming} onChange={setStreaming} />
+        <Toggle
+          checked={settings.streaming}
+          onChange={(streaming) => update({ streaming })}
+        />
       </Row>
       <Row
         label="Поиск в интернете"
         hint="Разрешить модели искать актуальную информацию"
       >
-        <Toggle checked={webSearch} onChange={setWebSearch} />
+        <Toggle
+          checked={settings.web_search}
+          onChange={(web_search) => update({ web_search })}
+        />
       </Row>
     </Section>
   );
 }
 
 function MemoryTab() {
-  const [about, setAbout] = useState("");
-  const [style, setStyle] = useState("");
-  const [autoMemory, setAutoMemory] = useState(true);
+  const { settings, update } = useSettings();
 
   return (
     <Section
       title="Память и инструкции"
       description="Эти данные модель будет использовать в каждом разговоре. Можно оставить пустым."
     >
+      <Row label="Как к вам обращаться" hint="Имя или ник для ответов модели">
+        <TextInput
+          value={settings.nickname}
+          onChange={(nickname) => update({ nickname })}
+          placeholder="Например: Артём"
+        />
+      </Row>
+      <Row label="Чем вы занимаетесь" hint="Помогает модели подбирать примеры">
+        <TextInput
+          value={settings.occupation}
+          onChange={(occupation) => update({ occupation })}
+          placeholder="Например: студент-программист"
+        />
+      </Row>
       <Field
         label="Что важно знать о вас"
         hint="Например: студент 3 курса CS; интересуют ML и алгоритмы; учу английский"
       >
         <Textarea
-          value={about}
-          onChange={setAbout}
+          value={settings.custom_about}
+          onChange={(custom_about) => update({ custom_about })}
           placeholder="Расскажите о себе, своей учёбе и интересах…"
           rows={4}
         />
@@ -322,8 +296,8 @@ function MemoryTab() {
         hint="Например: короче, на русском, с примерами кода; не извиняйся, переходи сразу к делу"
       >
         <Textarea
-          value={style}
-          onChange={setStyle}
+          value={settings.custom_style}
+          onChange={(custom_style) => update({ custom_style })}
           placeholder="Опишите предпочитаемый стиль ответов…"
           rows={4}
         />
@@ -332,7 +306,10 @@ function MemoryTab() {
         label="Автоматическая память"
         hint="Модель будет сама запоминать факты о вас между чатами"
       >
-        <Toggle checked={autoMemory} onChange={setAutoMemory} />
+        <Toggle
+          checked={settings.auto_memory}
+          onChange={(auto_memory) => update({ auto_memory })}
+        />
       </Row>
       <div className="rounded-xl border border-line bg-paper-2/30 p-4">
         <div className="flex items-center justify-between">
@@ -354,62 +331,28 @@ function MemoryTab() {
   );
 }
 
-function ScenariosTab() {
-  return (
-    <Section
-      title="Сценарии"
-      description="Сценарий — это пресет системного промпта и параметров модели. Скоро вы сможете редактировать существующие и создавать свои."
-    >
-      <ScenarioGroup title="Чат" items={chatScenarios} />
-      <ScenarioGroup title="Код" items={codeScenarios} />
-      <ScenarioGroup title="Исследовать" items={researchScenarios} />
-    </Section>
-  );
-}
-
-function NotificationsTab() {
-  const [emailLong, setEmailLong] = useState(true);
-  const [browserPush, setBrowserPush] = useState(false);
-  const [sound, setSound] = useState(true);
-  const [reminders, setReminders] = useState(false);
-  const [productUpdates, setProductUpdates] = useState(true);
-
-  return (
-    <Section title="Уведомления">
-      <Row
-        label="Email о завершении задач"
-        hint="Прислать письмо, когда долгая задача закончится"
-      >
-        <Toggle checked={emailLong} onChange={setEmailLong} />
-      </Row>
-      <Row
-        label="Push в браузере"
-        hint="Браузерные уведомления для активной вкладки"
-      >
-        <Toggle checked={browserPush} onChange={setBrowserPush} />
-      </Row>
-      <Row label="Звук при ответе">
-        <Toggle checked={sound} onChange={setSound} />
-      </Row>
-      <Row
-        label="Напоминания о незавершённых чатах"
-        hint="Подсветим в сайдбаре, если разговор остановился на середине"
-      >
-        <Toggle checked={reminders} onChange={setReminders} />
-      </Row>
-      <Row
-        label="Новости продукта"
-        hint="Только важные апдейты, без спама"
-      >
-        <Toggle checked={productUpdates} onChange={setProductUpdates} />
-      </Row>
-    </Section>
-  );
-}
+type SubscriptionInfo = {
+  plan: string;
+  plan_label: string;
+  daily_messages: number | null;
+};
+type UsageInfo = { request_count: number; daily_limit: number | null };
 
 function SubscriptionTab() {
-  const usage = { current: 23, limit: 50 };
-  const pct = Math.round((usage.current / usage.limit) * 100);
+  const api = useApi();
+  const [sub, setSub] = useState<SubscriptionInfo | null>(null);
+  const [usage, setUsage] = useState<UsageInfo | null>(null);
+
+  useEffect(() => {
+    // read-only заглушки ЛК: тариф и сегодняшнее использование с бэка.
+    api.get<SubscriptionInfo>("/api/me/subscription/").then(setSub).catch(() => {});
+    api.get<UsageInfo>("/api/me/usage/").then(setUsage).catch(() => {});
+  }, [api]);
+
+  const planLabel = sub?.plan_label ?? "Free";
+  const limit = sub?.daily_messages ?? null; // null = безлимит
+  const current = usage?.request_count ?? 0;
+  const pct = limit ? Math.min(100, Math.round((current / limit) * 100)) : 0;
 
   return (
     <Section title="Подписка">
@@ -419,13 +362,15 @@ function SubscriptionTab() {
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
               Текущий план
             </p>
-            <p className="mt-1 text-[20px] font-semibold text-ink">Free</p>
+            <p className="mt-1 text-[20px] font-semibold text-ink">{planLabel}</p>
             <p className="mt-0.5 text-[13px] text-muted">
-              Базовые модели · 50 сообщений в день
+              {limit === null
+                ? "Безлимит сообщений"
+                : `Базовые модели · ${limit} сообщений в день`}
             </p>
           </div>
-          <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-muted ring-1 ring-line">
-            Free
+          <span className="rounded-full bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-muted ring-1 ring-line">
+            {planLabel}
           </span>
         </div>
 
@@ -433,7 +378,7 @@ function SubscriptionTab() {
           <div className="flex items-center justify-between text-[12.5px] text-muted">
             <span>Использовано сегодня</span>
             <span>
-              {usage.current} / {usage.limit}
+              {current} / {limit === null ? "∞" : limit}
             </span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
@@ -525,7 +470,7 @@ function DataTab() {
         <button
           type="button"
           disabled
-          className="rounded-lg border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
         >
           Скоро
         </button>
@@ -534,15 +479,17 @@ function DataTab() {
         <button
           type="button"
           disabled
-          className="rounded-lg border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
+          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
         >
           Открыть
         </button>
       </Row>
 
-      <div className="mt-4 rounded-xl border border-red-200 bg-red-50/40 p-4">
-        <p className="text-[13.5px] font-medium text-red-700">Опасная зона</p>
-        <p className="mt-1 text-[12.5px] text-red-700/70">
+      <div className="mt-4 rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-500/25 dark:bg-red-500/10">
+        <p className="text-[13.5px] font-medium text-red-700 dark:text-red-300">
+          Опасная зона
+        </p>
+        <p className="mt-1 text-[12.5px] text-red-700/70 dark:text-red-300/60">
           Эти действия необратимы.
         </p>
 
@@ -561,43 +508,6 @@ function DataTab() {
           />
         </div>
       </div>
-    </Section>
-  );
-}
-
-function ShortcutsTab() {
-  const shortcuts: { keys: string[]; label: string }[] = [
-    { keys: ["⌘", "K"], label: "Новый чат" },
-    { keys: ["⌘", "\\"], label: "Свернуть / раскрыть сайдбар" },
-    { keys: ["⌘", "F"], label: "Поиск по чатам" },
-    { keys: ["⌘", ","], label: "Открыть настройки" },
-    { keys: ["Enter"], label: "Отправить сообщение" },
-    { keys: ["Shift", "Enter"], label: "Перенос строки" },
-    { keys: ["⌘", "Enter"], label: "Отправить с принудительным «думать»" },
-    { keys: ["Esc"], label: "Закрыть диалог / снять фокус" },
-    { keys: ["↑"], label: "Редактировать последнее сообщение" },
-  ];
-
-  return (
-    <Section
-      title="Горячие клавиши"
-      description="На Windows и Linux вместо ⌘ — Ctrl."
-    >
-      <ul className="divide-y divide-line rounded-xl border border-line bg-white">
-        {shortcuts.map((s) => (
-          <li
-            key={s.label}
-            className="flex items-center justify-between px-4 py-2.5"
-          >
-            <span className="text-[13.5px] text-ink">{s.label}</span>
-            <span className="flex items-center gap-1">
-              {s.keys.map((k, i) => (
-                <Kbd key={i}>{k}</Kbd>
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
     </Section>
   );
 }
@@ -686,7 +596,7 @@ function Toggle({
       onClick={() => onChange(!checked)}
       className={cn(
         "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 outline-none transition-colors duration-200",
-        "focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        "focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand-surface)]",
         checked
           ? "bg-[var(--brand-primary)]"
           : "bg-[var(--brand-line)] hover:bg-[color-mix(in_oklab,var(--brand-line),var(--brand-muted)_18%)]"
@@ -726,7 +636,7 @@ function SegmentedControl<T extends string>({
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12.5px] transition-colors",
               active
-                ? "bg-white text-ink shadow-[0_1px_2px_rgba(9,15,31,0.08)]"
+                ? "bg-surface text-ink shadow-[0_1px_2px_rgba(9,15,31,0.08)] dark:shadow-none dark:ring-1 dark:ring-white/10"
                 : "text-muted hover:text-ink"
             )}
           >
@@ -753,7 +663,7 @@ function SelectBox({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="min-w-[200px] appearance-none rounded-lg border border-line bg-white px-3 py-1.5 pr-8 text-[13px] text-ink outline-none transition-colors hover:bg-paper-2/40 focus:border-[var(--brand-primary)]"
+        className="min-w-[200px] appearance-none rounded-lg border border-line bg-surface px-3 py-1.5 pr-8 text-[13px] text-ink outline-none transition-colors hover:bg-paper-2/40 focus:border-[var(--brand-primary)]"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -811,6 +721,26 @@ function Slider({
   );
 }
 
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="min-w-[220px] rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-ink outline-none transition-colors placeholder:text-muted hover:bg-paper-2/40 focus:border-[var(--brand-primary)]"
+    />
+  );
+}
+
 function Textarea({
   value,
   onChange,
@@ -828,35 +758,8 @@ function Textarea({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full resize-y rounded-lg border border-line bg-white px-3 py-2 text-[13.5px] leading-relaxed text-ink outline-none transition-colors placeholder:text-muted focus:border-[var(--brand-primary)]"
+      className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] leading-relaxed text-ink outline-none transition-colors placeholder:text-muted focus:border-[var(--brand-primary)]"
     />
-  );
-}
-
-function ScenarioGroup({
-  title,
-  items,
-}: {
-  title: string;
-  items: readonly Scenario[];
-}) {
-  return (
-    <div>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
-        {title}
-      </p>
-      <ul className="mt-2 flex flex-col gap-1.5">
-        {items.map((s) => (
-          <li
-            key={s.id}
-            className="rounded-lg border border-line bg-white px-3 py-2"
-          >
-            <p className="text-[13.5px] font-medium text-ink">{s.label}</p>
-            <p className="mt-0.5 text-[12.5px] text-muted">{s.description}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
   );
 }
 
@@ -871,18 +774,10 @@ function DangerButton({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between rounded-lg border border-red-200 bg-white px-3 py-1.5 text-[13px] font-medium text-red-700 transition-colors hover:bg-red-50"
+      className="flex w-full items-center justify-between rounded-lg border border-red-200 bg-surface px-3 py-1.5 text-[13px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:border-red-500/25 dark:text-red-300 dark:hover:bg-red-500/10"
     >
       {label}
       <Trash2 className="h-4 w-4" strokeWidth={1.7} />
     </button>
-  );
-}
-
-function Kbd({ children }: { children: ReactNode }) {
-  return (
-    <kbd className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-md border border-line bg-paper-2/60 px-1.5 font-mono text-[11px] font-medium text-ink-soft">
-      {children}
-    </kbd>
   );
 }

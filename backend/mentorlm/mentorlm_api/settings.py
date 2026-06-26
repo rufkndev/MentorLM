@@ -65,13 +65,19 @@ INSTALLED_APPS = [
 
     # Third-party
     'rest_framework',
+    'corsheaders',
 
     # Local apps
     'apps.core',
+    'apps.users',
+    'apps.conversations',
+    'apps.usage',
+    'apps.billing',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -154,3 +160,34 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Django REST Framework
+# Аутентификация по умолчанию — Clerk JWT (см. apps/users/authentication.py).
+# Источник правды об авторизации — Clerk; наша БД хранит лишь зеркало UserProfile.
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'apps.users.authentication.ClerkJWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+
+# CORS
+CORS_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:3000,http://127.0.0.1:3000',
+    ).split(',')
+    if o.strip()
+]
+
+
+# Clerk — верификация JWT сессии по публичным ключам (JWKS).
+# CLERK_JWKS_URL: https://<your-frontend-api>/.well-known/jwks.json
+# CLERK_ISSUER:   https://<your-frontend-api>  (значение claim `iss` в токене)
+CLERK_JWKS_URL = os.environ.get('CLERK_JWKS_URL', '')
+CLERK_ISSUER = os.environ.get('CLERK_ISSUER', '')

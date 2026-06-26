@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { PanelLeft } from "lucide-react";
 import { AppSidebar } from "@/components/mainapp/AppSidebar";
 import { SettingsDialog } from "@/components/mainapp/SettingsDialog";
+import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 
 export default function ModesLayout({
   children,
@@ -16,7 +17,8 @@ export default function ModesLayout({
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="relative flex min-h-screen text-ink">
+    <SettingsProvider>
+      <div className="relative flex min-h-screen text-ink">
       <AppSidebar
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((v) => !v)}
@@ -63,10 +65,11 @@ export default function ModesLayout({
         />
       </div>
 
-      <SettingsDialog
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-      />
-    </div>
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </div>
+    </SettingsProvider>
   );
 }
