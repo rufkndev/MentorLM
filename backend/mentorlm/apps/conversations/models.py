@@ -16,13 +16,15 @@ class Conversation(models.Model):
     )
     mode = models.CharField(max_length=20, choices=Mode.choices)
     title = models.CharField(max_length=255, blank=True)
+    pinned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Диалог"
         verbose_name_plural = "Диалоги"
-        ordering = ("-updated_at",)
+        # Закреплённые — выше, затем по свежести.
+        ordering = ("-pinned", "-updated_at")
         indexes = [
             # список чатов пользователя в конкретном режиме
             models.Index(fields=["user", "mode"]),

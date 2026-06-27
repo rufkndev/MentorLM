@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "motion/react";
 import { PanelLeft } from "lucide-react";
 import { AppSidebar } from "@/components/mainapp/AppSidebar";
+import { ConversationsProvider } from "@/components/mainapp/ConversationsProvider";
 import { SettingsDialog } from "@/components/mainapp/SettingsDialog";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 
@@ -18,12 +19,15 @@ export default function ModesLayout({
 
   return (
     <SettingsProvider>
+      <ConversationsProvider>
       <div className="relative flex min-h-screen text-ink">
-      <AppSidebar
-        open={sidebarOpen}
-        onToggle={() => setSidebarOpen((v) => !v)}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+      <Suspense fallback={null}>
+        <AppSidebar
+          open={sidebarOpen}
+          onToggle={() => setSidebarOpen((v) => !v)}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+      </Suspense>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="relative flex-1">{children}</main>
@@ -70,6 +74,7 @@ export default function ModesLayout({
           onClose={() => setSettingsOpen(false)}
         />
       </div>
+      </ConversationsProvider>
     </SettingsProvider>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ChatComposer,
@@ -8,6 +9,8 @@ import {
 } from "@/components/mainapp/ChatComposer";
 import { ChatEmpty } from "@/components/mainapp/ChatEmpty";
 import { ChatMessage, type Message } from "@/components/mainapp/ChatMessage";
+import { useConversations } from "@/components/mainapp/ConversationsProvider";
+import { ApiError, useApi } from "@/lib/api";
 import type { Scenario } from "@/lib/mainapp-contents";
 
 type Props = {
@@ -17,14 +20,41 @@ type Props = {
   placeholder?: string;
 };
 
-export function ChatScreen({
+/** Сообщение из истории диалога (см. MessageSerializer на бэке). */
+type ApiMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+};
+
+export function ChatScreen(props: Props) {
+  // useSearchParams требует Suspense-границы при сборке (CSR bailout).
+  return (
+    <Suspense fallback={<div className="h-[calc(100vh-1.5rem)]" />}>
+      <ChatScreenInner {...props} />
+    </Suspense>
+  );
+}
+
+function ChatScreenInner({
   scenarios,
   defaultScenarioId,
   greeting,
   placeholder,
 }: Props) {
+  const api = useApi();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { mode, create, refresh } = useConversations();
+
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sending, setSending] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+
+  // id активного диалога; ref — чтобы сравнивать с URL без перезагрузки истории.
+  const [convId, setConvId] = useState<string | null>(null);
+  const convIdRef = useRef<string | null>(null);
+  convIdRef.current = convId;
 
   useEffect(() => {
     threadRef.current?.scrollTo({
@@ -33,36 +63,113 @@ export function ChatScreen({
     });
   }, [messages]);
 
-  const handleSubmit = ({ text }: ComposerSubmit) => {
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: text,
-    };
-    const placeholderMsg: Message = {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "",
-      thinking: true,
-    };
+  // Подгрузка истории при переходе на /chat?c=<id> (в т.ч. из сайдбара).
+  useEffect(() => {
+    const urlC = searchParams.get("c");
+    if (!urlC) {
+      setConvId(null);
+      setMessages([]);
+      return;
+    }
+    if (urlC === convIdRef.current) return; // уже активен (напр. только создан)
 
-    setMessages((prev) => [...prev, userMsg, placeholderMsg]);
+    let cancelled = false;
+    setConvId(urlC);
+    api
+      .get<{ messages: ApiMessage[] }>(`/api/conversations/${urlC}/`)
+      .then((data) => {
+        if (cancelled) return;
+        setMessages(
+          data.messages.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            content: m.content,
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setMessages([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, api]);
 
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === placeholderMsg.id
-            ? {
-                ...m,
-                thinking: false,
-                content:
-                  "Это пример ответа. Здесь будет потоковый ответ модели — я уже думаю над тем, как лучше объяснить и подобрать материалы под ваш вопрос.",
-              }
-            : m
-        )
-      );
-    }, 900);
-  };
+  const handleSubmit = useCallback(
+    async ({ text, scenarioId }: ComposerSubmit) => {
+      if (sending) return;
+      const systemPrompt =
+        scenarios.find((s) => s.id === scenarioId)?.systemPrompt ?? "";
+
+      setSending(true);
+
+      // Сразу показываем сообщение пользователя и «думаю» — без ожидания сети,
+      // чтобы переход в чат и индикация были мгновенными.
+      const placeholderId = crypto.randomUUID();
+      setMessages((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), role: "user", content: text },
+        { id: placeholderId, role: "assistant", content: "", thinking: true },
+      ]);
+
+      // Создаём диалог при первом сообщении и фиксируем его в URL.
+      let id = convIdRef.current;
+      if (!id) {
+        try {
+          id = await create(mode);
+        } catch {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === placeholderId
+                ? { ...m, thinking: false, content: "Не удалось создать чат." }
+                : m,
+            ),
+          );
+          setSending(false);
+          return;
+        }
+        setConvId(id);
+        convIdRef.current = id;
+        router.replace(`/${mode}?c=${id}`);
+      }
+
+      try {
+        await api.stream(
+          `/api/conversations/${id}/messages/`,
+          { content: text, system_prompt: systemPrompt },
+          {
+            onDelta: (delta) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === placeholderId
+                    ? { ...m, thinking: false, content: m.content + delta }
+                    : m,
+                ),
+              );
+            },
+          },
+        );
+      } catch (err) {
+        const detail = err instanceof ApiError ? err.message : String(err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId
+              ? {
+                  ...m,
+                  thinking: false,
+                  content: `Не удалось получить ответ.\n\n${detail}`,
+                }
+              : m,
+          ),
+        );
+      } finally {
+        setSending(false);
+        // Обновляем сайдбар: заголовок чата и порядок по последней активности.
+        refresh();
+      }
+    },
+    [api, create, mode, refresh, router, scenarios, sending],
+  );
 
   const isEmpty = messages.length === 0;
 
@@ -75,7 +182,7 @@ export function ChatScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.32 }}
+            transition={{ duration: 0.12 }}
             className="flex flex-1 flex-col items-center justify-center px-6"
           >
             <ChatEmpty greeting={greeting} />
@@ -86,6 +193,7 @@ export function ChatScreen({
                 defaultScenarioId={defaultScenarioId}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
+                disabled={sending}
               />
             </div>
           </motion.section>
@@ -95,7 +203,7 @@ export function ChatScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.32 }}
+            transition={{ duration: 0.12 }}
             className="relative flex flex-1 flex-col overflow-hidden"
           >
             <div
@@ -115,6 +223,7 @@ export function ChatScreen({
                 defaultScenarioId={defaultScenarioId}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
+                disabled={sending}
               />
             </div>
           </motion.section>

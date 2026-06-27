@@ -195,6 +195,7 @@ export type ChatPreview = {
   id: string;
   title: string;
   updatedAt: string; // ISO
+  pinned?: boolean;
 };
 
 /**
@@ -221,6 +222,7 @@ export const promptSuggestions = [
  */
 export function groupChatsByDate(chats: readonly ChatPreview[]) {
   const buckets: Record<string, ChatPreview[]> = {
+    Закреплённые: [],
     Сегодня: [],
     Вчера: [],
     "Последние 7 дней": [],
@@ -235,6 +237,11 @@ export function groupChatsByDate(chats: readonly ChatPreview[]) {
   startOfWeek.setDate(startOfWeek.getDate() - 7);
 
   for (const chat of chats) {
+    // Закреплённые показываем отдельной группой сверху.
+    if (chat.pinned) {
+      buckets["Закреплённые"].push(chat);
+      continue;
+    }
     const t = new Date(chat.updatedAt).getTime();
     if (t >= startOfToday.getTime()) buckets["Сегодня"].push(chat);
     else if (t >= startOfYesterday.getTime()) buckets["Вчера"].push(chat);

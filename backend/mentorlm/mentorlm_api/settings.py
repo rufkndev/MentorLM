@@ -191,3 +191,9 @@ CORS_ALLOWED_ORIGINS = [
 # CLERK_ISSUER:   https://<your-frontend-api>  (значение claim `iss` в токене)
 CLERK_JWKS_URL = os.environ.get('CLERK_JWKS_URL', '')
 CLERK_ISSUER = os.environ.get('CLERK_ISSUER', '')
+
+
+# OpenAI — режим «Общий» (chat). Модель задаётся через env, чтобы менять её
+# без правок кода; дефолт — недорогая и быстрая gpt-4o-mini.
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+OPENAI_CHAT_MODEL = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
