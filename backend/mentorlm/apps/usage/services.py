@@ -14,6 +14,8 @@ from .models import Usage
 MODEL_RATES_RUB_PER_1K = {
     "gpt-4o-mini": {"in": Decimal("0.015"), "out": Decimal("0.06")},
     "gpt-4o": {"in": Decimal("0.25"), "out": Decimal("1.0")},
+    # Claude Sonnet 4.6 — режим «Код» ($3/$15 за 1M ≈ ₽/1K при курсе ~90).
+    "claude-sonnet-4-6": {"in": Decimal("0.27"), "out": Decimal("1.35")},
 }
 
 

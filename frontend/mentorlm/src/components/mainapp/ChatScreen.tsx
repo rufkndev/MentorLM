@@ -98,8 +98,6 @@ function ChatScreenInner({
   const handleSubmit = useCallback(
     async ({ text, scenarioId }: ComposerSubmit) => {
       if (sending) return;
-      const systemPrompt =
-        scenarios.find((s) => s.id === scenarioId)?.systemPrompt ?? "";
 
       setSending(true);
 
@@ -136,7 +134,8 @@ function ChatScreenInner({
       try {
         await api.stream(
           `/api/conversations/${id}/messages/`,
-          { content: text, system_prompt: systemPrompt },
+          // Промпт сценария выбирает бэк по scenario_id — клиент его не задаёт.
+          { content: text, scenario_id: scenarioId },
           {
             onDelta: (delta) => {
               setMessages((prev) =>
@@ -168,7 +167,7 @@ function ChatScreenInner({
         refresh();
       }
     },
-    [api, create, mode, refresh, router, scenarios, sending],
+    [api, create, mode, refresh, router, sending],
   );
 
   const isEmpty = messages.length === 0;
@@ -210,7 +209,7 @@ function ChatScreenInner({
               ref={threadRef}
               className="flex-1 overflow-y-auto px-4 [scrollbar-width:thin]"
             >
-              <div className="mx-auto flex max-w-3xl flex-col gap-5 py-6">
+              <div className="mx-auto flex max-w-4xl flex-col gap-5 py-6">
                 {messages.map((m) => (
                   <ChatMessage key={m.id} message={m} />
                 ))}

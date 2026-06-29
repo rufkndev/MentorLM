@@ -32,6 +32,10 @@ type Props = {
   onOpenSettings: () => void;
 };
 
+/** Подпись режима для строки чата в сайдбаре. */
+const labelForMode = (id: ChatPreview["mode"]) =>
+  modes.find((m) => m.id === id)?.label ?? id;
+
 export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -58,15 +62,9 @@ export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
           className="relative z-30 shrink-0 overflow-hidden"
         >
-          <div
-            className="sticky top-3 ml-3 flex h-[calc(100vh-1.5rem)] w-72 flex-col rounded-3xl glass-strong"
-            style={{
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.78) 100%)",
-              boxShadow:
-                "var(--glass-rim), 0 1px 2px rgba(9,15,31,0.04)",
-            }}
-          >
+          {/* Фон — через .glass-strong (у класса есть тёмный вариант), без
+              хардкода белого, иначе сайдбар оставался бы белым в тёмной теме. */}
+          <div className="sticky top-3 ml-3 flex h-[calc(100vh-1.5rem)] w-72 flex-col rounded-3xl glass-strong">
             <SidebarHeader onCollapse={onToggle} />
             <ModeSwitcher pathname={pathname} />
 
@@ -121,7 +119,7 @@ function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
         onClick={onCollapse}
         aria-label="Свернуть сайдбар"
         title="Свернуть сайдбар"
-        className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-white/60 hover:text-ink"
+        className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       >
         <PanelLeftClose className="h-4 w-4" strokeWidth={1.7} />
       </button>
@@ -132,7 +130,7 @@ function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
 function ModeSwitcher({ pathname }: { pathname: string | null }) {
   return (
     <div className="px-3 pt-2">
-      <div className="flex flex-col gap-0.5 rounded-2xl bg-white/45 p-1">
+      <div className="flex flex-col gap-0.5 rounded-2xl bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] p-1">
         {modes.map((mode) => {
           const active = pathname?.startsWith(mode.href);
           return (
@@ -143,7 +141,7 @@ function ModeSwitcher({ pathname }: { pathname: string | null }) {
                 "relative flex h-9 items-center rounded-xl px-3 text-[13.5px] font-medium transition-colors",
                 active
                   ? "text-white"
-                  : "text-ink-soft hover:bg-white/60 hover:text-ink"
+                  : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
               )}
             >
               {active && (
@@ -185,7 +183,7 @@ function SearchInput({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="mt-2 flex h-9 items-center gap-2 rounded-xl bg-white/55 px-3">
+    <div className="mt-2 flex h-9 items-center gap-2 rounded-xl bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] px-3">
       <Search className="h-[14px] w-[14px] text-muted" strokeWidth={1.7} />
       <input
         value={value}
@@ -286,23 +284,31 @@ function ChatRow({
     <li>
       <div
         className={cn(
-          "group flex h-9 items-center gap-2 rounded-xl pl-2 pr-1 text-[13.5px] transition-colors",
+          "group flex items-center gap-2 rounded-xl py-1.5 pl-2 pr-1 text-[13.5px] transition-colors",
           active
             ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
             : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink",
         )}
       >
+        {/* Переход в чат его собственного режима (чаты всех режимов в одном
+            списке). prefetch — мгновенный переход без подгрузки маршрута. */}
         <Link
-          href={`/chat?c=${chat.id}`}
-          className="flex min-w-0 flex-1 items-center gap-1.5"
+          href={`/${chat.mode}?c=${chat.id}`}
+          prefetch
+          className="flex min-w-0 flex-1 flex-col gap-0.5"
         >
-          {chat.pinned && (
-            <Pin
-              className="h-3 w-3 shrink-0 -rotate-45 opacity-70"
-              strokeWidth={2}
-            />
-          )}
-          <span className="truncate">{chat.title}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            {chat.pinned && (
+              <Pin
+                className="h-3 w-3 shrink-0 -rotate-45 opacity-70"
+                strokeWidth={2}
+              />
+            )}
+            <span className="truncate">{chat.title}</span>
+          </span>
+          <span className="truncate font-mono text-[9.5px] uppercase tracking-wider text-muted">
+            {labelForMode(chat.mode)}
+          </span>
         </Link>
 
         <button
@@ -387,7 +393,7 @@ function SidebarFooter({ onOpenSettings }: { onOpenSettings: () => void }) {
       <button
         type="button"
         onClick={onOpenSettings}
-        className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-white/55 hover:text-ink"
+        className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       >
         <Settings className="h-[14px] w-[14px]" strokeWidth={1.7} />
         Настройки

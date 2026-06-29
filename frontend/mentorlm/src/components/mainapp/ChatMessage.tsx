@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { cn } from "@/lib/cn";
+import { Markdown } from "@/components/mainapp/Markdown";
 
 export type Message = {
   id: string;
@@ -27,16 +28,18 @@ export function ChatMessage({ message }: { message: Message }) {
 
       <div
         className={cn(
-          "chat-text max-w-[78%] whitespace-pre-wrap rounded-3xl px-4 py-3",
+          "chat-text max-w-[78%] rounded-3xl px-4 py-3",
           isUser
-            ? "bg-[var(--brand-primary)] text-white shadow-[0_12px_28px_-14px_rgba(23,70,245,0.55)]"
-            : "text-ink"
+            ? "whitespace-pre-wrap bg-[var(--brand-primary)] text-white shadow-[0_12px_28px_-14px_rgba(23,70,245,0.55)]"
+            : "min-w-0 text-ink"
         )}
       >
         {message.thinking ? (
           <ThinkingDots />
-        ) : (
+        ) : isUser ? (
           message.content
+        ) : (
+          <Markdown content={message.content} />
         )}
       </div>
     </motion.div>

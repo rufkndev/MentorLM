@@ -7,10 +7,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.billing.limits import limits_for
+from apps.ai import service as ai_service
 from apps.usage.services import record_usage
 
-from . import services
 from .models import Conversation, Message
 from .serializers import ConversationDetailSerializer, ConversationSerializer
 
@@ -56,11 +55,10 @@ class MessageCreateView(APIView):
         content = (request.data.get("content") or "").strip()
         if not content:
             raise ValidationError({"content": "Пустое сообщение."})
-        scenario_prompt = request.data.get("system_prompt", "") or ""
+        # Системный промпт выбирает бэк по mode + scenario_id; клиент его не задаёт.
+        scenario_id = request.data.get("scenario_id") or None
 
         user = request.user
-        user_settings = user.settings
-        plan_limits = limits_for(user.plan)
 
         # 1. Сохраняем сообщение пользователя; первое — задаёт заголовок чата.
         Message.objects.create(
@@ -72,26 +70,16 @@ class MessageCreateView(APIView):
             conversation.title = content[:40]
             conversation.save(update_fields=["title", "updated_at"])
 
-        # 2. Готовим запрос к модели до старта стрима.
-        model = services.resolve_model(user_settings)
-        system_prompt = services.build_system_prompt(
-            user_settings, conversation.mode, scenario_prompt
-        )
-        history = services.build_context(conversation, user_settings, plan_limits)
-        messages = [{"role": "system", "content": system_prompt}, *history]
+        # 2. Готовим запрос к модели до старта стрима (выбор провайдера/промпта
+        #    и сборка контекста — в едином ИИ-слое apps.ai).
+        ai = ai_service.run_conversation_stream(conversation, scenario_id, user)
+        model = ai.model
 
         def event_stream():
-            usage: dict = {}
+            usage = ai.usage
             assistant_content = ""
             try:
-                deltas = services.stream_chat_completion(
-                    messages,
-                    model=model,
-                    temperature=user_settings.temperature,
-                    response_length=user_settings.response_length,
-                    usage=usage,
-                )
-                for delta in deltas:
+                for delta in ai.deltas:
                     assistant_content += delta
                     yield _sse({"delta": delta})
             except Exception as exc:  # noqa: BLE001 — отдаём ошибку клиенту

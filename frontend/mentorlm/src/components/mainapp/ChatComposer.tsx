@@ -117,7 +117,7 @@ export function ChatComposer({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         "mx-auto w-full",
-        variant === "hero" ? "max-w-2xl" : "max-w-3xl"
+        variant === "hero" ? "max-w-3xl" : "max-w-4xl"
       )}
     >
       <div
@@ -210,7 +210,7 @@ function ScenarioRow({
               "relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
               isActive
                 ? "bg-[var(--brand-ink)] text-white"
-                : "bg-white/55 text-ink-soft hover:bg-white/80 hover:text-ink"
+                : "bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_12%,transparent)] hover:text-ink"
             )}
           >
             <Icon className="h-[14px] w-[14px]" strokeWidth={1.7} />
@@ -243,7 +243,7 @@ function ToolButton({
         "flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors",
         active
           ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
-          : "text-ink-soft hover:bg-white/60 hover:text-ink"
+          : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       )}
     >
       {children}
@@ -278,7 +278,7 @@ function SendButton({
 
 function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
-    <span className="flex items-center gap-1.5 rounded-full bg-white/60 px-2.5 py-1 text-[12px] text-ink-soft">
+    <span className="flex items-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] px-2.5 py-1 text-[12px] text-ink-soft">
       <Paperclip className="h-[13px] w-[13px]" strokeWidth={1.7} />
       <span className="max-w-[160px] truncate">{file.name}</span>
       <button

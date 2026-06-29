@@ -26,6 +26,7 @@ function toPreview(c: ApiConversation): ChatPreview {
   return {
     id: String(c.id),
     title: c.title || "Новый чат",
+    mode: c.mode,
     updatedAt: c.updated_at,
     pinned: c.pinned,
   };
@@ -67,22 +68,22 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const [conversations, setConversations] = useState<readonly ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Тянем диалоги всех режимов сразу — в сайдбаре виден весь список с подписью
+  // режима. Список не зависит от текущего раздела, поэтому при переходе между
+  // чатами/режимами он не перезагружается (переход мгновенный, без мерцания).
   const refresh = useCallback(async () => {
     try {
-      const data = await api.get<ApiConversation[]>(
-        `/api/conversations/?mode=${mode}`,
-      );
-      setConversations(data.map(toPreview));
+      const data = await api.get<ApiConversation[]>("/api/conversations/");
+      setConversations(sortPreviews(data.map(toPreview)));
     } catch {
       // Не залогинен / бэк недоступен — оставляем пустой список.
     } finally {
       setLoading(false);
     }
-  }, [api, mode]);
+  }, [api]);
 
-  // Перезагружаем список при смене режима.
+  // Грузим список один раз при монтировании (refresh стабилен).
   useEffect(() => {
-    setLoading(true);
     refresh();
   }, [refresh]);
 

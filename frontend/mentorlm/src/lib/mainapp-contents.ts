@@ -194,6 +194,7 @@ export const researchDefaultScenarioId = "overview";
 export type ChatPreview = {
   id: string;
   title: string;
+  mode: ModeId; // режим диалога — показываем подпись в сайдбаре
   updatedAt: string; // ISO
   pinned?: boolean;
 };

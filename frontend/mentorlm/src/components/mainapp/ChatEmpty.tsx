@@ -51,7 +51,7 @@ export function PromptSuggestions({
             delay: 0.25 + i * 0.05,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="rounded-full bg-white/55 px-3.5 py-2 text-[13px] text-ink-soft transition-all hover:-translate-y-px hover:bg-white/85 hover:text-ink"
+          className="rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] px-3.5 py-2 text-[13px] text-ink-soft transition-all hover:-translate-y-px hover:bg-[color-mix(in_srgb,var(--brand-ink)_12%,transparent)] hover:text-ink"
         >
           {p}
         </motion.button>

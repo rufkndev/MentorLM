@@ -176,6 +176,137 @@ html[data-theme="dark"] {
   line-height: 1.6;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Markdown в ответах ИИ (.md). Цвета — через --brand-* токены, поэтому стили
+ * автоматически работают и в тёмной теме. Скоуп на .md, чтобы не задеть UI.
+ * ────────────────────────────────────────────────────────────────────────── */
+.md {
+  line-height: 1.6;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0.5em 0;
+}
+.md strong {
+  font-weight: 650;
+  color: var(--brand-ink);
+}
+.md em {
+  font-style: italic;
+}
+.md a {
+  color: var(--brand-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md a:hover {
+  color: var(--brand-primary-hover);
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  font-weight: 650;
+  line-height: 1.3;
+  margin: 1em 0 0.4em;
+  color: var(--brand-ink);
+}
+.md h1 {
+  font-size: 1.3em;
+}
+.md h2 {
+  font-size: 1.18em;
+}
+.md h3 {
+  font-size: 1.06em;
+}
+.md h4 {
+  font-size: 1em;
+}
+.md ul,
+.md ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin: 0.2em 0;
+}
+.md li::marker {
+  color: var(--brand-muted);
+}
+.md blockquote {
+  margin: 0.6em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--brand-line);
+  color: var(--brand-ink-soft);
+}
+.md hr {
+  margin: 1em 0;
+  border: 0;
+  border-top: 1px solid var(--brand-line);
+}
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+/* инлайновый код (не внутри pre) — подложка-плашка */
+.md :not(pre) > code {
+  background: color-mix(in srgb, var(--brand-ink) 8%, transparent);
+  padding: 0.12em 0.36em;
+  border-radius: 6px;
+}
+.md pre {
+  margin: 0.6em 0;
+  padding: 0.85em 1em;
+  border-radius: 14px;
+  overflow-x: auto;
+  background: color-mix(in srgb, var(--brand-ink) 6%, transparent);
+  box-shadow: inset 0 0 0 1px var(--brand-line);
+  scrollbar-width: thin;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.86em;
+  line-height: 1.5;
+}
+.md table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 0.95em;
+}
+.md th,
+.md td {
+  border: 1px solid var(--brand-line);
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.md th {
+  background: color-mix(in srgb, var(--brand-ink) 6%, transparent);
+  font-weight: 600;
+}
+.md img {
+  max-width: 100%;
+  border-radius: 10px;
+}
+
 body {
   background: transparent;
   font-family: var(--font-sans);

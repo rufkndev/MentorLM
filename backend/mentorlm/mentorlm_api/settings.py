@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     # Local apps
     'apps.core',
     'apps.users',
+    'apps.ai',
     'apps.conversations',
     'apps.usage',
     'apps.billing',
@@ -193,7 +194,14 @@ CLERK_JWKS_URL = os.environ.get('CLERK_JWKS_URL', '')
 CLERK_ISSUER = os.environ.get('CLERK_ISSUER', '')
 
 
-# OpenAI — режим «Общий» (chat). Модель задаётся через env, чтобы менять её
-# без правок кода; дефолт — недорогая и быстрая gpt-4o-mini.
+# Модели режимов задаются через env, чтобы менять их без правок кода.
+# Реестр режимов (apps.ai.registry) читает эти значения.
+# OpenAI — режим «Общий» (chat); дефолт — недорогая и быстрая gpt-4o-mini.
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_CHAT_MODEL = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-4o-mini')
+# OpenAI Responses API + web_search — режим «Исследовать».
+OPENAI_RESEARCH_MODEL = os.environ.get('OPENAI_RESEARCH_MODEL', 'gpt-4o')
+
+# Anthropic — режим «Код» (Claude Sonnet 4.6).
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+ANTHROPIC_CODE_MODEL = os.environ.get('ANTHROPIC_CODE_MODEL', 'claude-sonnet-4-6')
