@@ -1,15 +1,22 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useApi } from "@/lib/api";
+import {
+  dropMessages,
+  loadConversationList,
+  saveConversationList,
+} from "@/lib/chat-cache";
 import { type ChatPreview, type ModeId } from "@/lib/mainapp-contents";
 
 /** Ответ бэка по диалогу (см. ConversationSerializer). */
@@ -62,11 +69,14 @@ const ConversationsContext = createContext<ConversationsContextValue | null>(nul
 
 export function ConversationsProvider({ children }: { children: ReactNode }) {
   const api = useApi();
+  const { userId: clerkUserId } = useAuth();
+  const userId = clerkUserId ?? null; // Clerk даёт string | null | undefined
   const pathname = usePathname();
   const mode = modeFromPath(pathname);
 
   const [conversations, setConversations] = useState<readonly ChatPreview[]>([]);
   const [loading, setLoading] = useState(true);
+  const hydratedRef = useRef(false);
 
   // Тянем диалоги всех режимов сразу — в сайдбаре виден весь список с подписью
   // режима. Список не зависит от текущего раздела, поэтому при переходе между
@@ -74,18 +84,33 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const data = await api.get<ApiConversation[]>("/api/conversations/");
-      setConversations(sortPreviews(data.map(toPreview)));
+      const list = sortPreviews(data.map(toPreview));
+      setConversations(list);
+      saveConversationList(userId, list); // обновляем кэш серверной правдой
     } catch {
-      // Не залогинен / бэк недоступен — оставляем пустой список.
+      // Не залогинен / бэк недоступен — оставляем кэш как есть.
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, userId]);
 
-  // Грузим список один раз при монтировании (refresh стабилен).
+  // Мгновенно показываем список из кэша (один раз), затем ревалидируем по сети.
   useEffect(() => {
+    if (!hydratedRef.current) {
+      const cached = loadConversationList(userId);
+      if (cached && cached.length) {
+        setConversations(cached);
+        setLoading(false);
+      }
+      hydratedRef.current = true;
+    }
     refresh();
-  }, [refresh]);
+  }, [userId, refresh]);
+
+  // Сохраняем непустой список в кэш при любых изменениях (вкл. оптимистичные).
+  useEffect(() => {
+    if (conversations.length) saveConversationList(userId, conversations);
+  }, [conversations, userId]);
 
   const create = useCallback(
     async (newMode: ModeId) => {
@@ -102,9 +127,10 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
   const remove = useCallback(
     async (id: string) => {
       setConversations((prev) => prev.filter((c) => c.id !== id));
+      dropMessages(userId, id); // чистим кэш сообщений удалённого чата
       api.delete(`/api/conversations/${id}/`).catch(() => refresh());
     },
-    [api, refresh],
+    [api, refresh, userId],
   );
 
   const rename = useCallback(

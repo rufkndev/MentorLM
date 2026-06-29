@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "motion/react";
 import {
   ChatComposer,
@@ -11,6 +12,7 @@ import { ChatEmpty } from "@/components/mainapp/ChatEmpty";
 import { ChatMessage, type Message } from "@/components/mainapp/ChatMessage";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
 import { ApiError, useApi } from "@/lib/api";
+import { loadMessages, saveMessages } from "@/lib/chat-cache";
 import type { Scenario } from "@/lib/mainapp-contents";
 
 type Props = {
@@ -43,6 +45,8 @@ function ChatScreenInner({
   placeholder,
 }: Props) {
   const api = useApi();
+  const { userId: clerkUserId } = useAuth();
+  const userId = clerkUserId ?? null;
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mode, create, refresh } = useConversations();
@@ -63,7 +67,9 @@ function ChatScreenInner({
     });
   }, [messages]);
 
-  // Подгрузка истории при переходе на /chat?c=<id> (в т.ч. из сайдбара).
+  // Подгрузка истории при переходе на /<mode>?c=<id> (в т.ч. из сайдбара).
+  // Сначала мгновенно показываем кэш, параллельно тянем свежую историю —
+  // переход в чат происходит без пустого экрана и задержки.
   useEffect(() => {
     const urlC = searchParams.get("c");
     if (!urlC) {
@@ -73,27 +79,46 @@ function ChatScreenInner({
     }
     if (urlC === convIdRef.current) return; // уже активен (напр. только создан)
 
-    let cancelled = false;
     setConvId(urlC);
+    const cached = loadMessages(userId, urlC);
+    if (cached) setMessages(cached); // мгновенный рендер из кэша
+
+    let cancelled = false;
     api
       .get<{ messages: ApiMessage[] }>(`/api/conversations/${urlC}/`)
       .then((data) => {
         if (cancelled) return;
-        setMessages(
-          data.messages.map((m) => ({
-            id: String(m.id),
-            role: m.role,
-            content: m.content,
-          })),
-        );
+        const msgs = data.messages.map((m) => ({
+          id: String(m.id),
+          role: m.role,
+          content: m.content,
+        }));
+        setMessages(msgs);
+        saveMessages(userId, urlC, msgs);
       })
       .catch(() => {
-        if (!cancelled) setMessages([]);
+        if (!cancelled && !cached) setMessages([]);
       });
     return () => {
       cancelled = true;
     };
-  }, [searchParams, api]);
+  }, [searchParams, api, userId]);
+
+  // На жёстком обновлении страницы userId от Clerk появляется не сразу. Как
+  // только он готов — подставляем кэш, если история ещё не показана (не трогаем
+  // активный стрим: там messages уже непустой).
+  useEffect(() => {
+    const urlC = searchParams.get("c");
+    if (!urlC || !userId) return;
+    setMessages((prev) => (prev.length ? prev : loadMessages(userId, urlC) ?? prev));
+  }, [userId, searchParams]);
+
+  // Кэшируем сообщения активного чата, когда стрим завершён.
+  useEffect(() => {
+    if (!convId || sending) return;
+    const real = messages.filter((m) => !m.thinking);
+    if (real.length) saveMessages(userId, convId, real);
+  }, [convId, sending, messages, userId]);
 
   const handleSubmit = useCallback(
     async ({ text, scenarioId }: ComposerSubmit) => {
@@ -170,7 +195,9 @@ function ChatScreenInner({
     [api, create, mode, refresh, router, sending],
   );
 
-  const isEmpty = messages.length === 0;
+  // Если в URL есть ?c=<id> — это открытый чат: сразу показываем тред (без
+  // вспышки приветствия и анимации empty→thread), даже пока грузится история.
+  const isEmpty = !searchParams.get("c") && messages.length === 0;
 
   return (
     <div className="flex h-[calc(100vh-1.5rem)] flex-col">
@@ -209,7 +236,7 @@ function ChatScreenInner({
               ref={threadRef}
               className="flex-1 overflow-y-auto px-4 [scrollbar-width:thin]"
             >
-              <div className="mx-auto flex max-w-4xl flex-col gap-5 py-6">
+              <div className="mx-auto flex max-w-5xl flex-col gap-5 py-6">
                 {messages.map((m) => (
                   <ChatMessage key={m.id} message={m} />
                 ))}

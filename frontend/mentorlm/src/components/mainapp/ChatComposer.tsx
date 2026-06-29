@@ -117,7 +117,7 @@ export function ChatComposer({
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
         "mx-auto w-full",
-        variant === "hero" ? "max-w-3xl" : "max-w-4xl"
+        variant === "hero" ? "max-w-3xl" : "max-w-5xl"
       )}
     >
       <div

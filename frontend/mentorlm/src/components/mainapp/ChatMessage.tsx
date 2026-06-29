@@ -28,10 +28,10 @@ export function ChatMessage({ message }: { message: Message }) {
 
       <div
         className={cn(
-          "chat-text max-w-[78%] rounded-3xl px-4 py-3",
+          "chat-text rounded-3xl px-4 py-3",
           isUser
-            ? "whitespace-pre-wrap bg-[var(--brand-primary)] text-white shadow-[0_12px_28px_-14px_rgba(23,70,245,0.55)]"
-            : "min-w-0 text-ink"
+            ? "max-w-[78%] whitespace-pre-wrap bg-[var(--brand-primary)] text-white shadow-[0_12px_28px_-14px_rgba(23,70,245,0.55)]"
+            : "min-w-0 max-w-[92%] flex-1 text-ink"
         )}
       >
         {message.thinking ? (

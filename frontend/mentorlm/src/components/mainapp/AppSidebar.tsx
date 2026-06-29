@@ -41,7 +41,8 @@ export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activeId = searchParams.get("c");
-  const { conversations, rename, remove, togglePin } = useConversations();
+  const { conversations, loading, rename, remove, togglePin } =
+    useConversations();
   const [query, setQuery] = useState("");
 
   const filtered = useMemo<readonly ChatPreview[]>(() => {
@@ -75,9 +76,12 @@ export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
 
             <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:thin]">
               {grouped.length === 0 ? (
-                <p className="mt-6 text-center text-[13px] text-muted">
-                  Чатов пока нет
-                </p>
+                // Пока идёт первая загрузка — молчим, чтобы не мигало «нет чатов».
+                loading ? null : (
+                  <p className="mt-6 text-center text-[13px] text-muted">
+                    Чатов пока нет
+                  </p>
+                )
               ) : (
                 grouped.map(([label, chats]) => (
                   <ChatGroup
