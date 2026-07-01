@@ -34,7 +34,10 @@ export type ComposerSubmit = {
 type Props = {
   onSubmit: (payload: ComposerSubmit) => void;
   scenarios: readonly Scenario[];
-  defaultScenarioId: string;
+  /** Выбранный сценарий — управляется снаружи (ChatScreen), чтобы он сохранялся
+   *  на весь диалог, а не сбрасывался при смене hero↔dock композера. */
+  scenarioId: string;
+  onScenarioChange: (id: string) => void;
   /** "hero" — большой по центру (empty state); "dock" — снизу в трэде. */
   variant?: "hero" | "dock";
   disabled?: boolean;
@@ -67,13 +70,13 @@ const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
 export function ChatComposer({
   onSubmit,
   scenarios,
-  defaultScenarioId,
+  scenarioId,
+  onScenarioChange,
   variant = "dock",
   disabled,
   placeholder = "Спросите что угодно по учёбе…",
 }: Props) {
   const [text, setText] = useState("");
-  const [scenarioId, setScenarioId] = useState<string>(defaultScenarioId);
   const [files, setFiles] = useState<File[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -172,7 +175,7 @@ export function ChatComposer({
       <ScenarioRow
         scenarios={scenarios}
         active={scenarioId}
-        onChange={setScenarioId}
+        onChange={onScenarioChange}
         className="mt-2.5"
       />
     </motion.div>

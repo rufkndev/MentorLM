@@ -14,12 +14,11 @@ except Exception:  # pragma: no cover - окружение без tiktoken
     tiktoken = None
 
 
-# Сколько токенов максимум просим у модели в зависимости от длины ответа.
-RESPONSE_MAX_TOKENS = {
-    "short": 512,
-    "balanced": 1024,
-    "detailed": 2048,
-}
+# Потолок длины ответа — ТОЛЬКО защита от runaway, а НЕ инструмент управления
+# длиной. Поставлен заведомо высоко, чтобы ответ никогда не обрывался на
+# полуслове ни в одном режиме/сценарии. Желаемую длину задаём мягко, через
+# промпт (response_length → директива в prompts.py), а не жёсткой обрезкой.
+MAX_OUTPUT_TOKENS = 16384
 
 
 def _encoding(model: str):
@@ -61,14 +60,17 @@ def resolve_model(mode: ModeConfig, user_settings) -> str:
     return mode.model
 
 
-def build_context(conversation, user_settings, plan_limits, *, model: str) -> list[dict]:
+def build_context(
+    conversation, plan_limits, *, model: str, max_messages: int = 20
+) -> list[dict]:
     """История диалога для модели — «память» чата.
 
-    Берём сообщения по порядку, оставляем последние N (context_size) и обрезаем
-    по бюджету токенов тарифа. System-промпт добавляет провайдер/вьюха отдельно.
+    Берём сообщения по порядку, оставляем последние N (max_messages — из
+    сценария) и обрезаем по бюджету токенов тарифа. System-промпт добавляет
+    провайдер/вьюха отдельно.
     """
     try:
-        max_messages = int(user_settings.context_size)
+        max_messages = int(max_messages)
     except (TypeError, ValueError):
         max_messages = 20
 

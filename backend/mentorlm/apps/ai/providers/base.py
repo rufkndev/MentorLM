@@ -10,7 +10,9 @@ class GenParams:
 
     model: str
     temperature: float
-    response_length: str  # "short" | "balanced" | "detailed"
+    # Длину ответа задаём промптом (см. prompts.py), а не лимитом токенов, чтобы
+    # ответ никогда не обрывался — поэтому max_tokens здесь нет.
+    tools: tuple[str, ...] = ()  # включённые инструменты, напр. ("web_search",)
 
 
 class LLMProvider(Protocol):

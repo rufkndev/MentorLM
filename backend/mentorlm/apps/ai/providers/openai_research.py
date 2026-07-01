@@ -28,12 +28,18 @@ class OpenAIResearchProvider:
 
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
+        # Веб-поиск включаем только если сценарий его запросил (напр. «обзор»
+        # отвечает по знаниям модели без поиска).
+        tools = (
+            [{"type": "web_search"}] if "web_search" in params.tools else []
+        )
+
         completion = ""
         with client.responses.stream(
             model=params.model,
             instructions=system,
             input=history,
-            tools=[{"type": "web_search"}],
+            tools=tools,
         ) as stream:
             for event in stream:
                 if event.type == "response.output_text.delta":

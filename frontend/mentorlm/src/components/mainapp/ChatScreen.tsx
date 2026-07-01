@@ -53,6 +53,9 @@ function ChatScreenInner({
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
+  // Выбранный сценарий держим здесь (а не в композере), чтобы он сохранялся на
+  // весь диалог и не сбрасывался при переходе hero→dock композера.
+  const [scenarioId, setScenarioId] = useState(defaultScenarioId);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // id активного диалога; ref — чтобы сравнивать с URL без перезагрузки истории.
@@ -60,12 +63,16 @@ function ChatScreenInner({
   const convIdRef = useRef<string | null>(null);
   convIdRef.current = convId;
 
+  // Прокручиваем вниз только при ПОЯВЛЕНИИ нового сообщения (отправка, загрузка
+  // истории), а не на каждый токен ответа — иначе экран дёргается вниз при
+  // стриминге. Во время стрима меняется content последнего сообщения, а их
+  // количество — нет, поэтому вид остаётся на месте.
   useEffect(() => {
     threadRef.current?.scrollTo({
       top: threadRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages.length]);
 
   // Подгрузка истории при переходе на /<mode>?c=<id> (в т.ч. из сайдбара).
   // Сначала мгновенно показываем кэш, параллельно тянем свежую историю —
@@ -75,11 +82,13 @@ function ChatScreenInner({
     if (!urlC) {
       setConvId(null);
       setMessages([]);
+      setScenarioId(defaultScenarioId); // новый чат — сценарий на дефолт режима
       return;
     }
     if (urlC === convIdRef.current) return; // уже активен (напр. только создан)
 
     setConvId(urlC);
+    setScenarioId(defaultScenarioId); // другой чат — сбрасываем сценарий на дефолт
     const cached = loadMessages(userId, urlC);
     if (cached) setMessages(cached); // мгновенный рендер из кэша
 
@@ -102,7 +111,7 @@ function ChatScreenInner({
     return () => {
       cancelled = true;
     };
-  }, [searchParams, api, userId]);
+  }, [searchParams, api, userId, defaultScenarioId]);
 
   // На жёстком обновлении страницы userId от Clerk появляется не сразу. Как
   // только он готов — подставляем кэш, если история ещё не показана (не трогаем
@@ -216,7 +225,8 @@ function ChatScreenInner({
               <ChatComposer
                 variant="hero"
                 scenarios={scenarios}
-                defaultScenarioId={defaultScenarioId}
+                scenarioId={scenarioId}
+                onScenarioChange={setScenarioId}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}
@@ -246,7 +256,8 @@ function ChatScreenInner({
             <div className="px-4 pb-5 pt-2">
               <ChatComposer
                 scenarios={scenarios}
-                defaultScenarioId={defaultScenarioId}
+                scenarioId={scenarioId}
+                onScenarioChange={setScenarioId}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}

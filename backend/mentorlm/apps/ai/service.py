@@ -16,6 +16,7 @@ from .context import build_context, resolve_model
 from .prompts import build_system_prompt
 from .providers import GenParams, get_provider
 from .registry import get_mode
+from .scenarios import get_scenario
 
 
 @dataclass
@@ -37,16 +38,22 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
     user_settings = user.settings
     plan_limits = limits_for(user.plan)
 
+    # Сценарий — источник правды о параметрах генерации (температура, длина,
+    # размер контекста, инструменты). Системный промпт собирается из режима +
+    # сценария; клиент присылает только scenario_id.
+    scenario = get_scenario(conversation.mode, scenario_id)
+
     model = resolve_model(mode, user_settings)
     system = build_system_prompt(conversation.mode, scenario_id, user_settings)
     history = build_context(
-        conversation, user_settings, plan_limits, model=model
+        conversation, plan_limits, model=model,
+        max_messages=scenario.context_messages,
     )
 
     params = GenParams(
         model=model,
-        temperature=user_settings.temperature,
-        response_length=user_settings.response_length,
+        temperature=scenario.temperature,
+        tools=scenario.tools,
     )
     usage: dict = {}
     deltas = get_provider(mode.provider).stream(

@@ -10,7 +10,7 @@ from typing import Iterator
 
 from django.conf import settings
 
-from ..context import RESPONSE_MAX_TOKENS, count_tokens
+from ..context import count_tokens
 from .base import GenParams
 
 
@@ -26,17 +26,14 @@ class OpenAIChatProvider:
         from openai import BadRequestError, OpenAI
 
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
-        max_tokens = RESPONSE_MAX_TOKENS.get(
-            params.response_length, RESPONSE_MAX_TOKENS["balanced"]
-        )
         messages = [{"role": "system", "content": system}, *history]
 
         completion = ""
         base_kwargs = dict(
             model=params.model,
             messages=messages,
-            # max_tokens устарел в пользу max_completion_tokens (док OpenAI 2026).
-            max_completion_tokens=max_tokens,
+            # Лимит вывода НЕ задаём: пусть модель допишет ответ полностью и
+            # остановится сама. Длину регулируем промптом, а не обрезкой.
             stream=True,
             stream_options={"include_usage": True},
         )
