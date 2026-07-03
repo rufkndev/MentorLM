@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 
 from django.http import StreamingHttpResponse
 from django.utils import timezone
@@ -8,14 +9,28 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ai import service as ai_service
+from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
 
 from .models import Conversation, Message
 from .serializers import ConversationDetailSerializer, ConversationSerializer
 
 
+def _purge_expired(user) -> None:
+    """Ленивая чистка: удалить диалоги старше настройки хранения пользователя.
+
+    Автоудаление по последней активности (updated_at). retention=0 — не удалять.
+    Дешёвых фоновых задач в MVP нет, поэтому чистим при обращении к списку чатов.
+    """
+    days = getattr(user.settings, "chat_retention_days", 0)
+    if not days:
+        return
+    cutoff = timezone.now() - timedelta(days=days)
+    Conversation.objects.filter(user=user, updated_at__lt=cutoff).delete()
+
+
 class ConversationListCreateView(generics.ListCreateAPIView):
-    """GET /api/conversations/?mode=chat — список; POST — новый пустой диалог."""
+    """GET /api/conversations/?mode=chat — список; POST — новый; DELETE — все."""
 
     serializer_class = ConversationSerializer
 
@@ -26,11 +41,20 @@ class ConversationListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(mode=mode)
         return qs
 
+    def list(self, request, *args, **kwargs):
+        _purge_expired(request.user)
+        return super().list(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         mode = self.request.data.get("mode", Conversation.Mode.CHAT)
         if mode not in Conversation.Mode.values:
             raise ValidationError({"mode": "Недопустимый режим."})
         serializer.save(user=self.request.user, mode=mode)
+
+    def delete(self, request, *args, **kwargs):
+        """Удалить все диалоги пользователя (опасная зона настроек)."""
+        Conversation.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -102,6 +126,9 @@ class MessageCreateView(APIView):
                         tokens_out=usage.get("completion_tokens", 0),
                         model=model,
                     )
+                    # Глобальная память: в фоне извлекаем устойчивые факты о
+                    # пользователе (если включена автопамять). Не блокирует ответ.
+                    extract_facts_in_background(user, conversation)
                 yield _sse({"done": True, "message_id": message_id})
 
         response = StreamingHttpResponse(

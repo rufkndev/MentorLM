@@ -6,8 +6,6 @@
 
 from __future__ import annotations
 
-from .registry import ModeConfig
-
 try:  # tiktoken не критичен — при отсутствии считаем токены грубой оценкой
     import tiktoken
 except Exception:  # pragma: no cover - окружение без tiktoken
@@ -44,20 +42,6 @@ def count_tokens(text: str, model: str) -> int:
         # ~4 символа на токен — достаточно для обрезки контекста.
         return max(1, len(text) // 4)
     return len(enc.encode(text))
-
-
-def resolve_model(mode: ModeConfig, user_settings) -> str:
-    """Реальный id модели режима.
-
-    Для режима «Общий» уважаем выбор пользователя в настройках, если это похоже
-    на OpenAI-модель (default_model хранит и продуктовые плейсхолдеры). Для
-    остальных режимов модель задаёт реестр — её нельзя переопределить из настроек.
-    """
-    if mode.provider == "openai_chat":
-        chosen = (getattr(user_settings, "default_model", "") or "").strip()
-        if chosen.startswith("gpt-"):
-            return chosen
-    return mode.model
 
 
 def build_context(

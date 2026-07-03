@@ -10,49 +10,75 @@ import {
   type ReactNode,
 } from "react";
 import { useApi } from "@/lib/api";
+import type {
+  ContextDepth,
+  Creativity,
+  EducationLevel,
+  LengthPref,
+  MemoryScope,
+  MemoryUse,
+  ModelTier,
+  ReasoningDepth,
+  RetentionDays,
+} from "@/lib/settings-contents";
 
 /* ── Тип настроек (зеркало UserSettingsSerializer на бэке) ── */
 export type Theme = "system" | "light" | "dark";
 export type FontSize = "sm" | "md" | "lg";
-export type ResponseLength = "short" | "balanced" | "detailed";
 
 export type Settings = {
+  // внешний вид / поведение
   theme: Theme;
   interface_lang: string;
   font_size: FontSize;
-  show_suggestions: boolean;
   auto_scroll: boolean;
-  default_model: string;
-  temperature: number;
-  response_length: ResponseLength;
-  context_size: string;
-  streaming: boolean;
-  web_search: boolean;
+  // модель ИИ (мягкие предпочтения поверх сценария)
+  chat_model: ModelTier;
+  code_model: ModelTier;
+  research_model: ModelTier;
+  creativity: Creativity;
+  response_length_preference: LengthPref;
+  reasoning_depth: ReasoningDepth;
+  // память / персональные инструкции
   nickname: string;
   occupation: string;
+  education_level: EducationLevel;
+  field_of_study: string;
+  learning_goals: string;
   custom_about: string;
   custom_style: string;
+  context_depth: ContextDepth;
   auto_memory: boolean;
+  memory_scope: MemoryScope;
+  memory_use: MemoryUse;
+  // данные
+  chat_retention_days: RetentionDays;
 };
 
-/* Значения по умолчанию = дефолты модели UserSettings. */
+/* Значения по умолчанию = дефолты модели UserSettings (apps/ai/preferences.py DEFAULTS). */
 export const DEFAULT_SETTINGS: Settings = {
   theme: "system",
   interface_lang: "ru",
   font_size: "md",
-  show_suggestions: true,
   auto_scroll: true,
-  default_model: "mentor-pro",
-  temperature: 0.7,
-  response_length: "balanced",
-  context_size: "20",
-  streaming: true,
-  web_search: false,
+  chat_model: "default",
+  code_model: "default",
+  research_model: "default",
+  creativity: "balanced",
+  response_length_preference: "default",
+  reasoning_depth: "auto",
   nickname: "",
   occupation: "",
+  education_level: "",
+  field_of_study: "",
+  learning_goals: "",
   custom_about: "",
   custom_style: "",
+  context_depth: "normal",
   auto_memory: true,
+  memory_scope: "balanced",
+  memory_use: "auto",
+  chat_retention_days: 0,
 };
 
 export const THEME_STORAGE_KEY = "mentorlm-theme";

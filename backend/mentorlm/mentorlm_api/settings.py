@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'apps.conversations',
     'apps.usage',
     'apps.billing',
+    'apps.memory',
 ]
 
 MIDDLEWARE = [
@@ -201,7 +202,19 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 OPENAI_CHAT_MODEL = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5.5')
 # OpenAI Responses API + web_search — режим «Исследовать».
 OPENAI_RESEARCH_MODEL = os.environ.get('OPENAI_RESEARCH_MODEL', 'gpt-5.5')
+# Дешёвая модель для извлечения фактов глобальной памяти (apps.memory).
+OPENAI_MEMORY_MODEL = os.environ.get('OPENAI_MEMORY_MODEL', 'gpt-4o-mini')
 
 # Anthropic — режим «Код» (Claude Sonnet 4.6).
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 ANTHROPIC_CODE_MODEL = os.environ.get('ANTHROPIC_CODE_MODEL', 'claude-sonnet-4-6')
+
+# Тиры моделей для пользовательской настройки «Модель ИИ» (apps.ai.preferences):
+# продуктовый выбор default/fast/quality маппится в реальные id. Если тир не
+# задан в env — берётся базовая модель режима (выше).
+OPENAI_CHAT_MODEL_FAST = os.environ.get('OPENAI_CHAT_MODEL_FAST', '')
+OPENAI_CHAT_MODEL_QUALITY = os.environ.get('OPENAI_CHAT_MODEL_QUALITY', '')
+ANTHROPIC_CODE_MODEL_FAST = os.environ.get('ANTHROPIC_CODE_MODEL_FAST', '')
+ANTHROPIC_CODE_MODEL_QUALITY = os.environ.get('ANTHROPIC_CODE_MODEL_QUALITY', '')
+OPENAI_RESEARCH_MODEL_FAST = os.environ.get('OPENAI_RESEARCH_MODEL_FAST', '')
+OPENAI_RESEARCH_MODEL_QUALITY = os.environ.get('OPENAI_RESEARCH_MODEL_QUALITY', '')

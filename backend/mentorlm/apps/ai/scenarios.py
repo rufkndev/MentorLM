@@ -48,6 +48,10 @@ class ScenarioConfig:
     id: str
     system_prompt: str
     temperature: float = 0.4
+    # Границы температуры для мягкого сдвига настройкой «Креативность»
+    # (apps.ai.preferences). None → окно ±0.2 вокруг temperature по умолчанию.
+    temperature_min: float | None = None
+    temperature_max: float | None = None
     response_length: ResponseLength = "balanced"
     context_messages: int = 20
     tools: tuple[Tool, ...] = ()

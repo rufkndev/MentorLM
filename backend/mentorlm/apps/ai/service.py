@@ -11,8 +11,10 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from apps.billing.limits import limits_for
+from apps.memory.services import build_memory_block
 
-from .context import build_context, resolve_model
+from .context import build_context
+from .preferences import resolve_preferences
 from .prompts import build_system_prompt
 from .providers import GenParams, get_provider
 from .registry import get_mode
@@ -38,25 +40,29 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
     user_settings = user.settings
     plan_limits = limits_for(user.plan)
 
-    # Сценарий — источник правды о параметрах генерации (температура, длина,
-    # размер контекста, инструменты). Системный промпт собирается из режима +
-    # сценария; клиент присылает только scenario_id.
+    # Сценарий — база параметров генерации (температура, длина, размер контекста,
+    # инструменты) и их границы. Пользовательские настройки согласуются с ним
+    # мягким сдвигом в этих границах (resolve_preferences). Клиент присылает
+    # только scenario_id и не может подменить ни промпт, ни параметры.
     scenario = get_scenario(conversation.mode, scenario_id)
+    prefs = resolve_preferences(mode, scenario, user_settings)
 
-    model = resolve_model(mode, user_settings)
-    system = build_system_prompt(conversation.mode, scenario_id, user_settings)
+    # Глобальная память: подмешиваем известные факты о пользователе (если
+    # включено настройкой memory_use). Пусто — блок просто не добавится.
+    memory_block = build_memory_block(user_settings)
+    system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
     history = build_context(
-        conversation, plan_limits, model=model,
-        max_messages=scenario.context_messages,
+        conversation, plan_limits, model=prefs.model,
+        max_messages=prefs.context_messages,
     )
 
     params = GenParams(
-        model=model,
-        temperature=scenario.temperature,
+        model=prefs.model,
+        temperature=prefs.temperature,
         tools=scenario.tools,
     )
     usage: dict = {}
     deltas = get_provider(mode.provider).stream(
         system=system, history=history, params=params, usage=usage
     )
-    return AIStream(deltas=deltas, model=model, usage=usage)
+    return AIStream(deltas=deltas, model=prefs.model, usage=usage)

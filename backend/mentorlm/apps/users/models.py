@@ -1,5 +1,18 @@
 from django.db import models
 
+from apps.ai.preferences import (
+    CONTEXT_DEPTH_CHOICES,
+    CREATIVITY_CHOICES,
+    DEFAULTS,
+    EDUCATION_LEVEL_CHOICES,
+    MEMORY_SCOPE_CHOICES,
+    MEMORY_USE_CHOICES,
+    MODEL_TIER_CHOICES,
+    REASONING_DEPTH_CHOICES,
+    RESPONSE_LENGTH_PREF_CHOICES,
+    RETENTION_CHOICES,
+)
+
 
 class UserProfile(models.Model):
     """Локальное отражение пользователя Clerk.
@@ -57,11 +70,6 @@ class UserSettings(models.Model):
         MD = "md", "Средний"
         LG = "lg", "Крупный"
 
-    class ResponseLength(models.TextChoices):
-        SHORT = "short", "Короткие"
-        BALANCED = "balanced", "Средние"
-        DETAILED = "detailed", "Подробные"
-
     user = models.OneToOneField(
         UserProfile,
         on_delete=models.CASCADE,
@@ -76,27 +84,68 @@ class UserSettings(models.Model):
     font_size = models.CharField(
         max_length=10, choices=FontSize.choices, default=FontSize.MD
     )
-    show_suggestions = models.BooleanField(default=True)
     auto_scroll = models.BooleanField(default=True)
 
-    # — Параметры модели ИИ (применяются к AI-вызовам, когда появится AI-слой) —
-    default_model = models.CharField(max_length=50, blank=True)
-    temperature = models.FloatField(default=0.7)
-    response_length = models.CharField(
-        max_length=20,
-        choices=ResponseLength.choices,
-        default=ResponseLength.BALANCED,
+    # — Данные —
+    # Автоудаление диалогов старше N дней (по последней активности). 0 — не удалять.
+    # Значения из RETENTION_CHOICES; чистка ленивая (при запросе списка чатов).
+    chat_retention_days = models.PositiveIntegerField(
+        choices=RETENTION_CHOICES, default=DEFAULTS["chat_retention_days"]
     )
-    context_size = models.CharField(max_length=10, default="20")
-    streaming = models.BooleanField(default=True)
-    web_search = models.BooleanField(default=False)
 
-    # — Память и персональные инструкции (≈ Claude «Personal preferences») —
+    # — Параметры модели ИИ —
+    # Выбор модели по режимам — продуктовые тиры (default/fast/quality), бэк
+    # маппит в реальные id (apps.ai.preferences). Креативность/длина/глубина —
+    # мягкие сдвиги поверх сценария, а не жёсткие значения (не перекрывают
+    # сценарий и им не перекрываются — согласуются в preferences.resolve_*).
+    chat_model = models.CharField(
+        max_length=20, choices=MODEL_TIER_CHOICES, default=DEFAULTS["chat_model"]
+    )
+    code_model = models.CharField(
+        max_length=20, choices=MODEL_TIER_CHOICES, default=DEFAULTS["code_model"]
+    )
+    research_model = models.CharField(
+        max_length=20, choices=MODEL_TIER_CHOICES, default=DEFAULTS["research_model"]
+    )
+    creativity = models.CharField(
+        max_length=20, choices=CREATIVITY_CHOICES, default=DEFAULTS["creativity"]
+    )
+    response_length_preference = models.CharField(
+        max_length=20,
+        choices=RESPONSE_LENGTH_PREF_CHOICES,
+        default=DEFAULTS["response_length_preference"],
+    )
+    reasoning_depth = models.CharField(
+        max_length=20,
+        choices=REASONING_DEPTH_CHOICES,
+        default=DEFAULTS["reasoning_depth"],
+    )
+
+    # — Память и персональные инструкции —
     nickname = models.CharField(max_length=100, blank=True)
     occupation = models.CharField(max_length=150, blank=True)
+    education_level = models.CharField(
+        max_length=20,
+        choices=EDUCATION_LEVEL_CHOICES,
+        blank=True,
+        default=DEFAULTS["education_level"],
+    )
+    field_of_study = models.CharField(max_length=150, blank=True)
+    learning_goals = models.TextField(blank=True)
     custom_about = models.TextField(blank=True)
     custom_style = models.TextField(blank=True)
-    auto_memory = models.BooleanField(default=True)
+    context_depth = models.CharField(
+        max_length=20,
+        choices=CONTEXT_DEPTH_CHOICES,
+        default=DEFAULTS["context_depth"],
+    )
+    auto_memory = models.BooleanField(default=DEFAULTS["auto_memory"])
+    memory_scope = models.CharField(
+        max_length=20, choices=MEMORY_SCOPE_CHOICES, default=DEFAULTS["memory_scope"]
+    )
+    memory_use = models.CharField(
+        max_length=20, choices=MEMORY_USE_CHOICES, default=DEFAULTS["memory_use"]
+    )
 
     updated_at = models.DateTimeField(auto_now=True)
 

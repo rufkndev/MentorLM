@@ -21,7 +21,22 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useApi } from "@/lib/api";
-import { useSettings } from "@/components/mainapp/SettingsProvider";
+import { useSettings, type Settings } from "@/components/mainapp/SettingsProvider";
+import { useConversations } from "@/components/mainapp/ConversationsProvider";
+import {
+  CONTEXT_DEPTH_OPTIONS,
+  CREATIVITY_OPTIONS,
+  EDUCATION_LEVEL_OPTIONS,
+  LENGTH_PREF_OPTIONS,
+  MEMORY_SCOPE_OPTIONS,
+  MEMORY_USE_OPTIONS,
+  MODEL_MODE_FIELDS,
+  MODEL_TIER_OPTIONS,
+  REASONING_DEPTH_OPTIONS,
+  RETENTION_OPTIONS,
+  type EducationLevel,
+  type RetentionDays,
+} from "@/lib/settings-contents";
 
 type TabId = "general" | "model" | "memory" | "subscription" | "data";
 
@@ -167,15 +182,6 @@ function GeneralTab() {
           ]}
         />
       </Row>
-      <Row
-        label="Подсказки промптов"
-        hint="Показывать примеры запросов на пустом экране"
-      >
-        <Toggle
-          checked={settings.show_suggestions}
-          onChange={(show_suggestions) => update({ show_suggestions })}
-        />
-      </Row>
     </Section>
   );
 }
@@ -184,77 +190,60 @@ function ModelTab() {
   const { settings, update } = useSettings();
 
   return (
-    <Section
-      title="Модель ИИ"
-      description="Параметры, с которыми модель отвечает по умолчанию. Каждый сценарий может переопределять их."
-    >
-      <Row label="Модель по умолчанию" hint="Используется во всех режимах">
-        <SelectBox
-          value={settings.default_model}
-          onChange={(default_model) => update({ default_model })}
-          options={[
-            { value: "mentor-pro", label: "Mentor Pro — умная, медленнее" },
-            { value: "mentor-lite", label: "Mentor Lite — быстрая" },
-            { value: "mentor-vision", label: "Mentor Vision — с картинками" },
-          ]}
-        />
-      </Row>
-      <Row label="Длина ответов">
-        <SegmentedControl
-          value={settings.response_length}
-          onChange={(response_length) => update({ response_length })}
-          options={[
-            { value: "short", label: "Короткие" },
-            { value: "balanced", label: "Средние" },
-            { value: "detailed", label: "Подробные" },
-          ]}
-        />
-      </Row>
-      <Row
-        label="Креативность"
-        hint="0 — точные предсказуемые ответы; 1 — свободные и творческие"
+    <div className="flex flex-col gap-7">
+      <Section
+        title="Модель ИИ"
+        description="Мягкие предпочтения поверх сценариев. Каждый сценарий задаёт свою основу — эти настройки лишь смещают её в допустимых пределах, не ломая задачу сценария."
       >
-        <Slider
-          value={settings.temperature}
-          min={0}
-          max={1}
-          step={0.1}
-          onChange={(temperature) => update({ temperature })}
-          format={(v) => v.toFixed(1)}
-        />
-      </Row>
-      <Row label="Длина контекста" hint="Сколько прошлых сообщений учитывать">
-        <SelectBox
-          value={settings.context_size}
-          onChange={(context_size) => update({ context_size })}
-          options={[
-            { value: "5", label: "5 сообщений" },
-            { value: "10", label: "10 сообщений" },
-            { value: "20", label: "20 сообщений" },
-            { value: "50", label: "50 сообщений" },
-            { value: "all", label: "Весь чат" },
-          ]}
-        />
-      </Row>
-      <Row
-        label="Потоковая выдача"
-        hint="Печатать ответ постепенно, как только модель его генерирует"
+        {MODEL_MODE_FIELDS.map((f) => (
+          <Row key={f.key} label={f.label} hint={f.hint}>
+            <SegmentedControl
+              value={settings[f.key]}
+              onChange={(v) => update({ [f.key]: v } as Partial<Settings>)}
+              options={MODEL_TIER_OPTIONS}
+            />
+          </Row>
+        ))}
+      </Section>
+
+      <Section
+        title="Стиль ответов"
+        description="Применяется во всех режимах поверх выбранного сценария."
       >
-        <Toggle
-          checked={settings.streaming}
-          onChange={(streaming) => update({ streaming })}
-        />
-      </Row>
-      <Row
-        label="Поиск в интернете"
-        hint="Разрешить модели искать актуальную информацию"
-      >
-        <Toggle
-          checked={settings.web_search}
-          onChange={(web_search) => update({ web_search })}
-        />
-      </Row>
-    </Section>
+        <Row
+          label="Креативность"
+          hint="Сдвигает «температуру» сценария к точным или к более свободным ответам"
+        >
+          <SegmentedControl
+            value={settings.creativity}
+            onChange={(creativity) => update({ creativity })}
+            options={CREATIVITY_OPTIONS}
+          />
+        </Row>
+        <Row
+          label="Длина ответов"
+          hint="Мягко короче или подробнее — но не короче, чем требует формат сценария"
+        >
+          <SegmentedControl
+            value={settings.response_length_preference}
+            onChange={(response_length_preference) =>
+              update({ response_length_preference })
+            }
+            options={LENGTH_PREF_OPTIONS}
+          />
+        </Row>
+        <Row
+          label="Глубина проработки"
+          hint="Быстрее и проще или тщательнее с проверкой логики и ограничений"
+        >
+          <SegmentedControl
+            value={settings.reasoning_depth}
+            onChange={(reasoning_depth) => update({ reasoning_depth })}
+            options={REASONING_DEPTH_OPTIONS}
+          />
+        </Row>
+      </Section>
+    </div>
   );
 }
 
@@ -262,72 +251,204 @@ function MemoryTab() {
   const { settings, update } = useSettings();
 
   return (
-    <Section
-      title="Память и инструкции"
-      description="Эти данные модель будет использовать в каждом разговоре. Можно оставить пустым."
-    >
-      <Row label="Как к вам обращаться" hint="Имя или ник для ответов модели">
-        <TextInput
-          value={settings.nickname}
-          onChange={(nickname) => update({ nickname })}
-          placeholder="Например: Артём"
-        />
-      </Row>
-      <Row label="Чем вы занимаетесь" hint="Помогает модели подбирать примеры">
-        <TextInput
-          value={settings.occupation}
-          onChange={(occupation) => update({ occupation })}
-          placeholder="Например: студент-программист"
-        />
-      </Row>
-      <Field
-        label="Что важно знать о вас"
-        hint="Например: студент 3 курса CS; интересуют ML и алгоритмы; учу английский"
+    <div className="flex flex-col gap-7">
+      <Section
+        title="О вас"
+        description="Модель учитывает это в каждом разговоре, чтобы подбирать примеры и уровень объяснений. Можно оставить пустым."
       >
-        <Textarea
-          value={settings.custom_about}
-          onChange={(custom_about) => update({ custom_about })}
-          placeholder="Расскажите о себе, своей учёбе и интересах…"
-          rows={4}
-        />
-      </Field>
-      <Field
-        label="Как вы хотите получать ответы"
-        hint="Например: короче, на русском, с примерами кода; не извиняйся, переходи сразу к делу"
+        <Row label="Как к вам обращаться" hint="Имя или ник для ответов модели">
+          <TextInput
+            value={settings.nickname}
+            onChange={(nickname) => update({ nickname })}
+            placeholder="Например: Артём"
+          />
+        </Row>
+        <Row label="Чем вы занимаетесь" hint="Помогает подбирать примеры">
+          <TextInput
+            value={settings.occupation}
+            onChange={(occupation) => update({ occupation })}
+            placeholder="Например: студент-программист"
+          />
+        </Row>
+        <Row label="Уровень обучения" hint="Влияет на глубину объяснений и терминологию">
+          <SelectBox
+            value={settings.education_level}
+            onChange={(v) =>
+              update({ education_level: v as EducationLevel })
+            }
+            options={EDUCATION_LEVEL_OPTIONS}
+          />
+        </Row>
+        <Row
+          label="Направление / специальность"
+          hint="Помогает подбирать предметные примеры"
+        >
+          <TextInput
+            value={settings.field_of_study}
+            onChange={(field_of_study) => update({ field_of_study })}
+            placeholder="Например: программная инженерия"
+          />
+        </Row>
+        <Field
+          label="Цели обучения"
+          hint="Например: подготовиться к экзамену, закрыть практические работы, разобраться в алгоритмах"
+        >
+          <Textarea
+            value={settings.learning_goals}
+            onChange={(learning_goals) => update({ learning_goals })}
+            placeholder="Чего вы хотите достичь…"
+            rows={3}
+          />
+        </Field>
+        <Field
+          label="Что ещё важно знать о вас"
+          hint="Например: студент 3 курса CS; интересуют ML и алгоритмы; учу английский"
+        >
+          <Textarea
+            value={settings.custom_about}
+            onChange={(custom_about) => update({ custom_about })}
+            placeholder="Расскажите о себе, своей учёбе и интересах…"
+            rows={4}
+          />
+        </Field>
+        <Field
+          label="Как вы хотите получать ответы"
+          hint="Мягкая инструкция поверх сценария. Например: короче, с примерами кода, без воды"
+        >
+          <Textarea
+            value={settings.custom_style}
+            onChange={(custom_style) => update({ custom_style })}
+            placeholder="Опишите предпочитаемый стиль ответов…"
+            rows={4}
+          />
+        </Field>
+      </Section>
+
+      <Section
+        title="Память диалога"
+        description="Сколько прошлого контекста учитывать. Итог ограничивают сценарий и ваш тариф."
       >
-        <Textarea
-          value={settings.custom_style}
-          onChange={(custom_style) => update({ custom_style })}
-          placeholder="Опишите предпочитаемый стиль ответов…"
-          rows={4}
-        />
-      </Field>
-      <Row
-        label="Автоматическая память"
-        hint="Модель будет сама запоминать факты о вас между чатами"
+        <Row
+          label="Глубина памяти"
+          hint="Больше истории — точнее для сложных задач, но дороже и медленнее"
+        >
+          <SegmentedControl
+            value={settings.context_depth}
+            onChange={(context_depth) => update({ context_depth })}
+            options={CONTEXT_DEPTH_OPTIONS}
+          />
+        </Row>
+      </Section>
+
+      <Section
+        title="Долговременная память"
+        description="Устойчивые факты о вас между чатами. Скоро — сейчас настройки сохраняются, а само хранилище фактов появится позже."
       >
-        <Toggle
-          checked={settings.auto_memory}
-          onChange={(auto_memory) => update({ auto_memory })}
-        />
-      </Row>
-      <div className="rounded-xl border border-line bg-paper-2/30 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-[13.5px] font-medium text-ink">Сохранённые факты</p>
-          <button
-            type="button"
-            className="text-[12.5px] text-muted hover:text-ink"
-            disabled
-          >
-            Очистить все
-          </button>
-        </div>
-        <p className="mt-1 text-[12.5px] text-muted">
-          Пока ничего не сохранено. Модель будет добавлять сюда факты, которые
-          посчитает важными.
+        <Row
+          label="Автоматическая память"
+          hint="Разрешить модели самой запоминать полезные факты о вас"
+        >
+          <Toggle
+            checked={settings.auto_memory}
+            onChange={(auto_memory) => update({ auto_memory })}
+          />
+        </Row>
+        <Row
+          label="Объём автопамяти"
+          hint="Насколько подробно запоминать учебный контекст"
+        >
+          <SegmentedControl
+            value={settings.memory_scope}
+            onChange={(memory_scope) => update({ memory_scope })}
+            options={MEMORY_SCOPE_OPTIONS}
+          />
+        </Row>
+        <Row
+          label="Использование памяти"
+          hint="Насколько активно подмешивать сохранённые факты в ответы"
+        >
+          <SegmentedControl
+            value={settings.memory_use}
+            onChange={(memory_use) => update({ memory_use })}
+            options={MEMORY_USE_OPTIONS}
+          />
+        </Row>
+        <SavedFacts />
+      </Section>
+    </div>
+  );
+}
+
+type MemoryFact = { id: number; content: string; created_at: string };
+
+function SavedFacts() {
+  const api = useApi();
+  const [facts, setFacts] = useState<MemoryFact[] | null>(null);
+
+  useEffect(() => {
+    api
+      .get<MemoryFact[]>("/api/memory/facts/")
+      .then(setFacts)
+      .catch(() => setFacts([]));
+  }, [api]);
+
+  const clearAll = () => {
+    setFacts([]);
+    api.delete("/api/memory/facts/").catch(() => {});
+  };
+  const removeOne = (id: number) => {
+    setFacts((prev) => prev?.filter((f) => f.id !== id) ?? null);
+    api.delete(`/api/memory/facts/${id}/`).catch(() => {});
+  };
+
+  const count = facts?.length ?? 0;
+
+  return (
+    <div className="rounded-xl border border-line bg-paper-2/30 p-4">
+      <div className="flex items-center justify-between">
+        <p className="text-[13.5px] font-medium text-ink">
+          Сохранённые факты{count > 0 && ` · ${count}`}
         </p>
+        <button
+          type="button"
+          onClick={clearAll}
+          disabled={count === 0}
+          className="text-[12.5px] text-muted transition-colors hover:text-ink disabled:opacity-50 disabled:hover:text-muted"
+        >
+          Очистить все
+        </button>
       </div>
-    </Section>
+
+      {facts === null ? (
+        <p className="mt-2 text-[12.5px] text-muted">Загрузка…</p>
+      ) : count === 0 ? (
+        <p className="mt-1 text-[12.5px] text-muted">
+          Пока ничего не сохранено. Если включена автоматическая память, модель
+          будет добавлять сюда устойчивые факты о вас из диалогов.
+        </p>
+      ) : (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {facts.map((f) => (
+            <li
+              key={f.id}
+              className="group flex items-start justify-between gap-2 rounded-lg bg-surface/60 px-2.5 py-1.5"
+            >
+              <span className="text-[12.5px] leading-snug text-ink-soft">
+                {f.content}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeOne(f.id)}
+                aria-label="Удалить факт"
+                className="mt-0.5 shrink-0 text-muted opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
+              >
+                <X className="h-3.5 w-3.5" strokeWidth={1.7} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -449,40 +570,34 @@ function SubscriptionTab() {
 }
 
 function DataTab() {
-  const [improveModel, setImproveModel] = useState(false);
-  const [saveHistory, setSaveHistory] = useState(true);
+  const { settings, update } = useSettings();
+  const api = useApi();
+  const { refresh } = useConversations();
+
+  const deleteAllChats = () => {
+    if (!window.confirm("Удалить все чаты безвозвратно?")) return;
+    api
+      .delete("/api/conversations/")
+      .then(() => refresh())
+      .catch(() => {});
+  };
 
   return (
     <Section title="Данные и приватность">
       <Row
-        label="Использовать чаты для улучшения модели"
-        hint="Анонимизированные диалоги помогают нам делать модель умнее"
+        label="Автоудаление старых чатов"
+        hint="Диалоги без активности дольше выбранного срока удаляются автоматически"
       >
-        <Toggle checked={improveModel} onChange={setImproveModel} />
-      </Row>
-      <Row
-        label="Сохранять историю чатов"
-        hint="Если выключить — новые чаты не будут сохраняться"
-      >
-        <Toggle checked={saveHistory} onChange={setSaveHistory} />
-      </Row>
-      <Row label="Экспорт чатов" hint="Скачать архив со всеми чатами в JSON">
-        <button
-          type="button"
-          disabled
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
-        >
-          Скоро
-        </button>
-      </Row>
-      <Row label="Архив чатов" hint="Скрытые из сайдбара, но не удалённые">
-        <button
-          type="button"
-          disabled
-          className="rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] font-medium text-ink-soft opacity-60"
-        >
-          Открыть
-        </button>
+        <SelectBox
+          value={String(settings.chat_retention_days)}
+          onChange={(v) =>
+            update({ chat_retention_days: Number(v) as RetentionDays })
+          }
+          options={RETENTION_OPTIONS.map((o) => ({
+            value: String(o.value),
+            label: o.label,
+          }))}
+        />
       </Row>
 
       <div className="mt-4 rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-500/25 dark:bg-red-500/10">
@@ -494,16 +609,11 @@ function DataTab() {
         </p>
 
         <div className="mt-3 flex flex-col gap-2">
-          <DangerButton
-            label="Удалить все чаты"
-            onClick={() => {
-              /* TODO: backend */
-            }}
-          />
+          <DangerButton label="Удалить все чаты" onClick={deleteAllChats} />
           <DangerButton
             label="Удалить аккаунт"
             onClick={() => {
-              /* TODO: backend */
+              /* TODO: удаление аккаунта через Clerk + бэкенд */
             }}
           />
         </div>
@@ -675,48 +785,6 @@ function SelectBox({
         className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted"
         strokeWidth={1.7}
       />
-    </div>
-  );
-}
-
-function Slider({
-  value,
-  min,
-  max,
-  step,
-  onChange,
-  format,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (v: number) => void;
-  format?: (v: number) => string;
-}) {
-  const pct = ((value - min) / (max - min)) * 100;
-  /*
-   * Заливка трека слева от thumb идёт через background-gradient на самом input.
-   * Кросс-браузерный способ — нет «лишних» псевдоэлементов и не зависит
-   * от ::-webkit-slider-runnable-track (который не работает в Firefox).
-   */
-  return (
-    <div className="flex min-w-[220px] items-center gap-3">
-      <input
-        type="range"
-        value={value}
-        min={min}
-        max={max}
-        step={step}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="range-slider flex-1"
-        style={{
-          background: `linear-gradient(to right, var(--brand-primary) 0%, var(--brand-primary) ${pct}%, var(--brand-line) ${pct}%, var(--brand-line) 100%)`,
-        }}
-      />
-      <span className="w-9 text-right font-mono text-[12px] tabular-nums text-muted">
-        {format ? format(value) : value}
-      </span>
     </div>
   );
 }

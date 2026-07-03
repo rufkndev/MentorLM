@@ -22,21 +22,28 @@ class UserSettingsSerializer(serializers.ModelSerializer):
             "theme",
             "interface_lang",
             "font_size",
-            "show_suggestions",
             "auto_scroll",
-            # параметры модели
-            "default_model",
-            "temperature",
-            "response_length",
-            "context_size",
-            "streaming",
-            "web_search",
+            # данные
+            "chat_retention_days",
+            # параметры модели ИИ
+            "chat_model",
+            "code_model",
+            "research_model",
+            "creativity",
+            "response_length_preference",
+            "reasoning_depth",
             # память / инструкции
             "nickname",
             "occupation",
+            "education_level",
+            "field_of_study",
+            "learning_goals",
             "custom_about",
             "custom_style",
+            "context_depth",
             "auto_memory",
+            "memory_scope",
+            "memory_use",
             "updated_at",
         ]
         read_only_fields = ["updated_at"]

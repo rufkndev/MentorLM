@@ -8,12 +8,17 @@
 reasoning_effort, quality_checks, require_citations) превращаются в короткие
 русские директивы здесь, в одном месте: добавить новое значение поля = дописать
 строку в соответствующий словарь.
+
+Длина ответа и глубина проработки берутся НЕ из сценария напрямую, а из уже
+согласованных с пользовательскими настройками значений (apps.ai.preferences):
+сценарий задаёт базу и границы, настройка юзера — мягкий сдвиг внутри них.
 """
 
 from __future__ import annotations
 
+from .preferences import ResolvedPreferences
 from .registry import get_mode
-from .scenarios import ScenarioConfig, get_scenario
+from .scenarios import ScenarioConfig
 
 # --- Расшифровки структурных полей в директивы -------------------------------
 
@@ -71,22 +76,28 @@ _QUALITY_CHECK: dict[str, str] = {
 }
 
 
-def _scenario_directives(scenario: ScenarioConfig) -> str:
-    """Структурные поля сценария → блок коротких директив (или пусто)."""
+def _scenario_directives(
+    scenario: ScenarioConfig, prefs: ResolvedPreferences
+) -> str:
+    """Структурные поля сценария → блок коротких директив (или пусто).
+
+    Длину и глубину берём из `prefs` (сценарий + мягкий сдвиг настройками),
+    остальные поля — из самого сценария.
+    """
     lines: list[str] = []
 
     fmt = _ANSWER_FORMAT.get(scenario.answer_format, "")
     if fmt:
         lines.append(fmt)
 
-    if scenario.response_length in _RESPONSE_LENGTH:
-        lines.append(_RESPONSE_LENGTH[scenario.response_length])
+    if prefs.response_length in _RESPONSE_LENGTH:
+        lines.append(_RESPONSE_LENGTH[prefs.response_length])
     if scenario.audience_level in _AUDIENCE_LEVEL:
         lines.append(_AUDIENCE_LEVEL[scenario.audience_level])
     if scenario.interaction_style in _INTERACTION_STYLE:
         lines.append(_INTERACTION_STYLE[scenario.interaction_style])
-    if scenario.reasoning_effort in _REASONING_EFFORT:
-        lines.append(_REASONING_EFFORT[scenario.reasoning_effort])
+    if prefs.reasoning_effort in _REASONING_EFFORT:
+        lines.append(_REASONING_EFFORT[prefs.reasoning_effort])
 
     if scenario.require_citations:
         lines.append(
@@ -102,34 +113,24 @@ def _scenario_directives(scenario: ScenarioConfig) -> str:
     return "\n".join(lines)
 
 
-def _persona_parts(user_settings) -> list[str]:
-    """Персонализация из настроек пользователя — добавляется к каждому ответу."""
-    persona: list[str] = []
-    if getattr(user_settings, "nickname", ""):
-        persona.append(
-            f"Обращайся к пользователю по имени: {user_settings.nickname}."
-        )
-    if getattr(user_settings, "occupation", ""):
-        persona.append(f"Род занятий пользователя: {user_settings.occupation}.")
-    if getattr(user_settings, "custom_about", ""):
-        persona.append(f"О пользователе: {user_settings.custom_about}")
-    if getattr(user_settings, "custom_style", ""):
-        persona.append(
-            f"Предпочтительный стиль ответов: {user_settings.custom_style}"
-        )
-    if not persona:
-        return []
-    return ["\n".join(persona)]
+def build_system_prompt(
+    mode_id: str,
+    scenario: ScenarioConfig,
+    prefs: ResolvedPreferences,
+    memory_block: str = "",
+) -> str:
+    """Системный промпт = база режима + сценарий + директивы + персонализация.
 
-
-def build_system_prompt(mode_id: str, scenario_id: str | None, user_settings) -> str:
-    """Системный промпт = база режима + сценарий + директивы + персонализация."""
+    Директивы длины/глубины и строки персонализации приходят уже согласованными
+    в `prefs` (см. apps.ai.preferences). `memory_block` — факты глобальной памяти
+    (apps.memory), добавляются, если настройки разрешают.
+    """
     mode = get_mode(mode_id)
-    scenario = get_scenario(mode_id, scenario_id)
     parts = [
         mode.base_system_prompt,
         scenario.system_prompt,
-        _scenario_directives(scenario),
-        *_persona_parts(user_settings),
+        _scenario_directives(scenario, prefs),
+        *prefs.persona,
+        memory_block,
     ]
     return "\n\n".join(p for p in parts if p)

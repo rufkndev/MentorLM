@@ -18,4 +18,4 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(UserSettings)
 class UserSettingsAdmin(admin.ModelAdmin):
-    list_display = ("user", "default_model", "temperature", "interface_lang", "theme")
+    list_display = ("user", "creativity", "context_depth", "theme")
