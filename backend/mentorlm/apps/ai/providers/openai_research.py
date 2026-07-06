@@ -40,6 +40,8 @@ class OpenAIResearchProvider:
             instructions=system,
             input=history,
             tools=tools,
+            # Потолок вывода — финансовый предохранитель тарифа (сверху).
+            max_output_tokens=params.max_output_tokens,
         ) as stream:
             for event in stream:
                 if event.type == "response.output_text.delta":

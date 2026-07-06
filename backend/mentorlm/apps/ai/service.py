@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Iterator
 
 from apps.billing.limits import limits_for
+from apps.billing.plans import effective_plan
 from apps.memory.services import build_memory_block
 
 from .context import build_context
@@ -38,7 +39,7 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
     """
     mode = get_mode(conversation.mode)
     user_settings = user.settings
-    plan_limits = limits_for(user.plan)
+    plan_limits = limits_for(effective_plan(user))
 
     # Сценарий — база параметров генерации (температура, длина, размер контекста,
     # инструменты) и их границы. Пользовательские настройки согласуются с ним
@@ -56,10 +57,18 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
         max_messages=prefs.context_messages,
     )
 
+    # Живой веб-поиск — платная фича. На тарифах без него режим «Исследовать»
+    # работает по знаниям модели (инструмент просто снимаем), а не блокируется.
+    tools = scenario.tools
+    if not plan_limits["allow_web_search"]:
+        tools = tuple(t for t in tools if t != "web_search")
+
     params = GenParams(
         model=prefs.model,
         temperature=prefs.temperature,
-        tools=scenario.tools,
+        tools=tools,
+        # Потолок длины ответа задаёт тариф (жёсткий финансовый предохранитель).
+        max_output_tokens=plan_limits["max_output_tokens"],
     )
     usage: dict = {}
     deltas = get_provider(mode.provider).stream(

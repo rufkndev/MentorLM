@@ -32,8 +32,9 @@ class OpenAIChatProvider:
         base_kwargs = dict(
             model=params.model,
             messages=messages,
-            # Лимит вывода НЕ задаём: пусть модель допишет ответ полностью и
-            # остановится сама. Длину регулируем промптом, а не обрезкой.
+            # Потолок вывода — финансовый предохранитель тарифа (сверху). Длину
+            # по-прежнему регулируем промптом, а не обрезкой.
+            max_completion_tokens=params.max_output_tokens,
             stream=True,
             stream_options={"include_usage": True},
         )

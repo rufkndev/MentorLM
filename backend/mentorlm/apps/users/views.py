@@ -1,14 +1,30 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.billing.limits import limits_for
+from apps.billing.plans import effective_plan
 from apps.usage.models import Usage
 
 from .models import UserSettings
 from .serializers import UserProfileSerializer, UserSettingsSerializer
+
+
+def _next_day_iso() -> str:
+    """Полночь следующего дня — когда обновятся дневные счётчики."""
+    tomorrow = date.today() + timedelta(days=1)
+    return timezone.make_aware(datetime.combine(tomorrow, time.min)).isoformat()
+
+
+def _next_month_iso() -> str:
+    """Начало следующего месяца — когда обновится месячный бюджет."""
+    today = date.today()
+    nxt = (today.replace(day=1) + timedelta(days=32)).replace(day=1)
+    return timezone.make_aware(datetime.combine(nxt, time.min)).isoformat()
 
 
 class MeView(APIView):
@@ -39,23 +55,53 @@ class MeSettingsView(APIView):
 
 
 class UsageView(APIView):
-    """GET /api/me/usage/ — использование за сегодня + лимит тарифа.
+    """GET /api/me/usage/ — понятные пользователю индикаторы расхода.
 
-    Заглушка-MVP: реального учёта пока нет, поэтому при отсутствии строки за
-    сегодня отдаём нули. Структура ответа финальная.
+    Считаем из дневных агрегатов Usage: остаток месячного бюджета (в %),
+    сообщения/research/code за сегодня против лимитов тарифа и время сброса.
+    Токены/рубли пользователю не показываем — только человекочитаемые счётчики.
     """
 
     def get(self, request):
-        plan_limits = limits_for(request.user.plan)
-        today = Usage.objects.filter(user=request.user, day=date.today()).first()
+        user = request.user
+        plan = effective_plan(user)
+        limits = limits_for(plan)
+
+        today = date.today()
+        rows = list(Usage.objects.filter(user=user, day=today))
+        per_mode = {r.mode: r.request_count for r in rows}
+        messages_used = sum(per_mode.values())
+
+        month_start = today.replace(day=1)
+        used_rub = sum(
+            (r.cost_rub for r in Usage.objects.filter(user=user, day__gte=month_start)),
+            Decimal("0"),
+        )
+        budget = limits["monthly_cost_rub"]
+        used_pct = (
+            int(min(Decimal("100"), used_rub / budget * 100)) if budget else 0
+        )
+
+        def line(used: int, limit) -> dict:
+            return {"used": used, "limit": limit}
+
         return Response(
             {
-                "day": date.today().isoformat(),
-                "request_count": today.request_count if today else 0,
-                "tokens_in": today.tokens_in if today else 0,
-                "tokens_out": today.tokens_out if today else 0,
-                "cost_rub": str(today.cost_rub) if today else "0",
-                "daily_limit": plan_limits["daily_messages"],
+                "plan": plan,
+                "plan_label": limits["label"],
+                "monthly": {
+                    "used_pct": used_pct,
+                    "remaining_pct": max(0, 100 - used_pct),
+                    "resets_at": _next_month_iso(),
+                },
+                "daily": {
+                    "messages": line(messages_used, limits["daily_messages"]),
+                    "research": line(
+                        per_mode.get("research", 0), limits["daily_research"]
+                    ),
+                    "code": line(per_mode.get("code", 0), limits["daily_code"]),
+                    "resets_at": _next_day_iso(),
+                },
             }
         )
 
@@ -63,19 +109,20 @@ class UsageView(APIView):
 class SubscriptionView(APIView):
     """GET /api/me/subscription/ — текущий тариф и его лимиты.
 
-    Заглушка-MVP: тариф берём из закэшированного UserProfile.plan; полная
-    история платежей и управление подпиской появятся с биллингом (YooKassa).
+    Тариф берём через effective_plan (учтёт статус подписки, когда появится
+    биллинг). Полная история платежей — с YooKassa позже.
     """
 
     def get(self, request):
-        plan = request.user.plan
-        plan_limits = limits_for(plan)
+        plan = effective_plan(request.user)
+        limits = limits_for(plan)
         return Response(
             {
                 "plan": plan,
-                "plan_label": plan_limits["label"],
-                "daily_messages": plan_limits["daily_messages"],
-                "context_tokens": plan_limits["context_tokens"],
+                "plan_label": limits["label"],
+                "daily_messages": limits["daily_messages"],
+                "context_tokens": limits["context_tokens"],
+                "monthly_cost_rub": str(limits["monthly_cost_rub"]),
             },
             status=status.HTTP_200_OK,
         )

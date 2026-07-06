@@ -23,6 +23,7 @@ class UserProfile(models.Model):
 
     class Plan(models.TextChoices):
         FREE = "free", "Бесплатный"
+        PLUS = "plus", "Plus"
         PRO = "pro", "Pro"
 
     clerk_id = models.CharField(max_length=255, unique=True, db_index=True)

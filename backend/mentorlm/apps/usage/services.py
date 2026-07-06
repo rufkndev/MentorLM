@@ -1,40 +1,83 @@
-"""Учёт расхода ИИ. Записываем потребление, но пока не блокируем по лимиту."""
+"""Учёт расхода ИИ: журнал событий + дневные агрегаты по режимам.
+
+Себестоимость считаем в USD по прайсингу API (за 1M токенов), затем переводим
+в рубли по курсу `USD_RUB_RATE`. Рубли — то, чем оперируют тарифные бюджеты
+(billing.limits.monthly_cost_rub) и что видит пользователь в ЛК.
+"""
 
 from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
 
+from django.conf import settings
 from django.db.models import F
 
-from .models import Usage
+from .models import Usage, UsageEvent
 
-# Ставки в рублях за 1000 токенов (грубо, для оценки стоимости в ЛК).
-# Неизвестные модели считаем бесплатными — расход всё равно виден в токенах.
-MODEL_RATES_RUB_PER_1K = {
-    "gpt-4o-mini": {"in": Decimal("0.015"), "out": Decimal("0.06")},
-    "gpt-4o": {"in": Decimal("0.25"), "out": Decimal("1.0")},
-    # Claude Sonnet 4.6 — режим «Код» ($3/$15 за 1M ≈ ₽/1K при курсе ~90).
-    "claude-sonnet-4-6": {"in": Decimal("0.27"), "out": Decimal("1.35")},
+# Ставки себестоимости в USD за 1M токенов (вход/выход) по реальным моделям.
+# Ключ — id модели (как в settings.*_MODEL). Неизвестные модели считаем
+# бесплатными — расход всё равно виден в токенах. Значения подбираемые: держать
+# в соответствии с актуальным прайсингом провайдеров.
+MODEL_RATES_USD_PER_1M = {
+    "gpt-4o-mini": {"in": Decimal("0.15"), "out": Decimal("0.60")},
+    "gpt-4o": {"in": Decimal("2.50"), "out": Decimal("10.0")},
+    "gpt-5.5": {"in": Decimal("2.50"), "out": Decimal("10.0")},
+    "claude-sonnet-4-6": {"in": Decimal("3.0"), "out": Decimal("15.0")},
+    "claude-haiku-4-5": {"in": Decimal("1.0"), "out": Decimal("5.0")},
 }
 
 
-def _cost_rub(model: str, tokens_in: int, tokens_out: int) -> Decimal:
-    rates = MODEL_RATES_RUB_PER_1K.get(model)
+def _usd_rub_rate() -> Decimal:
+    """Курс USD→RUB из settings; дефолт заложен в settings.USD_RUB_RATE."""
+    return Decimal(str(getattr(settings, "USD_RUB_RATE", 95)))
+
+
+def cost_of(model: str, tokens_in: int, tokens_out: int) -> tuple[Decimal, Decimal]:
+    """Себестоимость запроса → (cost_usd, cost_rub). Неизвестная модель → 0."""
+    rates = MODEL_RATES_USD_PER_1M.get(model)
     if not rates:
-        return Decimal("0")
-    return (
+        return Decimal("0"), Decimal("0")
+    usd = (
         rates["in"] * Decimal(tokens_in) + rates["out"] * Decimal(tokens_out)
-    ) / Decimal(1000)
+    ) / Decimal(1_000_000)
+    rub = usd * _usd_rub_rate()
+    return usd, rub
 
 
-def record_usage(user, *, tokens_in: int, tokens_out: int, model: str) -> None:
-    """Инкрементирует дневную строку Usage пользователя (атомарно через F())."""
-    cost = _cost_rub(model, tokens_in, tokens_out)
-    usage, created = Usage.objects.get_or_create(user=user, day=date.today())
+def record_usage(
+    user,
+    *,
+    mode: str,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    scenario: str = "",
+    conversation=None,
+) -> None:
+    """Списывает фактический расход: журнал события + дневной агрегат режима.
+
+    Вызывается ПОСЛЕ успешного ответа — неуспешный запрос не списывается.
+    Дневную строку Usage инкрементируем атомарно через F().
+    """
+    cost_usd, cost_rub = cost_of(model, tokens_in, tokens_out)
+
+    UsageEvent.objects.create(
+        user=user,
+        conversation=conversation,
+        mode=mode,
+        scenario=scenario or "",
+        model=model,
+        tokens_in=tokens_in,
+        tokens_out=tokens_out,
+        cost_usd=cost_usd,
+        cost_rub=cost_rub,
+    )
+
+    usage, _ = Usage.objects.get_or_create(user=user, day=date.today(), mode=mode)
     Usage.objects.filter(pk=usage.pk).update(
         request_count=F("request_count") + 1,
         tokens_in=F("tokens_in") + tokens_in,
         tokens_out=F("tokens_out") + tokens_out,
-        cost_rub=F("cost_rub") + cost,
+        cost_rub=F("cost_rub") + cost_rub,
     )

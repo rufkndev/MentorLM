@@ -1,9 +1,4 @@
-/**
- * Контент страницы /billing. Тарифы и сравнительная таблица.
- *
- * Цены и лимиты — заглушка. После подключения Stripe/ЮKassa и реальных
- * лимитов на бэке эти данные подменятся (или будут читаться из БД).
- */
+/* Контент страницы /billing. Тарифы и сравнительная таблица. */
 
 export type PlanCta = {
   label: string;
@@ -14,7 +9,7 @@ export type PlanCta = {
 };
 
 export type BillingPlan = {
-  id: "free" | "pro" | "team";
+  id: "free" | "plus" | "pro";
   name: string;
   /** В рублях. null = «по запросу». */
   price: number | null;
@@ -36,48 +31,45 @@ export const billingPlans: readonly BillingPlan[] = [
     features: [
       "Все режимы: чат, код, исследование",
       "Базовые модели",
-      "50 сообщений в день",
+      "20 сообщений в день",
       "Контекст до 8K токенов",
-      "До 50 МБ материалов",
+      "Исследование — 3, код — 5 в день",
       "История диалогов",
     ],
     cta: { label: "Текущий план", href: null, disabled: true },
   },
   {
-    id: "pro",
-    name: "Pro",
-    price: 490,
-    description: "Для серьёзной учёбы и работы с большим объёмом материалов.",
+    id: "plus",
+    name: "Plus",
+    price: 349,
+    description: "Основной тариф для серьёзной учёбы и работы.",
     tagline: "Самый популярный",
     features: [
-      "Безлимит сообщений",
-      "Mentor Pro и Mentor Vision",
-      "Контекст до 200K токенов",
+      "150 сообщений в день",
+      "Максимальная модель",
+      "Контекст до 32K токенов",
       "Поиск в интернете",
-      "Работа с PDF и таблицами",
-      "До 5 ГБ материалов",
+      "Исследование — 30, код — 40 в день",
       "Расширенная память",
-      "Приоритетная очередь",
-      "Экспорт конспектов",
     ],
-    cta: { label: "Оформить Pro", href: "/billing/checkout?plan=pro" },
+    cta: { label: "Оформить Plus", href: "/billing/checkout?plan=plus" },
     featured: true,
   },
   {
-    id: "team",
-    name: "Team",
-    price: null,
-    description: "Для учебных групп, кафедр и онлайн-школ.",
-    tagline: "По запросу",
+    id: "pro",
+    name: "Pro",
+    price: 990,
+    description: "Для активных студентов, дипломов, ресёрча и кода.",
+    tagline: "Максимум возможностей",
     features: [
-      "Всё из Pro для каждого участника",
-      "Общая библиотека материалов",
-      "Управление участниками",
-      "SSO и аналитика",
-      "Поддержка 24/7",
-      "Кастомные сценарии и промпты",
+      "400 сообщений в день",
+      "Максимальная модель без компромиссов",
+      "Контекст до 128K токенов",
+      "Поиск в интернете",
+      "Исследование — 150, код — 200 в день",
+      "Приоритетная очередь",
     ],
-    cta: { label: "Связаться", href: "mailto:hello@mentorlm.ru" },
+    cta: { label: "Оформить Pro", href: "/billing/checkout?plan=pro" },
   },
 ] as const;
 
@@ -88,8 +80,8 @@ export type CompareValue = boolean | string;
 export type CompareRow = {
   label: string;
   free: CompareValue;
+  plus: CompareValue;
   pro: CompareValue;
-  team: CompareValue;
 };
 
 export type CompareGroup = {
@@ -101,36 +93,27 @@ export const comparisonTable: readonly CompareGroup[] = [
   {
     title: "Использование",
     rows: [
-      { label: "Сообщения в день", free: "50", pro: "Без лимита", team: "Без лимита" },
-      { label: "Длина контекста", free: "8K токенов", pro: "200K токенов", team: "200K токенов" },
-      { label: "Объём материалов", free: "50 МБ", pro: "5 ГБ", team: "Без лимита" },
-      { label: "История диалогов", free: true, pro: true, team: true },
+      { label: "Сообщения в день", free: "20", plus: "150", pro: "400" },
+      { label: "Длина контекста", free: "8K токенов", plus: "32K токенов", pro: "128K токенов" },
+      { label: "Исследований в день", free: "3", plus: "30", pro: "150" },
+      { label: "Запросов кода в день", free: "5", plus: "40", pro: "200" },
+      { label: "История диалогов", free: true, plus: true, pro: true },
     ],
   },
   {
     title: "Модели и инструменты",
     rows: [
-      { label: "Базовые модели", free: true, pro: true, team: true },
-      { label: "Mentor Pro и Vision", free: false, pro: true, team: true },
-      { label: "Поиск в интернете", free: false, pro: true, team: true },
-      { label: "Работа с PDF и таблицами", free: false, pro: true, team: true },
-      { label: "Расширенная память", free: "10 фактов", pro: "1000 фактов", team: "Без лимита" },
+      { label: "Базовые модели", free: true, plus: true, pro: true },
+      { label: "Максимальная модель", free: false, plus: true, pro: true },
+      { label: "Поиск в интернете", free: false, plus: true, pro: true },
+      { label: "Расширенная память", free: "10 фактов", plus: "1000 фактов", pro: "Без лимита" },
     ],
   },
   {
     title: "Скорость и приоритет",
     rows: [
-      { label: "Очередь", free: "Стандарт", pro: "Приоритет", team: "VIP" },
-      { label: "Экспорт конспектов", free: false, pro: true, team: true },
-    ],
-  },
-  {
-    title: "Команда и интеграции",
-    rows: [
-      { label: "Общая библиотека", free: false, pro: false, team: true },
-      { label: "Управление участниками", free: false, pro: false, team: true },
-      { label: "SSO", free: false, pro: false, team: true },
-      { label: "Поддержка", free: "Сообщество", pro: "Email", team: "24/7" },
+      { label: "Очередь", free: "Стандарт", plus: "Приоритет", pro: "VIP" },
+      { label: "Экспорт конспектов", free: false, plus: true, pro: true },
     ],
   },
 ] as const;

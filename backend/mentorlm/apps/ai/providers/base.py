@@ -10,9 +10,11 @@ class GenParams:
 
     model: str
     temperature: float
-    # Длину ответа задаём промптом (см. prompts.py), а не лимитом токенов, чтобы
-    # ответ никогда не обрывался — поэтому max_tokens здесь нет.
     tools: tuple[str, ...] = ()  # включённые инструменты, напр. ("web_search",)
+    # Жёсткий потолок длины ответа — финансовый предохранитель тарифа (см.
+    # billing.limits.max_output_tokens). Желаемую длину по-прежнему задаём мягко
+    # промптом; это ограничение сверху, чтобы дорогой тариф не жёг лишнее.
+    max_output_tokens: int = 16384
 
 
 class LLMProvider(Protocol):

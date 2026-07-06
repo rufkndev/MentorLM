@@ -10,7 +10,7 @@ from typing import Iterator
 
 from django.conf import settings
 
-from ..context import MAX_OUTPUT_TOKENS, count_tokens
+from ..context import count_tokens
 from .base import GenParams
 
 
@@ -27,12 +27,12 @@ class AnthropicProvider:
 
         client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-        # max_tokens у Anthropic обязателен — ставим высокий потолок, чтобы
-        # ответ не обрывался; это лимит, а не цель, модель остановится сама.
+        # max_tokens у Anthropic обязателен — берём потолок тарифа (финансовый
+        # предохранитель); это лимит сверху, а не цель, модель остановится сама.
         completion = ""
         with client.messages.stream(
             model=params.model,
-            max_tokens=MAX_OUTPUT_TOKENS,
+            max_tokens=params.max_output_tokens,
             temperature=params.temperature,
             system=system,
             messages=history,

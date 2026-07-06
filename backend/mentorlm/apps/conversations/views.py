@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ai import service as ai_service
+from apps.billing.guard import LimitExceeded, preflight
 from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
 
@@ -84,6 +85,19 @@ class MessageCreateView(APIView):
 
         user = request.user
 
+        # 0. Preflight-лимиты ДО сохранения сообщения — чтобы не плодить
+        #    осиротевшие сообщения без ответа. Отдаём JSON с кодом/статусом до
+        #    старта SSE: фронтовый api.stream увидит non-200 и покажет апселл.
+        try:
+            preflight(
+                user, mode=conversation.mode, scenario=scenario_id, input_text=content
+            )
+        except LimitExceeded as exc:
+            return Response(
+                {"code": exc.code, "message": exc.message, **exc.extra},
+                status=exc.status,
+            )
+
         # 1. Сохраняем сообщение пользователя; первое — задаёт заголовок чата.
         Message.objects.create(
             conversation=conversation,
@@ -122,9 +136,12 @@ class MessageCreateView(APIView):
                     conversation.save(update_fields=["updated_at"])
                     record_usage(
                         user,
+                        mode=conversation.mode,
+                        scenario=scenario_id or "",
+                        conversation=conversation,
+                        model=model,
                         tokens_in=usage.get("prompt_tokens", 0),
                         tokens_out=usage.get("completion_tokens", 0),
-                        model=model,
                     )
                     # Глобальная память: в фоне извлекаем устойчивые факты о
                     # пользователе (если включена автопамять). Не блокирует ответ.

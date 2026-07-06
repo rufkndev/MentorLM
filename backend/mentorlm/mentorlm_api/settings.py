@@ -218,3 +218,7 @@ ANTHROPIC_CODE_MODEL_FAST = os.environ.get('ANTHROPIC_CODE_MODEL_FAST', '')
 ANTHROPIC_CODE_MODEL_QUALITY = os.environ.get('ANTHROPIC_CODE_MODEL_QUALITY', '')
 OPENAI_RESEARCH_MODEL_FAST = os.environ.get('OPENAI_RESEARCH_MODEL_FAST', '')
 OPENAI_RESEARCH_MODEL_QUALITY = os.environ.get('OPENAI_RESEARCH_MODEL_QUALITY', '')
+
+# Курс USD→RUB для перевода себестоимости запроса в рубли (apps.usage.services).
+# Рублями оперируют тарифные бюджеты и ЛК. Обновлять при заметном сдвиге курса.
+USD_RUB_RATE = float(os.environ.get('USD_RUB_RATE', '80'))

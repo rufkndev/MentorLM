@@ -457,7 +457,29 @@ type SubscriptionInfo = {
   plan_label: string;
   daily_messages: number | null;
 };
-type UsageInfo = { request_count: number; daily_limit: number | null };
+type UsageLine = { used: number; limit: number | null };
+type UsageInfo = {
+  plan: string;
+  plan_label: string;
+  monthly: { used_pct: number; remaining_pct: number; resets_at: string };
+  daily: {
+    messages: UsageLine;
+    research: UsageLine;
+    code: UsageLine;
+    resets_at: string;
+  };
+};
+
+function DailyUsageRow({ label, line }: { label: string; line: UsageLine }) {
+  return (
+    <div className="flex items-center justify-between text-[12.5px]">
+      <span className="text-muted">{label}</span>
+      <span className="text-ink-soft">
+        {line.used} / {line.limit === null ? "∞" : line.limit}
+      </span>
+    </div>
+  );
+}
 
 function SubscriptionTab() {
   const api = useApi();
@@ -465,15 +487,14 @@ function SubscriptionTab() {
   const [usage, setUsage] = useState<UsageInfo | null>(null);
 
   useEffect(() => {
-    // read-only заглушки ЛК: тариф и сегодняшнее использование с бэка.
+    // read-only индикаторы ЛК: тариф и сегодняшнее использование с бэка.
     api.get<SubscriptionInfo>("/api/me/subscription/").then(setSub).catch(() => {});
     api.get<UsageInfo>("/api/me/usage/").then(setUsage).catch(() => {});
   }, [api]);
 
-  const planLabel = sub?.plan_label ?? "Free";
-  const limit = sub?.daily_messages ?? null; // null = безлимит
-  const current = usage?.request_count ?? 0;
-  const pct = limit ? Math.min(100, Math.round((current / limit) * 100)) : 0;
+  const planLabel = usage?.plan_label ?? sub?.plan_label ?? "Free";
+  const remainingPct = usage?.monthly.remaining_pct ?? 100;
+  const usedPct = usage?.monthly.used_pct ?? 0;
 
   return (
     <Section title="Подписка">
@@ -485,9 +506,7 @@ function SubscriptionTab() {
             </p>
             <p className="mt-1 text-[20px] font-semibold text-ink">{planLabel}</p>
             <p className="mt-0.5 text-[13px] text-muted">
-              {limit === null
-                ? "Безлимит сообщений"
-                : `Базовые модели · ${limit} сообщений в день`}
+              Осталось {remainingPct}% месячного лимита
             </p>
           </div>
           <span className="rounded-full bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-muted ring-1 ring-line">
@@ -497,18 +516,27 @@ function SubscriptionTab() {
 
         <div className="mt-4">
           <div className="flex items-center justify-between text-[12.5px] text-muted">
-            <span>Использовано сегодня</span>
-            <span>
-              {current} / {limit === null ? "∞" : limit}
-            </span>
+            <span>Месячный лимит</span>
+            <span>{usedPct}% использовано</span>
           </div>
           <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
             <div
               className="h-full rounded-full bg-[var(--brand-primary)] transition-all"
-              style={{ width: `${pct}%` }}
+              style={{ width: `${usedPct}%` }}
             />
           </div>
         </div>
+
+        {usage && (
+          <div className="mt-4 space-y-2 border-t border-line pt-4">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
+              Сегодня
+            </p>
+            <DailyUsageRow label="Сообщений" line={usage.daily.messages} />
+            <DailyUsageRow label="Исследований" line={usage.daily.research} />
+            <DailyUsageRow label="Запросов кода" line={usage.daily.code} />
+          </div>
+        )}
       </div>
 
       <div className="rounded-2xl border border-[var(--brand-primary)]/30 bg-[var(--brand-primary-soft)]/40 p-5">
@@ -526,10 +554,10 @@ function SubscriptionTab() {
         </p>
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-soft">
           {[
-            "Без лимитов на сообщения",
-            "Доступ к Mentor Pro и Vision",
-            "Длинный контекст до 200K токенов",
-            "Поиск в интернете и работа с PDF",
+            "До 400 сообщений в день",
+            "Максимальная модель без компромиссов",
+            "Длинный контекст до 128K токенов",
+            "Поиск в интернете",
             "Приоритетная очередь в часы пик",
           ].map((line) => (
             <li key={line} className="flex items-center gap-2">
@@ -543,7 +571,8 @@ function SubscriptionTab() {
         </ul>
         <div className="mt-4 flex items-center justify-between">
           <p className="text-[13px] text-ink">
-            <span className="text-[18px] font-semibold">490 ₽</span>
+            <span className="text-muted">от </span>
+            <span className="text-[18px] font-semibold">349 ₽</span>
             <span className="text-muted"> / месяц</span>
           </p>
           <Link

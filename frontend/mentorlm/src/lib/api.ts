@@ -10,10 +10,28 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    // Машинный код ошибки лимита от бэка (guard.py): rate_limited,
+    // daily_messages, monthly_budget, mode_daily_limit, input_too_long,
+    // feature_locked. Пусто — обычная ошибка.
+    public code?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
+}
+
+// Разбирает тело ответа-ошибки: бэк отдаёт JSON {code, message} для лимитов.
+async function apiErrorFrom(res: Response): Promise<ApiError> {
+  const text = await res.text().catch(() => "");
+  try {
+    const data = JSON.parse(text) as { code?: string; message?: string };
+    if (data && (data.message || data.code)) {
+      return new ApiError(res.status, data.message || res.statusText, data.code);
+    }
+  } catch {
+    // не JSON — вернём как есть ниже
+  }
+  return new ApiError(res.status, text || res.statusText);
 }
 
 export function useApi() {
@@ -35,8 +53,7 @@ export function useApi() {
       });
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new ApiError(res.status, text || res.statusText);
+        throw await apiErrorFrom(res);
       }
 
       // 204 No Content — без тела.
@@ -69,8 +86,7 @@ export function useApi() {
       });
 
       if (!res.ok || !res.body) {
-        const text = await res.text().catch(() => "");
-        throw new ApiError(res.status, text || res.statusText);
+        throw await apiErrorFrom(res);
       }
 
       const reader = res.body.getReader();

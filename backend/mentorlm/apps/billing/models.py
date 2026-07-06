@@ -10,6 +10,7 @@ class Subscription(models.Model):
 
     class Plan(models.TextChoices):
         FREE = "free", "Бесплатный"
+        PLUS = "plus", "Plus"
         PRO = "pro", "Pro"
 
     class Status(models.TextChoices):

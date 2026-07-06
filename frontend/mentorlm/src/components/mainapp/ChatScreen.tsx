@@ -183,16 +183,23 @@ function ChatScreenInner({
           },
         );
       } catch (err) {
-        const detail = err instanceof ApiError ? err.message : String(err);
+        // Лимиты тарифа (guard.py) приходят с машинным code — показываем
+        // дружелюбный текст бэка и апселл, а не generic-ошибку.
+        const isLimit = err instanceof ApiError && !!err.code && err.code !== "";
+        let content: string;
+        if (isLimit) {
+          const e = err as ApiError;
+          content =
+            e.code === "rate_limited"
+              ? e.message
+              : `${e.message}\n\n[Посмотреть тарифы](/billing)`;
+        } else {
+          const detail = err instanceof ApiError ? err.message : String(err);
+          content = `Не удалось получить ответ.\n\n${detail}`;
+        }
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === placeholderId
-              ? {
-                  ...m,
-                  thinking: false,
-                  content: `Не удалось получить ответ.\n\n${detail}`,
-                }
-              : m,
+            m.id === placeholderId ? { ...m, thinking: false, content } : m,
           ),
         );
       } finally {

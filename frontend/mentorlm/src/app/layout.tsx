@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ruRU } from "@clerk/localizations";
+import { clerkLocalization } from "@/lib/clerk-localization";
 import { Onest, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -54,7 +54,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider localization={ruRU}>
+    <ClerkProvider localization={clerkLocalization}>
       <html
         lang="ru"
         className={`${onest.variable} ${jetbrains.variable}`}
