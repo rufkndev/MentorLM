@@ -11,7 +11,11 @@ from apps.billing.plans import effective_plan
 from apps.usage.models import Usage
 
 from .models import UserSettings
-from .serializers import UserProfileSerializer, UserSettingsSerializer
+from .serializers import (
+    UserProfileSerializer,
+    UserSettingsSerializer,
+    settings_defaults,
+)
 
 
 def _next_day_iso() -> str:
@@ -62,6 +66,18 @@ class MeSettingsView(APIView):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+
+class MeSettingsDefaultsView(APIView):
+    """GET /api/me/settings/defaults/ — канонические дефолты настроек.
+
+    Значения выведены из модели UserSettings (единый источник), чтобы фронт не
+    держал их копию. Фронт кэширует ответ и использует как базу для первого
+    рендера/офлайна; при обычной загрузке значения перекрывает /api/me/settings/.
+    """
+
+    def get(self, request):
+        return Response(settings_defaults())
 
 
 class UsageView(APIView):

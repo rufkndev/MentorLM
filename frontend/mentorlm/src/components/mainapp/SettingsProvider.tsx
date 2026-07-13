@@ -60,8 +60,11 @@ export type Settings = {
   chat_retention_days: RetentionDays;
 };
 
-// Значения по умолчанию = дефолты бэка (apps/ai/preferences.py DEFAULTS).
-const DEFAULT_SETTINGS: Settings = {
+// Резерв на самый первый рендер (SSR / пока бэк ещё ни разу не ответил / офлайн).
+// Канонические дефолты приходят с бэка (/api/me/settings/defaults/, выводятся из
+// модели UserSettings) и кэшируются — этот объект используется только как
+// последний резерв, когда закэшированных дефолтов ещё нет.
+const FALLBACK_SETTINGS: Settings = {
   theme: "system",
   font_size: "md",
   chat_model: "default",
@@ -88,16 +91,31 @@ const DEFAULT_SETTINGS: Settings = {
 const THEME_STORAGE_KEY = "mentorlm-theme";
 const FONT_STORAGE_KEY = "mentorlm-font-size";
 const SETTINGS_STORAGE_KEY = "mentorlm-settings";
+// Кэш канонических дефолтов с бэка (/api/me/settings/defaults/).
+const DEFAULTS_STORAGE_KEY = "mentorlm-settings-defaults";
+
+// База дефолтов: закэшированные значения бэка поверх резерва (бэк — источник).
+function readCachedDefaults(): Settings {
+  if (typeof window === "undefined") return FALLBACK_SETTINGS;
+  try {
+    const raw = localStorage.getItem(DEFAULTS_STORAGE_KEY);
+    if (!raw) return FALLBACK_SETTINGS;
+    return { ...FALLBACK_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+  } catch {
+    return FALLBACK_SETTINGS;
+  }
+}
 
 // Синхронно читает закэшированные настройки (на сервере — дефолты).
 function readCachedSettings(): Settings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
+  if (typeof window === "undefined") return FALLBACK_SETTINGS;
+  const base = readCachedDefaults();
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (!raw) return base;
+    return { ...base, ...(JSON.parse(raw) as Partial<Settings>) };
   } catch {
-    return DEFAULT_SETTINGS;
+    return base;
   }
 }
 
@@ -154,6 +172,29 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<Partial<Settings>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Канонические дефолты с бэка (единый источник) — кэшируем для будущих
+  // первых рендеров/офлайна. На текущий рендер не влияют: настройки ниже
+  // приходят уже с подставленными дефолтами.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<Partial<Settings>>("/api/me/settings/defaults/")
+      .then((defaults) => {
+        if (cancelled) return;
+        try {
+          localStorage.setItem(DEFAULTS_STORAGE_KEY, JSON.stringify(defaults));
+        } catch {
+          /* localStorage недоступен — не критично. */
+        }
+      })
+      .catch(() => {
+        /* Не залогинен / бэк недоступен — остаёмся на резерве. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
   // Загрузка настроек с бэка при монтировании (бэк — источник правды).
   useEffect(() => {
     let cancelled = false;
@@ -161,7 +202,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       .get<Settings>("/api/me/settings/")
       .then((data) => {
         if (cancelled) return;
-        const merged = { ...DEFAULT_SETTINGS, ...data };
+        const merged = { ...readCachedDefaults(), ...data };
         setSettings(merged);
         // Бэк — источник правды: синхронизируем localStorage и применяем.
         localStorage.setItem(THEME_STORAGE_KEY, merged.theme);

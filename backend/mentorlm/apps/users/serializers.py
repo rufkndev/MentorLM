@@ -3,6 +3,24 @@ from rest_framework import serializers
 from .models import UserProfile, UserSettings
 
 
+def settings_defaults() -> dict:
+    """Канонические дефолты настроек, выведенные из модели UserSettings.
+
+    Единый источник — сами поля модели: значения по умолчанию берём прямо из
+    них для тех полей, что сериализатор отдаёт наружу и разрешает менять. Так
+    фронт не держит копию значений (иначе они тихо расходятся с бэком).
+    """
+    read_only = set(UserSettingsSerializer.Meta.read_only_fields)
+    writable = [f for f in UserSettingsSerializer.Meta.fields if f not in read_only]
+    model_fields = {f.name: f for f in UserSettings._meta.get_fields()}
+    out: dict = {}
+    for name in writable:
+        field = model_fields.get(name)
+        if field is not None:
+            out[name] = field.get_default()
+    return out
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     """Read-only представление профиля для ЛК (имя/аватар берёт фронт из Clerk)."""
 

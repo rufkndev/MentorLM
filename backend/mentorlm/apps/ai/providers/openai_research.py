@@ -24,7 +24,7 @@ class OpenAIResearchProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
-        from openai import OpenAI
+        from openai import BadRequestError, OpenAI
 
         client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -34,20 +34,42 @@ class OpenAIResearchProvider:
             [{"type": "web_search"}] if "web_search" in params.tools else []
         )
 
-        completion = ""
-        with client.responses.stream(
+        base_kwargs = dict(
             model=params.model,
             instructions=system,
             input=history,
             tools=tools,
             # Потолок вывода — финансовый предохранитель тарифа (сверху).
             max_output_tokens=params.max_output_tokens,
-        ) as stream:
+        )
+        # reasoning_effort передаём нативно тем моделям, что его поддерживают;
+        # обычные модели на него ругаются (400) — тогда повторяем без него.
+        # .stream() бьёт в API на __enter__, поэтому входим в контекст вручную.
+        def _open(with_reasoning: bool):
+            kwargs = dict(base_kwargs)
+            if with_reasoning and params.reasoning_effort:
+                kwargs["reasoning"] = {"effort": params.reasoning_effort}
+            return client.responses.stream(**kwargs)
+
+        try:
+            manager = _open(True)
+            stream = manager.__enter__()
+        except BadRequestError as exc:
+            if params.reasoning_effort and "reasoning" in str(exc).lower():
+                manager = _open(False)
+                stream = manager.__enter__()
+            else:
+                raise
+
+        completion = ""
+        try:
             for event in stream:
                 if event.type == "response.output_text.delta":
                     completion += event.delta
                     yield event.delta
             final = stream.get_final_response()
+        finally:
+            manager.__exit__(None, None, None)
 
         # TODO: достать url_citation annotations из final.output и отдавать
         # источники на фронт (отдельным полем SSE) — пока только текст.

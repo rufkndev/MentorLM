@@ -11,6 +11,7 @@ from typing import Iterator
 from django.conf import settings
 
 from ..context import count_tokens
+from ._openai import create_with_optional
 from .base import GenParams
 
 
@@ -38,17 +39,18 @@ class OpenAIChatProvider:
             stream=True,
             stream_options={"include_usage": True},
         )
-        try:
-            stream = client.chat.completions.create(
-                temperature=params.temperature, **base_kwargs
-            )
-        except BadRequestError as exc:
-            # Reasoning-модели (o-series / gpt-5) принимают только temperature=1 —
-            # повторяем без параметра, чтобы модель взяла значение по умолчанию.
-            if "temperature" in str(exc):
-                stream = client.chat.completions.create(**base_kwargs)
-            else:
-                raise
+        # temperature и reasoning_effort — необязательные: reasoning-модели
+        # (o-series/gpt-5) отвергают temperature≠1, но понимают reasoning_effort;
+        # обычные модели — наоборот. Пробуем со всеми и снимаем непринятые по 400.
+        stream = create_with_optional(
+            client.chat.completions.create,
+            base_kwargs,
+            {
+                "temperature": params.temperature,
+                "reasoning_effort": params.reasoning_effort,
+            },
+            BadRequestError,
+        )
 
         for chunk in stream:
             if chunk.usage is not None:

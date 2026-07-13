@@ -67,6 +67,9 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
         model=prefs.model,
         temperature=prefs.temperature,
         tools=tools,
+        # Усилие рассуждения после согласования сценария с настройкой юзера —
+        # провайдеры OpenAI передают его в API нативно, а не только через промпт.
+        reasoning_effort=prefs.reasoning_effort,
         # Потолок длины ответа задаёт тариф (жёсткий финансовый предохранитель).
         max_output_tokens=plan_limits["max_output_tokens"],
     )
