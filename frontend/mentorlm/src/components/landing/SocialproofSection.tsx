@@ -1,13 +1,20 @@
+/**
+ * Секция социального доказательства.
+ * Заголовок с описанием, три метрики-карточки и бегущая строка логотипов вузов.
+ */
+
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Marquee } from "@/components/ui/Marquee";
 import { Reveal } from "@/components/ui/Reveal";
 import { socialproof } from "@/lib/landing-contents";
 
+// Секция соцдоказательства.
 export function SocialproofSection() {
   return (
     <section id="faq" className="relative py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-end">
+          {/* Заголовок и описание */}
           <Reveal>
             <p className="text-eyebrow">{socialproof.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
@@ -19,6 +26,7 @@ export function SocialproofSection() {
             </p>
           </Reveal>
 
+          {/* Метрики-карточки */}
           <dl className="grid grid-cols-3 gap-3">
             {socialproof.stats.map((s, i) => (
               <Reveal key={s.label} delay={0.1 * (i + 1)}>
@@ -33,6 +41,7 @@ export function SocialproofSection() {
           </dl>
         </div>
 
+        {/* Бегущая строка логотипов вузов */}
         <Reveal delay={0.2} className="mt-16">
           <Marquee>
             {socialproof.logos.map((logo) => (

@@ -1,3 +1,8 @@
+/**
+ * Обёртка появления при скролле: контент проявляется (fade + сдвиг + blur),
+ * когда попадает в область видимости. Используется по всему лендингу.
+ */
+
 "use client";
 
 import { motion, type Variants } from "motion/react";
@@ -11,6 +16,7 @@ type Props = {
   once?: boolean;
 };
 
+// Анимационные состояния: скрыто → видно.
 const variants: Variants = {
   hidden: { opacity: 0, y: 16, filter: "blur(6px)" },
   visible: {
@@ -24,6 +30,7 @@ const variants: Variants = {
   },
 };
 
+// Проявляет детей при первом появлении в вьюпорте (с задержкой delay).
 export function Reveal({
   children,
   delay = 0,

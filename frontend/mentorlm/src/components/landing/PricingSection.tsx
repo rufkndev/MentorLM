@@ -1,9 +1,15 @@
+/**
+ * Секция тарифов на лендинге (краткая версия, не путать со страницей /billing).
+ * Заголовок и три карточки планов; выделенный план рендерится отдельным видом.
+ */
+
 import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import { pricing } from "@/lib/landing-contents";
 
+// Секция тарифов лендинга.
 export function PricingSection() {
   return (
     <section id="pricing" className="relative py-28 sm:py-36">
@@ -22,6 +28,7 @@ export function PricingSection() {
           </header>
         </Reveal>
 
+        {/* Карточки планов (выделенный — особым видом) */}
         <div className="mt-14 grid items-stretch gap-5 lg:grid-cols-3">
           {pricing.plans.map((plan, i) => (
             <Reveal key={plan.name} delay={0.07 * (i + 1)} className="h-full">
@@ -40,6 +47,7 @@ export function PricingSection() {
 
 type Plan = (typeof pricing.plans)[number];
 
+// Обычная карточка плана (стеклянная).
 function PlainPlan({ plan }: { plan: Plan }) {
   return (
     <GlassCard
@@ -61,6 +69,7 @@ function PlainPlan({ plan }: { plan: Plan }) {
   );
 }
 
+// Выделенная карточка плана (тёмный градиент + бейдж «Рекомендуем»).
 function FeaturedPlan({ plan }: { plan: Plan }) {
   return (
     <article
@@ -84,6 +93,7 @@ function FeaturedPlan({ plan }: { plan: Plan }) {
   );
 }
 
+// Шапка карточки: название, цена, описание.
 function PlanHead({ plan, featured }: { plan: Plan; featured?: boolean }) {
   return (
     <>
@@ -125,6 +135,7 @@ function PlanHead({ plan, featured }: { plan: Plan; featured?: boolean }) {
   );
 }
 
+// Список возможностей плана.
 function PlanFeatures({ plan, featured }: { plan: Plan; featured?: boolean }) {
   return (
     <ul className="mt-6 space-y-2.5">
@@ -144,6 +155,7 @@ function PlanFeatures({ plan, featured }: { plan: Plan; featured?: boolean }) {
   );
 }
 
+// Иконка-галочка перед пунктом плана.
 function Check({ featured }: { featured?: boolean }) {
   return (
     <span

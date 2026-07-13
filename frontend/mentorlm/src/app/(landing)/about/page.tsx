@@ -1,12 +1,19 @@
+/**
+ * Страница «О проекте» (/about).
+ * Статический текст в обёртке DocPage: описание платформы, режимов и тарифов.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "О проекте",
   description:
     "Mentor LM — единая AI-платформа для учёбы. Подробное описание возможностей, режимов работы и тарифных планов.",
 };
 
+// Контент страницы «О проекте».
 export default function AboutPage() {
   return (
     <DocPage

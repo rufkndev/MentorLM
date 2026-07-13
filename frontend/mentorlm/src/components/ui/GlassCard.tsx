@@ -1,3 +1,9 @@
+/**
+ * Стеклянная карточка (.glass-card) с бликом, следящим за курсором.
+ * Обновляет CSS-переменные --mx/--my по позиции мыши для эффекта.
+ * Используется в секциях лендинга и карточках.
+ */
+
 "use client";
 
 import { useRef, type HTMLAttributes, type ReactNode } from "react";
@@ -8,6 +14,7 @@ type Props = HTMLAttributes<HTMLDivElement> & {
   children: ReactNode;
 };
 
+// Карточка-стекло; тег можно менять (div/article/section).
 export function GlassCard({
   className,
   children,
@@ -16,6 +23,7 @@ export function GlassCard({
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Пишем позицию курсора в CSS-переменные — от них зависит блик.
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;

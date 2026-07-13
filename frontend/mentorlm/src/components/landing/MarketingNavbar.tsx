@@ -1,3 +1,9 @@
+/**
+ * Плавающая навигация лендинга (шапка сверху).
+ * Логотип, ссылки-якоря и кнопка входа/перехода в приложение.
+ * Меняет тень при прокрутке; текст кнопки зависит от авторизации.
+ */
+
 "use client";
 
 import Link from "next/link";
@@ -9,12 +15,15 @@ import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";
 import { nav } from "@/lib/landing-contents";
 
+// Верхняя навигация маркетинговых страниц.
 export function MarketingNavbar() {
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
   const { isLoaded, isSignedIn } = useAuth();
+  // Авторизован → «Открыть приложение», иначе → «Войти».
   const cta = isLoaded && isSignedIn ? nav.ctaAuthed : nav.ctaPrimary;
 
+  // Включаем тень навбара после небольшой прокрутки.
   useMotionValueEvent(scrollY, "change", (v) => {
     setScrolled(v > 8);
   });
@@ -31,6 +40,7 @@ export function MarketingNavbar() {
           scrolled && "shadow-[0_18px_60px_-20px_rgba(7,27,77,0.25)]"
         )}
       >
+        {/* Логотип-ссылка на главную */}
         <Link
           href="/"
           className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/40 transition-colors"
@@ -38,6 +48,7 @@ export function MarketingNavbar() {
           <Logo />
         </Link>
 
+        {/* Ссылки-якоря по секциям (скрыты на мобильном) */}
         <ul className="hidden items-center gap-1 md:flex">
           {nav.links.map((l) => (
             <li key={l.href}>
@@ -51,6 +62,7 @@ export function MarketingNavbar() {
           ))}
         </ul>
 
+        {/* Главная кнопка действия (вход / открыть приложение) */}
         <div className="flex items-center">
           <Button href={cta.href} size="sm">
             {cta.label}

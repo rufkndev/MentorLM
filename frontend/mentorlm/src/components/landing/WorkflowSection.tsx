@@ -1,3 +1,8 @@
+/**
+ * Секция «Как это работает»: три шага с прогресс-линией, заполняющейся при скролле.
+ * Каждый шаг проявляется по мере попадания в вьюпорт.
+ */
+
 "use client";
 
 import { motion, useScroll, useTransform } from "motion/react";
@@ -6,8 +11,10 @@ import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import { workflow } from "@/lib/landing-contents";
 
+// Секция «Как это работает».
 export function WorkflowSection() {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Прогресс прокрутки секции → высота заполнения линии.
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start 30%", "end 70%"],
@@ -34,7 +41,7 @@ export function WorkflowSection() {
         </header>
 
         <div ref={containerRef} className="relative mt-16 grid gap-10 lg:grid-cols-[80px_1fr]">
-          {/* progress rail */}
+          {/* Вертикальная линия прогресса слева */}
           <div className="relative hidden lg:block">
             <div className="sticky top-32 h-[420px]">
               <div className="relative mx-auto h-full w-px bg-[var(--brand-line)]">
@@ -46,6 +53,7 @@ export function WorkflowSection() {
             </div>
           </div>
 
+          {/* Карточки шагов */}
           <ol className="flex flex-col gap-6">
             {workflow.steps.map((step, i) => (
               <Step key={step.n} step={step} index={i} />
@@ -57,6 +65,7 @@ export function WorkflowSection() {
   );
 }
 
+// Одна карточка-шаг, проявляющаяся при прокрутке в вьюпорт.
 function Step({
   step,
   index,

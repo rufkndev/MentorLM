@@ -60,17 +60,29 @@ def build_context(
 
     token_budget = plan_limits.get("context_tokens") or 8_000
 
-    qs = list(conversation.messages.order_by("created_at"))
+    # prefetch вложений — их извлечённый текст подмешиваем в контент сообщения,
+    # чтобы модель «видела» прикреплённые файлы (в текущем и прошлых ходах).
+    qs = list(
+        conversation.messages.prefetch_related("attachments").order_by("created_at")
+    )
     recent = qs[-max_messages:] if max_messages > 0 else qs
 
     # Идём с конца и набираем сообщения, пока укладываемся в бюджет токенов.
     selected: list[dict] = []
     used = 0
     for msg in reversed(recent):
-        cost = count_tokens(msg.content, model)
+        content = _content_with_attachments(msg)
+        cost = count_tokens(content, model)
         if selected and used + cost > token_budget:
             break
-        selected.append({"role": msg.role, "content": msg.content})
+        selected.append({"role": msg.role, "content": content})
         used += cost
     selected.reverse()
     return selected
+
+
+def _content_with_attachments(msg) -> str:
+    """Текст сообщения плюс извлечённый текст его вложений (если есть)."""
+    from apps.conversations.attachments import render_attachments_block
+
+    return msg.content + render_attachments_block(msg.attachments.all())

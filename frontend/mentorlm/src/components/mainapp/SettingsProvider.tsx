@@ -1,3 +1,10 @@
+/**
+ * Провайдер пользовательских настроек (тема, шрифт, предпочтения ИИ, память).
+ * Читает/пишет /api/me/settings/, кэширует их в localStorage для мгновенного
+ * старта, применяет тему и размер шрифта к <html>, а обновления шлёт на бэк
+ * дебаунс-PATCH'ем. Потребители — диалог настроек и весь UI через useSettings().
+ */
+
 "use client";
 
 import {
@@ -22,16 +29,14 @@ import type {
   RetentionDays,
 } from "@/lib/settings-contents";
 
-/* ── Тип настроек (зеркало UserSettingsSerializer на бэке) ── */
+// Тип настроек — зеркало UserSettingsSerializer на бэке.
 export type Theme = "system" | "light" | "dark";
 export type FontSize = "sm" | "md" | "lg";
 
 export type Settings = {
   // внешний вид / поведение
   theme: Theme;
-  interface_lang: string;
   font_size: FontSize;
-  auto_scroll: boolean;
   // модель ИИ (мягкие предпочтения поверх сценария)
   chat_model: ModelTier;
   code_model: ModelTier;
@@ -55,12 +60,10 @@ export type Settings = {
   chat_retention_days: RetentionDays;
 };
 
-/* Значения по умолчанию = дефолты модели UserSettings (apps/ai/preferences.py DEFAULTS). */
-export const DEFAULT_SETTINGS: Settings = {
+// Значения по умолчанию = дефолты бэка (apps/ai/preferences.py DEFAULTS).
+const DEFAULT_SETTINGS: Settings = {
   theme: "system",
-  interface_lang: "ru",
   font_size: "md",
-  auto_scroll: true,
   chat_model: "default",
   code_model: "default",
   research_model: "default",
@@ -81,14 +84,12 @@ export const DEFAULT_SETTINGS: Settings = {
   chat_retention_days: 0,
 };
 
-export const THEME_STORAGE_KEY = "mentorlm-theme";
-export const FONT_STORAGE_KEY = "mentorlm-font-size";
-/** Кэш всего объекта настроек — для мгновенной отрисовки без задержки на сеть. */
-export const SETTINGS_STORAGE_KEY = "mentorlm-settings";
+// Ключи localStorage для темы, шрифта и полного объекта настроек.
+const THEME_STORAGE_KEY = "mentorlm-theme";
+const FONT_STORAGE_KEY = "mentorlm-font-size";
+const SETTINGS_STORAGE_KEY = "mentorlm-settings";
 
-/* Синхронно читаем закэшированные настройки (stale-while-revalidate).
-   На сервере window нет — отдаём дефолты; диалог настроек всё равно не
-   рендерится при SSR, так что рассинхрона гидратации не возникает. */
+// Синхронно читает закэшированные настройки (на сервере — дефолты).
 function readCachedSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
@@ -100,7 +101,9 @@ function readCachedSettings(): Settings {
   }
 }
 
-/* ── Применение темы/шрифта к <html> ── */
+// Применение темы/шрифта к <html>
+
+// Разворачивает "system" в реальную тему по системной настройке.
 function resolveTheme(theme: Theme): "light" | "dark" {
   if (theme === "system") {
     const prefersDark =
@@ -111,26 +114,27 @@ function resolveTheme(theme: Theme): "light" | "dark" {
   return theme;
 }
 
+// Ставит выбранную тему на <html> (атрибут data-theme).
 function applyTheme(theme: Theme) {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", resolveTheme(theme));
 }
 
+// Ставит размер шрифта чата на <html> (атрибут data-font-size).
 function applyFontSize(size: FontSize) {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-font-size", size);
 }
 
-/* ── Контекст ── */
 type SettingsContextValue = {
   settings: Settings;
-  /** Частичное обновление: оптимистично + дебаунс-PATCH на бэк. */
-  update: (patch: Partial<Settings>) => void;
+  update: (patch: Partial<Settings>) => void; // оптимистично + дебаунс-PATCH
   loading: boolean;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+// Провайдер: держит настройки, синхронизирует с бэком и применяет тему/шрифт.
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const api = useApi();
   // Стартуем сразу с закэшированных настроек — без вспышки дефолтов.
@@ -150,7 +154,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const pendingRef = useRef<Partial<Settings>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Загрузка настроек с бэка при монтировании. */
+  // Загрузка настроек с бэка при монтировании (бэк — источник правды).
   useEffect(() => {
     let cancelled = false;
     api
@@ -177,7 +181,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* Если тема = system — реагируем на смену системной темы. */
+  // Если тема = system — реагируем на смену системной темы на лету.
   useEffect(() => {
     if (settings.theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -186,6 +190,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     return () => mq.removeEventListener("change", onChange);
   }, [settings.theme]);
 
+  // Отправляет накопленные изменения одним PATCH на бэк.
   const flush = useCallback(() => {
     const patch = pendingRef.current;
     pendingRef.current = {};
@@ -195,6 +200,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     });
   }, [api]);
 
+  // Частичное обновление настроек: локально сразу, на бэк — дебаунсом.
   const update = useCallback(
     (patch: Partial<Settings>) => {
       // 1) оптимистичное локальное обновление
@@ -233,6 +239,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Доступ к настройкам и функции их обновления.
 export function useSettings() {
   const ctx = useContext(SettingsContext);
   if (!ctx) {

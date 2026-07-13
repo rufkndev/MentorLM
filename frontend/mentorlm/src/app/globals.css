@@ -1,10 +1,17 @@
+/*
+ * Глобальные стили и дизайн-система приложения (Tailwind v4, CSS-first).
+ * Здесь: брендовые токены (--brand-*), мост к Tailwind (@theme), тёмная тема,
+ * стеклянные поверхности (.glass*), типографика, стили Markdown-ответов ИИ и
+ * анимации. Единый источник правды по оформлению — подключается в app/layout.
+ */
+
 @import "tailwindcss";
 
-/* dark-вариант завязан на data-theme="dark" (а не prefers-color-scheme),
-   чтобы утилиты `dark:*` совпадали с нашим переключателем темы. */
+/* Тёмный вариант привязан к data-theme="dark" (не к prefers-color-scheme),
+   чтобы утилиты dark:* совпадали с нашим переключателем темы. */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
-/* design tokens */
+/* ── Брендовые токены (светлая тема по умолчанию) ── */
 :root {
   --brand-paper: #f1f2f5;
   --brand-paper-2: #e6e8ee;
@@ -13,7 +20,7 @@
   --brand-muted: #6a7285;
   --brand-line: #dce2ee;
 
-  /* приподнятая поверхность (диалоги, карточки, поля ввода) */
+  /* приподнятая поверхность: диалоги, карточки, поля ввода */
   --brand-surface: #ffffff;
   --brand-surface-2: #f6f7fb;
 
@@ -38,7 +45,7 @@
   --shadow-soft: 0 1px 2px rgba(9, 15, 31, 0.04), 0 8px 24px rgba(9, 15, 31, 0.06);
   --shadow-lift: 0 24px 60px -20px rgba(7, 27, 77, 0.25);
 
-  /* apple-style liquid glass shadow stack */
+  /* набор теней для «жидкого стекла» */
   --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.9),
     inset 0 -1px 0 rgba(255, 255, 255, 0.18),
     inset 0 0 0 1px rgba(255, 255, 255, 0.42),
@@ -53,11 +60,8 @@
   --chat-scale: 1;
 }
 
-/*
- * Тёмная тема — функциональная: переопределяем доменные --brand-* токены и
- * стеклянные поверхности. Активируется атрибутом data-theme="dark" на <html>
- * (его ставит SettingsProvider / анти-FOUC скрипт). Светлая — по умолчанию.
- */
+/* ── Тёмная тема: переопределяем токены и стеклянные поверхности.
+   Включается атрибутом data-theme="dark" на <html> (ставит SettingsProvider). ── */
 :root[data-theme="dark"] {
   --brand-paper: #0b1020;
   --brand-paper-2: #151b2e;
@@ -66,25 +70,25 @@
   --brand-muted: #8b93a7;
   --brand-line: #28324c;
 
-  /* приподнятая поверхность темнее фона, но светлее paper-2 — даёт «слой» */
+  /* поверхность темнее фона, но светлее paper-2 — даёт ощущение «слоя» */
   --brand-surface: #1b2236;
   --brand-surface-2: #222b42;
 
   --brand-primary: #4a74ff;
   --brand-primary-hover: #6a8cff;
-  --brand-primary-soft: #1a2444; /* dark cobalt tint */
+  --brand-primary-soft: #1a2444; /* тёмный кобальтовый оттенок */
 
   --brand-blue-soft: #2a3b66;
   --brand-warm: #1c1b22;
 
-  /* стеклянная «кромка» и тени под тёмный фон */
+  /* кромка стекла и тени под тёмный фон */
   --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4),
     0 24px 60px -20px rgba(0, 0, 0, 0.6);
 }
 
-/* размер шрифта в чате — шкала, потребляемая .chat-text */
+/* размер шрифта в чате — шкала для .chat-text */
 :root[data-font-size="sm"] {
   --chat-scale: 0.9;
 }
@@ -92,7 +96,7 @@
   --chat-scale: 1.12;
 }
 
-/* tailwind theme bridge */
+/* ── Мост токенов к именам Tailwind (@theme) ── */
 @theme inline {
   --color-paper: var(--brand-paper);
   --color-paper-2: var(--brand-paper-2);
@@ -119,7 +123,7 @@
   --radius-pill: 999px;
 }
 
-/* base */
+/* ── Базовые стили документа ── */
 * {
   border-color: var(--brand-line);
 }
@@ -170,16 +174,14 @@ html[data-theme="dark"] {
   color: var(--brand-ink);
 }
 
-/* размер текста сообщений в чате (масштабируется var(--chat-scale)) */
+/* текст сообщений чата (масштабируется var(--chat-scale)) */
 .chat-text {
   font-size: calc(14.5px * var(--chat-scale));
   line-height: 1.6;
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * Markdown в ответах ИИ (.md). Цвета — через --brand-* токены, поэтому стили
- * автоматически работают и в тёмной теме. Скоуп на .md, чтобы не задеть UI.
- * ────────────────────────────────────────────────────────────────────────── */
+/* ── Стили Markdown в ответах ИИ (.md). Цвета через --brand-* токены,
+   поэтому работают и в тёмной теме. Скоуп .md — чтобы не задеть остальной UI. ── */
 .md {
   line-height: 1.6;
   word-wrap: break-word;
@@ -262,7 +264,7 @@ html[data-theme="dark"] {
   font-family: var(--font-mono);
   font-size: 0.9em;
 }
-/* инлайновый код (не внутри pre) — подложка-плашка */
+/* инлайновый код (вне pre) — подложка-плашка */
 .md :not(pre) > code {
   background: color-mix(in srgb, var(--brand-ink) 8%, transparent);
   padding: 0.12em 0.36em;
@@ -323,7 +325,7 @@ body {
   color: #ffffff;
 }
 
-/* range slider */
+/* ── Ползунок-слайдер (input range) ── */
 .range-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -389,7 +391,7 @@ body {
   transform: scale(1.12);
 }
 
-/* typography */
+/* ── Типографика (утилиты заголовков/акцентов) ── */
 .text-display {
   font-feature-settings: "ss01", "ss02";
   letter-spacing: -0.035em;
@@ -428,7 +430,7 @@ body {
   color: transparent;
 }
 
-/* liquid glass (apple) */
+/* ── «Жидкое стекло»: полупрозрачные поверхности с блюром ── */
 .glass,
 .glass-strong,
 .glass-card {
@@ -474,7 +476,7 @@ body {
     box-shadow 320ms var(--ease-spring);
 }
 
-/* тёмная тема: стекло становится тёмным полупрозрачным, без белых заливок */
+/* тёмная тема: стекло становится тёмным полупрозрачным */
 :root[data-theme="dark"] .glass {
   background: linear-gradient(
     180deg,
@@ -496,14 +498,14 @@ body {
     rgba(11, 16, 32, 0.5) 100%
   );
 }
-/* приглушаем белые specular-блики на тёмном фоне */
+/* приглушаем белые блики на тёмном фоне */
 :root[data-theme="dark"] .glass::before,
 :root[data-theme="dark"] .glass-strong::before,
 :root[data-theme="dark"] .glass-card::before {
   opacity: 0.18;
 }
 
-/* specular highlights (static) */
+/* статичные блики на стекле */
 .glass::before,
 .glass-strong::before,
 .glass-card::before {
@@ -525,7 +527,7 @@ body {
   z-index: 0;
 }
 
-/* mouse-tracked spec highlight (on glass-card) */
+/* блик, следящий за курсором (для .glass-card) */
 .glass-card::after {
   content: "";
   position: absolute;
@@ -553,7 +555,7 @@ body {
   opacity: 1;
 }
 
-/* content of cards on ::before/::after */
+/* контент поверх псевдоэлементов ::before/::after */
 .glass > *,
 .glass-strong > *,
 .glass-card > * {
@@ -561,26 +563,7 @@ body {
   z-index: 2;
 }
 
-.glass-dark {
-  position: relative;
-  background: linear-gradient(
-    180deg,
-    rgba(7, 27, 77, 0.7) 0%,
-    rgba(7, 27, 77, 0.5) 100%
-  );
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: #ffffff;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.hairline {
-  box-shadow: 0 0 0 1px var(--brand-line);
-}
-
-/* hero-local aurora — on top of global background, more bright */
+/* ── Декор: аврора, сетка, шум ── */
 .aurora {
   position: absolute;
   inset: 0;
@@ -648,7 +631,7 @@ body {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
 }
 
-/* keyframes (animations) */
+/* ── Кейфреймы анимаций ── */
 @keyframes drift {
   0% {
     transform: translate3d(0, 0, 0) scale(1);
@@ -658,15 +641,6 @@ body {
   }
   100% {
     transform: translate3d(-30px, 30px, 0) scale(0.98);
-  }
-}
-
-@keyframes shine {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(220%);
   }
 }
 
@@ -720,26 +694,6 @@ body {
 
 .animate-float {
   animation: float 7s ease-in-out infinite;
-}
-
-.animate-shine {
-  position: relative;
-  overflow: hidden;
-}
-
-.animate-shine::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 30%,
-    rgba(255, 255, 255, 0.5) 50%,
-    transparent 70%
-  );
-  transform: translateX(-120%);
-  animation: shine 2.6s ease-in-out infinite;
-  pointer-events: none;
 }
 
 .lift {

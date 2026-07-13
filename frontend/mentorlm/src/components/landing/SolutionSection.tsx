@@ -1,13 +1,20 @@
+/**
+ * Секция «Решение» лендинга.
+ * Слева — заголовок, описание и три метрики; справа — слот под видео-демо.
+ */
+
 "use client";
 
 import { Reveal } from "@/components/ui/Reveal";
 import { solution } from "@/lib/landing-contents";
 
+// Секция «Решение».
 export function SolutionSection() {
   return (
     <section className="relative py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
+          {/* Левая колонка: текст и метрики */}
           <Reveal>
             <p className="text-eyebrow">{solution.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
@@ -19,6 +26,7 @@ export function SolutionSection() {
               {solution.description}
             </p>
 
+            {/* Три ключевые метрики решения */}
             <dl className="mt-10 grid grid-cols-3 gap-3">
               {solution.highlights.map((h, i) => (
                 <Reveal key={h.label} delay={0.06 * (i + 1)}>
@@ -33,6 +41,7 @@ export function SolutionSection() {
             </dl>
           </Reveal>
 
+          {/* Правая колонка: слот под видео-демо */}
           <Reveal delay={0.15}>
             <SolutionVideoSlot />
           </Reveal>
@@ -42,15 +51,8 @@ export function SolutionSection() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────
- * SolutionVideoSlot — заглушка под видео-демо мейн-аппа.
- *
- * Пока вместо видео — стеклянная карточка с рамкой-градиентом и
- * подсказкой. Чтобы вставить ролик: положи файл в /public/video/
- * (например, mainapp.mp4 + mainapp.webm) и замени блок-placeholder
- * на тег <video> ниже — пример раскомментирован в коде.
- * ──────────────────────────────────────────────────────────────── */
-
+// Заглушка под видео-демо приложения (пока стеклянная карточка с подсказкой).
+// Готовый ролик кладётся в /public/video/ и вставляется тегом <video> ниже.
 function SolutionVideoSlot() {
   return (
     <div className="relative aspect-video w-full justify-self-center lg:justify-self-end">
@@ -64,7 +66,7 @@ function SolutionVideoSlot() {
       />
 
       <div className="glass-strong absolute inset-3 flex items-center justify-center overflow-hidden rounded-[22px]">
-        {/* ───── когда видео будет готово, замени блок ниже на:
+        {/* Когда видео будет готово — заменить блок-заглушку ниже на:
         <video
           src="/video/mainapp.mp4"
           poster="/video/mainapp-poster.jpg"
@@ -91,6 +93,7 @@ function SolutionVideoSlot() {
   );
 }
 
+// Иконка «play» для заглушки видео.
 function PlayIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>

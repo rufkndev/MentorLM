@@ -1,4 +1,11 @@
-// значения должны совпадать с бэком (apps/ai/preferences.py)
+/**
+ * Справочник опций для диалога настроек (вкладки «Модель ИИ», «Память», «Данные»).
+ * Здесь только типы и списки вариантов для селектов/переключателей — без логики.
+ * Значения обязаны совпадать с бэком (apps/ai/preferences.py).
+ * Используется в компонентах settings/tabs/* и в SettingsProvider.
+ */
+
+// Типы значений настроек (строковые коды, понятные бэку).
 export type ModelTier = "default" | "fast" | "quality";
 export type Creativity = "precise" | "balanced" | "creative";
 export type LengthPref = "shorter" | "default" | "longer";
@@ -6,7 +13,7 @@ export type ReasoningDepth = "fast" | "auto" | "deep";
 export type EducationLevel =
   | ""
   | "school"
-  | "college" 
+  | "college"
   | "bachelor"
   | "master"
   | "postgraduate"
@@ -16,34 +23,40 @@ export type MemoryScope = "minimal" | "balanced" | "detailed";
 export type MemoryUse = "off" | "auto" | "always";
 export type RetentionDays = 0 | 30 | 90 | 180;
 
+// Общая форма пункта селекта: код значения + подпись в UI.
 type Option<T extends string> = { value: T; label: string };
 
-/* ── Модель ИИ ── */
+// ── Модель ИИ ──
+
+// Тир модели: скорость против качества.
 export const MODEL_TIER_OPTIONS: Option<ModelTier>[] = [
   { value: "fast", label: "Быстрая" },
   { value: "default", label: "Стандартная" },
   { value: "quality", label: "Максимальная" },
 ];
 
+// Креативность ответов (смещает «температуру» сценария).
 export const CREATIVITY_OPTIONS: Option<Creativity>[] = [
   { value: "precise", label: "Точные" },
   { value: "balanced", label: "Сбалансированные" },
   { value: "creative", label: "Творческие" },
 ];
 
+// Предпочтительная длина ответа.
 export const LENGTH_PREF_OPTIONS: Option<LengthPref>[] = [
   { value: "shorter", label: "Короче" },
   { value: "default", label: "Как в сценарии" },
   { value: "longer", label: "Подробнее" },
 ];
 
+// Глубина проработки ответа.
 export const REASONING_DEPTH_OPTIONS: Option<ReasoningDepth>[] = [
   { value: "fast", label: "Быстро" },
   { value: "auto", label: "Авто" },
   { value: "deep", label: "Тщательно" },
 ];
 
-/* Режимы, для которых выбирается модель. Порядок = порядок в UI. */
+// Режимы, для которых пользователь выбирает модель (порядок = порядок в UI).
 export const MODEL_MODE_FIELDS = [
   {
     key: "chat_model",
@@ -62,7 +75,9 @@ export const MODEL_MODE_FIELDS = [
   },
 ] as const;
 
-/* ── Память ── */
+// ── Память ──
+
+// Уровень обучения пользователя (влияет на глубину объяснений).
 export const EDUCATION_LEVEL_OPTIONS: Option<EducationLevel>[] = [
   { value: "", label: "Не указано" },
   { value: "school", label: "Школа" },
@@ -73,6 +88,7 @@ export const EDUCATION_LEVEL_OPTIONS: Option<EducationLevel>[] = [
   { value: "other", label: "Другое" },
 ];
 
+// Сколько истории диалога учитывать.
 export const CONTEXT_DEPTH_OPTIONS: Option<ContextDepth>[] = [
   { value: "compact", label: "Компактно" },
   { value: "normal", label: "Обычно" },
@@ -80,19 +96,23 @@ export const CONTEXT_DEPTH_OPTIONS: Option<ContextDepth>[] = [
   { value: "maximum", label: "Максимум" },
 ];
 
+// Насколько подробно запоминать факты о пользователе.
 export const MEMORY_SCOPE_OPTIONS: Option<MemoryScope>[] = [
   { value: "minimal", label: "Минимальный" },
   { value: "balanced", label: "Сбалансированный" },
   { value: "detailed", label: "Подробный" },
 ];
 
+// Насколько активно подмешивать сохранённые факты в ответы.
 export const MEMORY_USE_OPTIONS: Option<MemoryUse>[] = [
   { value: "off", label: "Не использовать" },
   { value: "auto", label: "Автоматически" },
   { value: "always", label: "Всегда" },
 ];
 
-/* ── Данные ── */
+// ── Данные ──
+
+// Срок автоудаления неактивных чатов.
 export const RETENTION_OPTIONS: { value: RetentionDays; label: string }[] = [
   { value: 0, label: "Не удалять" },
   { value: 30, label: "Старше 30 дней" },

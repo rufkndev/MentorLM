@@ -1,12 +1,19 @@
+/**
+ * Страница «Условия использования» (/legal/terms).
+ * Юридический документ-черновик в обёртке DocPage.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "Условия использования",
   description:
     "Условия использования сервиса Mentor LM: правила доступа, обязанности сторон и ограничения ответственности.",
 };
 
+// Контент условий использования.
 export default function TermsPage() {
   return (
     <DocPage

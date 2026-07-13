@@ -1,8 +1,15 @@
+/**
+ * Логотип Mentor LM: градиентная иконка + текст «MentorLM».
+ * Используется в шапке лендинга и в сайдбаре приложения.
+ */
+
 import { cn } from "@/lib/cn";
 
+// Логотип: иконка-значок и словесная марка.
 export function Logo({ className }: { className?: string }) {
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
+      {/* Градиентный значок логотипа */}
       <span
         aria-hidden
         className="relative inline-flex h-7 w-7 items-center justify-center rounded-xl"
@@ -16,6 +23,7 @@ export function Logo({ className }: { className?: string }) {
         <span className="absolute inset-[3px] rounded-[9px] bg-[var(--brand-paper)]" />
         <span className="relative h-1.5 w-1.5 rounded-full bg-[var(--brand-primary)]" />
       </span>
+      {/* Текстовая часть логотипа */}
       <span className="text-[15px] font-semibold tracking-tight text-ink">
         Mentor<span className="text-[var(--brand-primary)]">LM</span>
       </span>

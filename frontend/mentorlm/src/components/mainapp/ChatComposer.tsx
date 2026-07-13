@@ -1,6 +1,18 @@
+/**
+ * Композер сообщения (поле ввода внизу чата / по центру на пустом экране).
+ * Управляет текстом, вложениями и рядом сценариев; сам выбранный сценарий
+ * хранится снаружи (в ChatScreen). Отправку отдаёт наверх через onSubmit.
+ */
+
 "use client";
 
-import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+} from "react";
 import { motion } from "motion/react";
 import {
   ArrowUp,
@@ -23,6 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { takeDraft } from "@/lib/draft";
 import type { Scenario, ScenarioIconId } from "@/lib/mainapp-contents";
 
 export type ComposerSubmit = {
@@ -42,13 +55,11 @@ type Props = {
   variant?: "hero" | "dock";
   disabled?: boolean;
   placeholder?: string;
+  /** Подставить черновик вопроса с лендинга (только на пустом hero-экране). */
+  seedDraft?: boolean;
 };
 
-/**
- * Соответствие id сценария → компоненту иконки lucide.
- * Сами иконки берём из библиотеки, чтобы они были согласованы по сетке и
- * толщине штриха. Кастомные нужны были бы только под брендовые символы.
- */
+// Соответствие id сценария → иконке lucide (для чипов сценариев).
 const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
   book: BookOpen,
   wrench: Wrench,
@@ -67,6 +78,14 @@ const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
   facts: ShieldCheck,
 };
 
+// Ограничения вложений — совпадают с бэком (apps/conversations/attachments.py).
+const MAX_FILES = 5;
+const MAX_FILE_MB = 10;
+// Форматы, из которых бэк умеет извлекать текст (pdf/docx/текст/код).
+const ACCEPT_ATTACHMENTS =
+  ".pdf,.docx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.py,.js,.ts,.tsx,.jsx,.java,.c,.h,.cpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.sql,.sh,.css,.scss";
+
+// Композер: текст + вложения + ряд сценариев; hero (центр) или dock (низ).
 export function ChatComposer({
   onSubmit,
   scenarios,
@@ -75,22 +94,41 @@ export function ChatComposer({
   variant = "dock",
   disabled,
   placeholder = "Спросите что угодно по учёбе…",
+  seedDraft = false,
 }: Props) {
-  const [text, setText] = useState("");
+  // При seedDraft одноразово забираем черновик с лендинга как стартовый текст.
+  const [text, setText] = useState(() => (seedDraft ? takeDraft() : ""));
   const [files, setFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const canSend = !disabled && text.trim().length > 0;
+  // Отправить можно, если есть текст ИЛИ хотя бы одно вложение.
+  const canSend = !disabled && (text.trim().length > 0 || files.length > 0);
 
+  // Если подставлен черновик — растим поле под его высоту и ставим курсор.
+  useEffect(() => {
+    if (!seedDraft || !text) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
+    ta.focus();
+    ta.setSelectionRange(text.length, text.length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Отправка сообщения наверх + сброс поля и вложений.
   const handleSubmit = () => {
     if (!canSend) return;
     onSubmit({ text: text.trim(), scenarioId, files });
     setText("");
     setFiles([]);
+    setFileError(null);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
+  // Enter — отправка, Shift+Enter — перенос строки.
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -98,6 +136,7 @@ export function ChatComposer({
     }
   };
 
+  // Ввод текста + авто-рост высоты поля.
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     const ta = e.target;
@@ -105,14 +144,35 @@ export function ChatComposer({
     ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
   };
 
+  // Добавление файлов с валидацией размера и количества (как на бэке).
   const handleFiles = (e: ChangeEvent<HTMLInputElement>) => {
-    const list = Array.from(e.target.files ?? []);
-    if (list.length) setFiles((prev) => [...prev, ...list]);
+    const picked = Array.from(e.target.files ?? []);
     e.target.value = "";
+    if (!picked.length) return;
+
+    const errors: string[] = [];
+    const fitting = picked.filter((f) => {
+      if (f.size > MAX_FILE_MB * 1024 * 1024) {
+        errors.push(`«${f.name}» больше ${MAX_FILE_MB} МБ`);
+        return false;
+      }
+      return true;
+    });
+
+    let merged = [...files, ...fitting];
+    if (merged.length > MAX_FILES) {
+      merged = merged.slice(0, MAX_FILES);
+      errors.push(`не больше ${MAX_FILES} файлов за раз`);
+    }
+    setFiles(merged);
+    setFileError(errors.length ? errors.join("; ") : null);
   };
 
-  const removeFile = (idx: number) =>
+  // Удаление одного вложения по индексу.
+  const removeFile = (idx: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
+    setFileError(null);
+  };
 
   return (
     <motion.div
@@ -129,6 +189,7 @@ export function ChatComposer({
           "shadow-[0_18px_60px_-22px_rgba(7,27,77,0.25)]"
         )}
       >
+        {/* Чипсы прикреплённых файлов (если есть) */}
         {files.length > 0 && (
           <div className="flex flex-wrap gap-1.5 px-1.5 pb-2 pt-1">
             {files.map((file, i) => (
@@ -137,6 +198,14 @@ export function ChatComposer({
           </div>
         )}
 
+        {/* Ошибка валидации вложений */}
+        {fileError && (
+          <p className="px-2.5 pb-1.5 text-[12px] text-red-600 dark:text-red-400">
+            {fileError}
+          </p>
+        )}
+
+        {/* Поле ввода сообщения */}
         <textarea
           ref={textareaRef}
           value={text}
@@ -151,11 +220,13 @@ export function ChatComposer({
           )}
         />
 
+        {/* Нижний ряд: прикрепить файл (слева) и отправить (справа) */}
         <div className="mt-1 flex items-center gap-1.5 px-1">
           <input
             ref={fileRef}
             type="file"
             multiple
+            accept={ACCEPT_ATTACHMENTS}
             onChange={handleFiles}
             className="hidden"
           />
@@ -172,6 +243,7 @@ export function ChatComposer({
         </div>
       </div>
 
+      {/* Ряд чипов-сценариев под композером */}
       <ScenarioRow
         scenarios={scenarios}
         active={scenarioId}
@@ -182,6 +254,7 @@ export function ChatComposer({
   );
 }
 
+// Ряд чипов-сценариев (пресетов задачи внутри режима).
 function ScenarioRow({
   scenarios,
   active,
@@ -225,15 +298,14 @@ function ScenarioRow({
   );
 }
 
+// Круглая кнопка-инструмент композера (напр. «прикрепить файл»).
 function ToolButton({
   children,
   onClick,
-  active,
   label,
 }: {
   children: React.ReactNode;
   onClick?: () => void;
-  active?: boolean;
   label: string;
 }) {
   return (
@@ -242,18 +314,14 @@ function ToolButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={cn(
-        "flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors",
-        active
-          ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
-          : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
-      )}
+      className="flex h-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
     >
       {children}
     </button>
   );
 }
 
+// Кнопка отправки сообщения.
 function SendButton({
   onClick,
   disabled,
@@ -279,6 +347,7 @@ function SendButton({
   );
 }
 
+// Чип прикреплённого файла с крестиком удаления.
 function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <span className="flex items-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] px-2.5 py-1 text-[12px] text-ink-soft">

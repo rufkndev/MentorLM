@@ -1,7 +1,13 @@
+/**
+ * Финальная секция призыва к действию (CTA) на тёмном градиентном фоне.
+ * Крупный заголовок, подпись и интерактивный тизер чата.
+ */
+
 import { LandingChatTeaser } from "@/components/landing/LandingChatTeaser";
 import { Reveal } from "@/components/ui/Reveal";
 import { cta } from "@/lib/landing-contents";
 
+// Секция CTA внизу лендинга.
 export function CTASection() {
   return (
     <section className="relative px-4 py-28 sm:py-36">
@@ -16,7 +22,7 @@ export function CTASection() {
           >
             <div className="noise pointer-events-none absolute inset-0" aria-hidden />
 
-            {/* glass orb */}
+            {/* Декоративные светящиеся сферы */}
             <div
               aria-hidden
               className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full"
@@ -48,6 +54,7 @@ export function CTASection() {
               {cta.description}
             </p>
 
+            {/* Интерактивный тизер чата */}
             <div className="relative mt-10">
               <LandingChatTeaser />
             </div>

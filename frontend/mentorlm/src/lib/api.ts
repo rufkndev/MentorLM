@@ -1,18 +1,24 @@
+/**
+ * HTTP-клиент фронтенда к Django-бэкенду.
+ * Хук useApi() отдаёт get/post/patch/delete и stream() для SSE-ответов ИИ,
+ * автоматически подставляя Clerk-токен в заголовок Authorization.
+ * Используется везде, где нужны данные с бэка (чат, настройки, память, тарифы).
+ */
+
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
 import { useCallback, useMemo } from "react";
 
+// Базовый адрес API (из env, без хвостового слэша); дефолт — локальный бэк.
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
+// Ошибка API с HTTP-статусом и машинным кодом лимита от бэка (guard.py).
 export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
-    // Машинный код ошибки лимита от бэка (guard.py): rate_limited,
-    // daily_messages, monthly_budget, mode_daily_limit, input_too_long,
-    // feature_locked. Пусто — обычная ошибка.
     public code?: string,
   ) {
     super(message);
@@ -20,7 +26,7 @@ export class ApiError extends Error {
   }
 }
 
-// Разбирает тело ответа-ошибки: бэк отдаёт JSON {code, message} для лимитов.
+// Собирает ApiError из тела ответа: у лимитов бэк отдаёт JSON {code, message}.
 async function apiErrorFrom(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => "");
   try {
@@ -29,14 +35,16 @@ async function apiErrorFrom(res: Response): Promise<ApiError> {
       return new ApiError(res.status, data.message || res.statusText, data.code);
     }
   } catch {
-    // не JSON — вернём как есть ниже
+    // тело не JSON — вернём как обычную ошибку ниже
   }
   return new ApiError(res.status, text || res.statusText);
 }
 
+// Главный хук доступа к API: собирает запросы с токеном Clerk.
 export function useApi() {
   const { getToken } = useAuth();
 
+  // Базовый запрос: подставляет токен, парсит JSON, кидает ApiError на !ok.
   const request = useCallback(
     async <T = unknown>(
       path: string,
@@ -56,13 +64,14 @@ export function useApi() {
         throw await apiErrorFrom(res);
       }
 
-      // 204 No Content — без тела.
+      // 204 No Content — тела нет.
       if (res.status === 204) return undefined as T;
       return (await res.json()) as T;
     },
     [getToken],
   );
 
+  // Стриминг ответа ИИ: читает SSE и отдаёт токены через onDelta.
   const stream = useCallback(
     async (
       path: string,
@@ -73,15 +82,18 @@ export function useApi() {
       } = {},
     ): Promise<{ messageId: number | null }> => {
       const token = await getToken();
+      // С вложениями шлём multipart (FormData) — Content-Type не ставим сами,
+      // браузер добавит boundary. Без файлов — как раньше, JSON.
+      const isForm = body instanceof FormData;
       const res = await fetch(`${API_URL}${path}`, {
         method: "POST",
-        // Без Accept: text/event-stream — иначе DRF (только JSON-рендерер)
-        // отдаёт 406 на этапе согласования формата ещё до обработчика.
+        // Заголовок Accept намеренно не ставим: DRF (только JSON-рендерер)
+        // иначе вернёт 406 на согласовании формата ещё до обработчика.
         headers: {
-          "Content-Type": "application/json",
+          ...(isForm ? {} : { "Content-Type": "application/json" }),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify(body),
+        body: isForm ? body : JSON.stringify(body),
         signal: options.signal,
       });
 
@@ -127,6 +139,7 @@ export function useApi() {
     [getToken],
   );
 
+  // Готовый набор методов, стабильный по ссылке между рендерами.
   return useMemo(
     () => ({
       get: <T = unknown>(path: string) => request<T>(path),

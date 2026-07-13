@@ -20,9 +20,7 @@ class UserSettingsSerializer(serializers.ModelSerializer):
         fields = [
             # внешний вид / поведение
             "theme",
-            "interface_lang",
             "font_size",
-            "auto_scroll",
             # данные
             "chat_retention_days",
             # параметры модели ИИ

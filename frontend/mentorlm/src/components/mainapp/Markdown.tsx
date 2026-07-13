@@ -1,17 +1,16 @@
+/**
+ * Рендер Markdown-ответа ИИ в HTML (списки, заголовки, таблицы, код и т.д.).
+ * Стили заданы в globals.css по скоупу `.md` через дизайн-токены — работают и в
+ * тёмной теме. Используется в ChatMessage для ответов ассистента.
+ */
+
 "use client";
 
 import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/**
- * Рендер Markdown-ответа ИИ. Разметка (списки, заголовки, таблицы, код,
- * **жирный** и т.д.) превращается в HTML; стили заданы в globals.css по скоупу
- * `.md` через design-токены, поэтому всё работает и в тёмной теме.
- *
- * memo: при стриминге контент часто меняется — мемоизируем по строке, чтобы не
- * перерисовывать дерево, пока текст не изменился.
- */
+// Внутренняя реализация рендера Markdown.
 function MarkdownImpl({ content }: { content: string }) {
   return (
     <div className="md">
@@ -30,4 +29,6 @@ function MarkdownImpl({ content }: { content: string }) {
   );
 }
 
+// memo: при стриминге контент часто меняется — не перерисовываем дерево,
+// пока строка не изменилась.
 export const Markdown = memo(MarkdownImpl);

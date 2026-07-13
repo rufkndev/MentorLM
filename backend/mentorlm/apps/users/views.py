@@ -28,10 +28,20 @@ def _next_month_iso() -> str:
 
 
 class MeView(APIView):
-    """GET /api/me/ — профиль текущего пользователя (тариф, дата регистрации)."""
+    """GET /api/me/ — профиль текущего пользователя; DELETE — удалить аккаунт."""
 
     def get(self, request):
         return Response(UserProfileSerializer(request.user).data)
+
+    def delete(self, request):
+        """Удалить профиль и все связанные данные пользователя.
+
+        Каскад (on_delete=CASCADE) стирает настройки, диалоги, сообщения,
+        память и счётчики использования. Сам аккаунт Clerk удаляет клиент
+        (user.delete()) — секретного ключа Clerk на бэкенде нет.
+        """
+        request.user.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MeSettingsView(APIView):

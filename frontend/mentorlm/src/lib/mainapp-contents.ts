@@ -1,11 +1,15 @@
 /**
- * Контент и типы для основного приложения.
- * Сейчас все данные мокаются на клиенте — позже это место станет
- * источником данных из Supabase / API.
+ * Данные и типы основного приложения (режимы, сценарии, чаты).
+ * Описывает три режима (Чат/Код/Исследовать) и их наборы сценариев —
+ * подписи и иконки для UI; сами промпты и параметры генерации живут на бэке
+ * (apps/ai/scenarios.py) и выбираются по id. Используется в сайдбаре, композере
+ * и на страницах режимов.
  */
 
+// Идентификатор режима приложения.
 export type ModeId = "chat" | "code" | "research";
 
+// Режим = вкладка приложения со своим URL и подписью.
 export type Mode = {
   id: ModeId;
   href: string;
@@ -13,6 +17,7 @@ export type Mode = {
   hint: string;
 };
 
+// Три режима приложения — рендерятся в переключателе сайдбара.
 export const modes: readonly Mode[] = [
   { id: "chat", href: "/chat", label: "Чат", hint: "Общий учебный диалог" },
   { id: "code", href: "/code", label: "Код", hint: "Разбор и написание кода" },
@@ -24,9 +29,7 @@ export const modes: readonly Mode[] = [
   },
 ] as const;
 
-/**
- * Иконки сценариев — рендерятся в композере; см. ScenarioIcon в ChatComposer.
- */
+// Идентификаторы иконок сценариев (маппятся на lucide в ChatComposer).
 export type ScenarioIconId =
   | "book"
   | "wrench"
@@ -44,6 +47,7 @@ export type ScenarioIconId =
   | "compare"
   | "facts";
 
+// Сценарий = пресет задачи внутри режима (то, что видит UI).
 export type Scenario = {
   id: string;
   label: string;
@@ -51,12 +55,7 @@ export type Scenario = {
   icon: ScenarioIconId;
 };
 
-/**
- * Сценарии под полем ввода — пресеты задачи внутри режима. Здесь только то, что
- * нужно UI (подпись, описание, иконка); сам системный промпт и параметры
- * генерации живут на бэке (apps/ai/scenarios.py) и выбираются по id — клиент их
- * не задаёт и не может подменить. У каждого режима свой набор.
- */
+// Сценарии режима «Чат» — чипы под полем ввода.
 export const chatScenarios: readonly Scenario[] = [
   {
     id: "study",
@@ -84,8 +83,10 @@ export const chatScenarios: readonly Scenario[] = [
   },
 ] as const;
 
+// Сценарий чата по умолчанию.
 export const chatDefaultScenarioId = "chat";
 
+// Сценарии режима «Код».
 export const codeScenarios: readonly Scenario[] = [
   {
     id: "write-code",
@@ -125,8 +126,10 @@ export const codeScenarios: readonly Scenario[] = [
   },
 ] as const;
 
+// Сценарий кода по умолчанию.
 export const codeDefaultScenarioId = "write-code";
 
+// Сценарии режима «Исследовать».
 export const researchScenarios: readonly Scenario[] = [
   {
     id: "sources",
@@ -160,8 +163,10 @@ export const researchScenarios: readonly Scenario[] = [
   },
 ] as const;
 
+// Сценарий исследования по умолчанию.
 export const researchDefaultScenarioId = "overview";
 
+// Превью чата для списка в сайдбаре.
 export type ChatPreview = {
   id: string;
   title: string;
@@ -170,28 +175,7 @@ export type ChatPreview = {
   pinned?: boolean;
 };
 
-/**
- * Список последних чатов пользователя.
- *
- * Сейчас пустой — это точка интеграции с бэкендом. В будущем тут будет
- * запрос к Supabase (Server Action / API route), отдающий чаты текущего
- * пользователя из таблицы `chats`, отсортированные по `updated_at desc`.
- *
- * Логика группировки (`groupChatsByDate` ниже) и UI-фолбэк «Чатов пока нет»
- * в `AppSidebar` уже готовы — достаточно подменить массив на реальные данные.
- */
-export const recentChats: readonly ChatPreview[] = [] as const;
-
-export const promptSuggestions = [
-  "Объясни тему производной с примерами",
-  "Разбери эту задачу шаг за шагом",
-  "Сделай конспект из этого PDF",
-  "Подготовь меня к экзамену по дискретной математике",
-] as const;
-
-/**
- * Группировка чатов в сайдбаре: сегодня / вчера / последние 7 дней / раньше.
- */
+// Группирует чаты сайдбара по времени: закреплённые/сегодня/вчера/7 дней/раньше.
 export function groupChatsByDate(chats: readonly ChatPreview[]) {
   const buckets: Record<string, ChatPreview[]> = {
     Закреплённые: [],
@@ -201,6 +185,7 @@ export function groupChatsByDate(chats: readonly ChatPreview[]) {
     Раньше: [],
   };
 
+  // Границы временных корзин от начала сегодняшнего дня.
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfYesterday = new Date(startOfToday);
@@ -208,8 +193,8 @@ export function groupChatsByDate(chats: readonly ChatPreview[]) {
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - 7);
 
+  // Раскладываем чаты по корзинам; закреплённые — всегда сверху.
   for (const chat of chats) {
-    // Закреплённые показываем отдельной группой сверху.
     if (chat.pinned) {
       buckets["Закреплённые"].push(chat);
       continue;
@@ -221,5 +206,6 @@ export function groupChatsByDate(chats: readonly ChatPreview[]) {
     else buckets["Раньше"].push(chat);
   }
 
+  // Отдаём только непустые группы в порядке объявления.
   return Object.entries(buckets).filter(([, list]) => list.length > 0);
 }

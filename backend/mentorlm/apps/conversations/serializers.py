@@ -1,14 +1,25 @@
 from rest_framework import serializers
 
-from .models import Conversation, Message
+from .models import Attachment, Conversation, Message
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    """Метаданные вложения для UI (сам текст файла наружу не отдаём)."""
+
+    class Meta:
+        model = Attachment
+        fields = ["id", "filename", "content_type", "size"]
+        read_only_fields = fields
 
 
 class MessageSerializer(serializers.ModelSerializer):
     """Сообщение диалога (read-only — создаётся бэком в процессе чата)."""
 
+    attachments = AttachmentSerializer(many=True, read_only=True)
+
     class Meta:
         model = Message
-        fields = ["id", "role", "content", "model", "created_at"]
+        fields = ["id", "role", "content", "model", "created_at", "attachments"]
         read_only_fields = fields
 
 

@@ -1,3 +1,9 @@
+/**
+ * Универсальная кнопка с «магнитным» эффектом наведения.
+ * Рендерится как <button> или <Link> (если передан href), поддерживает
+ * варианты оформления и размеры. Используется в основном на лендинге.
+ */
+
 "use client";
 
 import Link from "next/link";
@@ -5,20 +11,25 @@ import { useMotionValue, useMotionValueEvent, useSpring } from "motion/react";
 import { useRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
+// Варианты оформления и размеры кнопки.
 type Variant = "primary" | "secondary" | "ghost" | "glass";
 type Size = "sm" | "md" | "lg";
 
+// Базовые классы, общие для всех кнопок.
 const base =
   "relative inline-flex items-center justify-center gap-2 font-medium tracking-tight rounded-full select-none transition-[background-color,color,box-shadow] duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--brand-paper)] disabled:opacity-50 disabled:pointer-events-none will-change-transform";
 
+// Параметры пружины для магнитного смещения.
 const springConfig = { stiffness: 180, damping: 22, mass: 0.5 } as const;
 
+// Классы размеров.
 const sizes: Record<Size, string> = {
   sm: "h-9 px-4 text-sm",
   md: "h-11 px-5 text-[15px]",
   lg: "h-[52px] px-7 text-[16px]",
 };
 
+// Классы вариантов оформления.
 const variants: Record<Variant, string> = {
   primary:
     "bg-[var(--brand-primary)] text-white shadow-[0_10px_28px_-10px_rgba(23,70,245,0.6)] hover:bg-[var(--brand-primary-hover)]",
@@ -42,6 +53,7 @@ type ButtonAsButton = CommonProps &
 type ButtonAsLink = CommonProps &
   Omit<ComponentPropsWithoutRef<"a">, "href"> & { href: string };
 
+// Кнопка/ссылка с вариантом, размером и опциональным магнитным эффектом.
 export function Button(props: ButtonAsButton | ButtonAsLink) {
   const {
     variant = "primary",
@@ -53,6 +65,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
   } = props;
   const ref = useRef<HTMLAnchorElement & HTMLButtonElement>(null);
 
+  // Плавно пружинящее смещение элемента за курсором.
   const tx = useMotionValue(0);
   const ty = useMotionValue(0);
   const sx = useSpring(tx, springConfig);
@@ -69,6 +82,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
     el.style.transform = `translate(${sx.get()}px, ${v}px)`;
   });
 
+  // Смещаем кнопку к курсору при наведении.
   const onMouseMove = (e: React.MouseEvent<HTMLElement>) => {
     if (!magnetic) return;
     const el = ref.current;
@@ -78,6 +92,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
     ty.set((e.clientY - r.top - r.height / 2) * 0.22);
   };
 
+  // Возвращаем кнопку на место при уходе курсора.
   const onMouseLeave = () => {
     if (!magnetic) return;
     tx.set(0);
@@ -86,6 +101,7 @@ export function Button(props: ButtonAsButton | ButtonAsLink) {
 
   const classes = cn(base, sizes[size], variants[variant], className);
 
+  // С href — ссылка Next, иначе — обычная кнопка.
   if ("href" in rest && rest.href) {
     const { href, ...anchor } = rest as ButtonAsLink;
     return (

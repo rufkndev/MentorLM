@@ -1,12 +1,19 @@
+/**
+ * Страница «Политика обработки персональных данных» (/legal/privacy).
+ * Юридический документ-черновик (152-ФЗ) в обёртке DocPage.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "Политика обработки персональных данных",
   description:
     "Политика обработки персональных данных пользователей сервиса Mentor LM в соответствии с 152-ФЗ.",
 };
 
+// Контент политики обработки ПДн.
 export default function PrivacyPage() {
   return (
     <DocPage

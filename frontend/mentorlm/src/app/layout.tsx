@@ -1,21 +1,30 @@
+/**
+ * Корневой layout приложения (App Router) — обёртка всех страниц.
+ * Подключает шрифты, глобальные стили, SEO-метаданные и провайдер Clerk,
+ * а также анти-FOUC скрипт, выставляющий тему и размер шрифта до отрисовки.
+ */
+
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { clerkLocalization } from "@/lib/clerk-localization";
 import { Onest, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+// Основной шрифт интерфейса (с кириллицей).
 const onest = Onest({
   variable: "--font-onest",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
+// Моноширинный шрифт (код, метки).
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });
 
+// SEO-метаданные сайта по умолчанию.
 export const metadata: Metadata = {
   title: {
     default: "Mentor LM — единая AI-платформа для учёбы",
@@ -44,12 +53,14 @@ export const metadata: Metadata = {
   },
 };
 
+// Цвет темы браузера и масштабирование вьюпорта.
 export const viewport: Viewport = {
   themeColor: "#F6F7FB",
   width: "device-width",
   initialScale: 1,
 };
 
+// Разметка <html>/<body> со всеми провайдерами и глобальными настройками.
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
@@ -61,6 +72,8 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <head>
+          {/* Анти-FOUC: ставим тему и размер шрифта из localStorage
+              синхронно, до первой отрисовки — чтобы не мигало. */}
           <script
             dangerouslySetInnerHTML={{
               __html: `(function(){try{

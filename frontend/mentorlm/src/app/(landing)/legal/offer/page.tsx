@@ -1,12 +1,19 @@
+/**
+ * Страница «Публичная оферта» (/legal/offer).
+ * Юридический документ-черновик в обёртке DocPage.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "Публичная оферта",
   description:
     "Публичная оферта на оказание услуг сервиса Mentor LM: предмет, порядок оплаты и условия возврата.",
 };
 
+// Контент публичной оферты.
 export default function OfferPage() {
   return (
     <DocPage

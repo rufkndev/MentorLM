@@ -1,3 +1,9 @@
+/**
+ * Страница оформления подписки (/billing/checkout).
+ * Сейчас заглушка: показывает выбранный план из ?plan=; форма оплаты
+ * (Stripe / ЮKassa) появится позже.
+ */
+
 "use client";
 
 import { Suspense } from "react";
@@ -5,6 +11,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, CreditCard, Shield } from "lucide-react";
 
+// Оборачиваем в Suspense — useSearchParams требует CSR-границы.
 export default function CheckoutPage() {
   return (
     <Suspense fallback={<CheckoutShell plan="…" />}>
@@ -13,15 +20,18 @@ export default function CheckoutPage() {
   );
 }
 
+// Достаёт выбранный план из query-параметра ?plan=.
 function CheckoutInner() {
   const params = useSearchParams();
   const plan = params.get("plan") ?? "pro";
   return <CheckoutShell plan={plan.toUpperCase()} />;
 }
 
+// Карточка-заглушка оформления подписки.
 function CheckoutShell({ plan }: { plan: string }) {
   return (
     <section className="mx-auto max-w-md px-6 py-20">
+      {/* Карточка с иконкой, названием плана и пояснением */}
       <div className="rounded-3xl bg-white p-8 text-center ring-1 ring-line">
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]">
           <CreditCard className="h-5 w-5" strokeWidth={1.7} />

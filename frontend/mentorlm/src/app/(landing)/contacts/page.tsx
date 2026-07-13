@@ -1,12 +1,19 @@
+/**
+ * Страница «Контакты» (/contacts).
+ * Юридические сведения и каналы связи (шаблон) в обёртке DocPage.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "Контакты",
   description:
     "Юридическая информация и контактные данные Mentor LM для пользователей и партнёров.",
 };
 
+// Контент страницы «Контакты».
 export default function ContactsPage() {
   return (
     <DocPage

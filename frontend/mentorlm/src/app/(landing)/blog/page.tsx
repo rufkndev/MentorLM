@@ -1,12 +1,19 @@
+/**
+ * Страница «Блог» (/blog).
+ * Пока заглушка-анонс: статический текст в обёртке DocPage.
+ */
+
 import type { Metadata } from "next";
 import { DocPage } from "@/components/landing/DocPage";
 
+// SEO-метаданные страницы.
 export const metadata: Metadata = {
   title: "Блог",
   description:
     "Блог Mentor LM: гайды по учёбе с AI, разборы возможностей платформы и обновления продукта.",
 };
 
+// Контент страницы «Блог».
 export default function BlogPage() {
   return (
     <DocPage

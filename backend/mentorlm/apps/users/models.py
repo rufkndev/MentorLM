@@ -81,11 +81,9 @@ class UserSettings(models.Model):
     theme = models.CharField(
         max_length=20, choices=Theme.choices, default=Theme.SYSTEM
     )
-    interface_lang = models.CharField(max_length=10, default="ru")
     font_size = models.CharField(
         max_length=10, choices=FontSize.choices, default=FontSize.MD
     )
-    auto_scroll = models.BooleanField(default=True)
 
     # — Данные —
     # Автоудаление диалогов старше N дней (по последней активности). 0 — не удалять.

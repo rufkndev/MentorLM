@@ -1,3 +1,9 @@
+/**
+ * Страница тарифов (/billing).
+ * Показывает промо-герой и три карточки планов из billing-contents.
+ * Данные берутся статически; кнопки ведут на оформление подписки.
+ */
+
 "use client";
 
 import Link from "next/link";
@@ -6,6 +12,7 @@ import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import { billingPlans, type BillingPlan } from "@/lib/billing-contents";
 
+// Страница тарифов: герой + сетка планов.
 export default function BillingPage() {
   return (
     <div className="relative pb-32 pt-20 sm:pt-28">
@@ -15,8 +22,7 @@ export default function BillingPage() {
   );
 }
 
-/*  hero  */
-
+// Промо-заголовок страницы тарифов.
 function HeroSection() {
   return (
     <section className="relative">
@@ -55,12 +61,12 @@ function HeroSection() {
   );
 }
 
-/*  plans  */
-
+// Сетка из трёх карточек тарифов.
 function PlansSection() {
   return (
     <section className="relative mt-16 sm:mt-20">
       <div className="mx-auto max-w-6xl px-6">
+        {/* Три карточки планов в ряд (на мобильном — колонкой) */}
         <div className="grid items-stretch gap-5 md:grid-cols-3">
           {billingPlans.map((plan, i) => (
             <Reveal key={plan.id} delay={0.08 * (i + 1)} className="h-full">
@@ -77,16 +83,12 @@ function PlansSection() {
   );
 }
 
-/*   единая карточка для всех планов  */
-
+// Карточка одного тарифа (единая структура для всех трёх планов).
 function PlanCard({ plan }: { plan: BillingPlan }) {
   const featured = !!plan.featured;
 
-  /*
-   * Одна и та же внутренняя структура для всех трёх карточек, чтобы названия
-   * и цены выравнивались по горизонтали. Featured отличается только фоном
-   * (тёмный градиент) и цветами текста, но не геометрией.
-   */
+  // Выделенный план отличается только фоном и цветом текста, не геометрией —
+  // так названия и цены выравниваются по горизонтали между карточками.
   return (
     <article
       className={cn(
@@ -104,8 +106,10 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
           : undefined
       }
     >
+      {/* Плашка-подпись над карточкой («популярный» и т.п.) */}
       <PlanTag tagline={plan.tagline} featured={featured} />
 
+      {/* Название, цена и описание плана */}
       <div className="mt-5">
         <h3
           className={cn(
@@ -128,6 +132,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
         </p>
       </div>
 
+      {/* Список возможностей плана с галочками */}
       <ul className="mt-6 space-y-2.5">
         {plan.features.map((f) => (
           <li
@@ -153,6 +158,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
         ))}
       </ul>
 
+      {/* Кнопка действия плана, прижата к низу карточки */}
       <div className="mt-auto pt-8">
         <PlanCta plan={plan} featured={featured} />
       </div>
@@ -160,6 +166,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
   );
 }
 
+// Плашка-подпись над карточкой (или невидимая заглушка для выравнивания).
 function PlanTag({
   tagline,
   featured,
@@ -168,7 +175,7 @@ function PlanTag({
   featured: boolean;
 }) {
   if (!tagline) {
-    /* единая высота с другими карточками: пустая невидимая плашка */
+    // Пустая невидимая плашка — чтобы высота совпадала с другими карточками.
     return <span className="invisible inline-block h-5" aria-hidden />;
   }
   return (
@@ -185,6 +192,7 @@ function PlanTag({
   );
 }
 
+// Цена плана: «По запросу» либо число рублей в месяц.
 function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
   if (plan.price === null) {
     return (
@@ -221,6 +229,7 @@ function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
   );
 }
 
+// Кнопка действия плана: неактивная плашка, внешняя ссылка или внутренний Link.
 function PlanCta({
   plan,
   featured,
@@ -230,6 +239,7 @@ function PlanCta({
 }) {
   const cta = plan.cta;
 
+  // Текущий план / «по запросу» — просто плашка без перехода.
   if (cta.disabled || !cta.href) {
     return (
       <div
@@ -243,6 +253,7 @@ function PlanCta({
     );
   }
 
+  // mailto/http — внешняя ссылка (<a>), остальное — маршрут Next (<Link>).
   const isExternal =
     cta.href.startsWith("mailto:") || cta.href.startsWith("http");
 

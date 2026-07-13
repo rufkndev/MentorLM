@@ -1,19 +1,27 @@
+/**
+ * Layout приложения (защищённые режимы /chat, /code, /research).
+ * Даёт общий каркас: сайдбар слева, контент режима по центру, аккаунт справа,
+ * диалог настроек. Оборачивает всё в провайдеры настроек и списка диалогов.
+ */
+
 "use client";
 
 import { Suspense, useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "motion/react";
 import { PanelLeft } from "lucide-react";
-import { AppSidebar } from "@/components/mainapp/AppSidebar";
+import { AppSidebar } from "@/components/mainapp/sidebar";
 import { ConversationsProvider } from "@/components/mainapp/ConversationsProvider";
-import { SettingsDialog } from "@/components/mainapp/SettingsDialog";
+import { SettingsDialog } from "@/components/mainapp/settings";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 
+// Каркас приложения: сайдбар + контент + аккаунт + настройки.
 export default function ModesLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Свёрнут/раскрыт сайдбар и открыт/закрыт диалог настроек.
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -21,6 +29,7 @@ export default function ModesLayout({
     <SettingsProvider>
       <ConversationsProvider>
       <div className="relative flex min-h-screen text-ink">
+      {/* Сайдбар со списком чатов и навигацией по режимам */}
       <Suspense fallback={null}>
         <AppSidebar
           open={sidebarOpen}
@@ -29,6 +38,7 @@ export default function ModesLayout({
         />
       </Suspense>
 
+      {/* Область контента активного режима */}
       <div className="flex min-w-0 flex-1 flex-col">
         <main className="relative flex-1">{children}</main>
       </div>

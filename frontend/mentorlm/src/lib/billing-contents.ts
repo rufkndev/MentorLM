@@ -1,26 +1,29 @@
-/* Контент страницы /billing. Тарифы и сравнительная таблица. */
+/**
+ * Контент страницы тарифов /billing: три плана и сравнительная таблица.
+ * Только данные (цены, фичи, тексты кнопок) — без логики оплаты.
+ * Используется на странице billing/page.tsx и в её секциях.
+ */
 
+// Кнопка-действие тарифа (куда ведёт, активна ли).
 export type PlanCta = {
   label: string;
-  /** Куда отправить пользователя. null = просто отображаемая плашка. */
-  href: string | null;
-  /** Текущий план / по запросу — отрисовываем как плашку без действия. */
-  disabled?: boolean;
+  href: string | null; // null = просто плашка без перехода
+  disabled?: boolean; // текущий план / «по запросу» — без действия
 };
 
+// Описание одного тарифа.
 export type BillingPlan = {
   id: "free" | "plus" | "pro";
   name: string;
-  /** В рублях. null = «по запросу». */
-  price: number | null;
+  price: number | null; // рубли; null = «по запросу»
   description: string;
-  /** Подпись над карточкой: «текущий план», «популярный», и т.п. */
-  tagline?: string;
+  tagline?: string; // подпись над карточкой
   features: readonly string[];
   cta: PlanCta;
-  featured?: boolean;
+  featured?: boolean; // выделенная карточка
 };
 
+// Три тарифных плана — карточки на странице /billing.
 export const billingPlans: readonly BillingPlan[] = [
   {
     id: "free",
@@ -70,50 +73,5 @@ export const billingPlans: readonly BillingPlan[] = [
       "Приоритетная очередь",
     ],
     cta: { label: "Оформить Pro", href: "/billing/checkout?plan=pro" },
-  },
-] as const;
-
-/* ───────────────────────  сравнение ─────────────────────── */
-
-export type CompareValue = boolean | string;
-
-export type CompareRow = {
-  label: string;
-  free: CompareValue;
-  plus: CompareValue;
-  pro: CompareValue;
-};
-
-export type CompareGroup = {
-  title: string;
-  rows: readonly CompareRow[];
-};
-
-export const comparisonTable: readonly CompareGroup[] = [
-  {
-    title: "Использование",
-    rows: [
-      { label: "Сообщения в день", free: "20", plus: "150", pro: "400" },
-      { label: "Длина контекста", free: "8K токенов", plus: "32K токенов", pro: "128K токенов" },
-      { label: "Исследований в день", free: "3", plus: "30", pro: "150" },
-      { label: "Запросов кода в день", free: "5", plus: "40", pro: "200" },
-      { label: "История диалогов", free: true, plus: true, pro: true },
-    ],
-  },
-  {
-    title: "Модели и инструменты",
-    rows: [
-      { label: "Базовые модели", free: true, plus: true, pro: true },
-      { label: "Максимальная модель", free: false, plus: true, pro: true },
-      { label: "Поиск в интернете", free: false, plus: true, pro: true },
-      { label: "Расширенная память", free: "10 фактов", plus: "1000 фактов", pro: "Без лимита" },
-    ],
-  },
-  {
-    title: "Скорость и приоритет",
-    rows: [
-      { label: "Очередь", free: "Стандарт", plus: "Приоритет", pro: "VIP" },
-      { label: "Экспорт конспектов", free: false, plus: true, pro: true },
-    ],
   },
 ] as const;

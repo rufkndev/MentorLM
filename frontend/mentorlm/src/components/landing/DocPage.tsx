@@ -1,3 +1,8 @@
+/**
+ * Обёртка для текстовых страниц (о проекте, блог, контакты, юридические).
+ * Даёт единый заголовок (eyebrow/title/description/дата) и типографику контента.
+ */
+
 import type { ReactNode } from "react";
 
 interface DocPageProps {
@@ -8,6 +13,7 @@ interface DocPageProps {
   children: ReactNode;
 }
 
+// Шаблон документной страницы: шапка + область текста (children).
 export function DocPage({
   eyebrow,
   title,
@@ -23,6 +29,7 @@ export function DocPage({
         aria-hidden
       />
       <div className="relative mx-auto max-w-3xl px-6">
+        {/* Шапка документа: рубрика, заголовок, описание, дата */}
         <header className="mb-12">
           {eyebrow ? <p className="text-eyebrow">{eyebrow}</p> : null}
           <h1 className="mt-4 text-[clamp(2rem,4.6vw,3.4rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ink">
@@ -39,6 +46,7 @@ export function DocPage({
             </p>
           ) : null}
         </header>
+        {/* Текстовое содержимое конкретной страницы */}
         <div className="doc-prose">{children}</div>
       </div>
     </section>

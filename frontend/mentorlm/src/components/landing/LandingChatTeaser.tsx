@@ -1,38 +1,36 @@
+/**
+ * Интерактивный тизер чата в CTA-секции лендинга.
+ * Пользователь набирает вопрос; при отправке черновик кладётся в sessionStorage
+ * и происходит переход в чат (если вошёл) или на регистрацию.
+ */
+
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
-import {
-  useRef,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-} from "react";
+import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
+import { saveDraft } from "@/lib/draft";
 
-const DRAFT_KEY = "mentorlm:draft";
-
+// Мини-композер для лендинга.
 export function LandingChatTeaser() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useAuth();
   const [text, setText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const canSend = text.trim().length > 0 && !submitting;
 
+  // Сохраняет черновик и уводит в чат или на регистрацию.
   const handleSend = () => {
     if (!canSend) return;
     setSubmitting(true);
-    try {
-      sessionStorage.setItem(DRAFT_KEY, text.trim());
-    } catch {
-      /* sessionStorage может быть недоступен — не блокируем редирект */
-    }
+    saveDraft(text.trim());
     const target = isLoaded && isSignedIn ? "/chat" : "/sign-up";
     router.push(target);
   };
 
+  // Enter — отправка, Shift+Enter — перенос строки.
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -40,6 +38,7 @@ export function LandingChatTeaser() {
     }
   };
 
+  // Ввод текста + авто-рост высоты поля.
   const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     const ta = e.target;
@@ -55,8 +54,8 @@ export function LandingChatTeaser() {
           "shadow-[0_18px_60px_-22px_rgba(7,27,77,0.4)]"
         )}
       >
+        {/* Поле ввода вопроса */}
         <textarea
-          ref={textareaRef}
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -65,6 +64,7 @@ export function LandingChatTeaser() {
           className="min-h-[72px] w-full resize-none bg-transparent px-3 py-2 text-[16px] leading-relaxed text-ink outline-none placeholder:text-muted"
         />
 
+        {/* Кнопка отправки */}
         <div className="mt-1 flex items-center px-1">
           <button
             type="button"
@@ -82,12 +82,11 @@ export function LandingChatTeaser() {
           </button>
         </div>
       </div>
-
-     
     </div>
   );
 }
 
+// Иконка-стрелка «отправить».
 function ArrowUp() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>

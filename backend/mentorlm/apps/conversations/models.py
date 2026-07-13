@@ -64,3 +64,31 @@ class Message(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_role_display()}: {self.content[:40]}"
+
+
+class Attachment(models.Model):
+    """Файл, прикреплённый к сообщению пользователя.
+
+    Сам файл не храним (медиа-хранилища в MVP нет) — сохраняем извлечённый
+    текст и метаданные. Текст подмешивается в контекст модели (build_context),
+    поэтому вложения «видны» ей и в текущем, и в последующих ходах диалога.
+    """
+
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+    )
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, blank=True)
+    size = models.PositiveIntegerField(default=0)
+    extracted_text = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Вложение"
+        verbose_name_plural = "Вложения"
+        ordering = ("id",)
+
+    def __str__(self) -> str:
+        return f"{self.filename} ({self.size} B)"

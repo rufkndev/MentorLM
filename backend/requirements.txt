@@ -17,3 +17,7 @@ yandex-ai-studio-sdk==0.19.2
 yandexcloud==0.379.0
 pgvector==0.4.1
 psycopg[binary]==3.2.12
+
+# извлечение текста из прикреплённых файлов (apps/conversations/attachments.py)
+pypdf==6.1.1
+python-docx==1.2.0

@@ -1,11 +1,19 @@
+/**
+ * Секция «Проблема» лендинга.
+ * Заголовок с описанием боли студента и три карточки-пейна.
+ * Контент — из landing-contents (problem).
+ */
+
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { problem } from "@/lib/landing-contents";
 
+// Секция «Проблема».
 export function ProblemSection() {
   return (
     <section className="relative py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-6">
+        {/* Заголовок секции и описание */}
         <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-end">
           <Reveal>
             <p className="text-eyebrow">{problem.eyebrow}</p>
@@ -22,6 +30,7 @@ export function ProblemSection() {
           </Reveal>
         </div>
 
+        {/* Карточки болей (по одной на пункт) */}
         <div className="mt-14 grid gap-5 md:grid-cols-3">
           {problem.pains.map((p, i) => (
             <Reveal key={p.title} delay={0.05 * (i + 1)}>

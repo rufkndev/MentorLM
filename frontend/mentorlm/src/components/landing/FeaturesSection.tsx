@@ -1,8 +1,14 @@
+/**
+ * Секция «Возможности»: bento-сетка карточек режимов с абстрактными визуалами.
+ * Заголовок + шесть карточек; у каждой свой мини-визуал (Visual0..5 ниже).
+ */
+
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import { features } from "@/lib/landing-contents";
 
+// Раскладка bento: размеры плиток по индексу карточки.
 const bento = [
   "md:col-span-2 md:row-span-1",
   "md:col-span-1 md:row-span-1",
@@ -12,8 +18,10 @@ const bento = [
   "md:col-span-1 md:row-span-1",
 ];
 
+// Мини-визуалы карточек по индексу.
 const visuals = [Visual0, Visual1, Visual2, Visual3, Visual4, Visual5];
 
+// Секция «Возможности».
 export function FeaturesSection() {
   return (
     <section id="features" className="relative py-28 sm:py-36">
@@ -34,6 +42,7 @@ export function FeaturesSection() {
           </Reveal>
         </header>
 
+        {/* Bento-сетка карточек возможностей */}
         <div className="mt-14 grid auto-rows-[minmax(220px,auto)] grid-cols-1 gap-4 md:grid-cols-3">
           {features.items.map((item, i) => {
             const Visual = visuals[i] ?? Visual0;
@@ -74,8 +83,9 @@ export function FeaturesSection() {
   );
 }
 
-/* — visuals: lightweight, on-brand, abstract — */
+// ── Абстрактные мини-визуалы карточек (лёгкие, в стиле бренда) ──
 
+// Визуал «Чат»: пузырьки диалога.
 function Visual0() {
   return (
     <div className="flex items-center gap-2">
@@ -99,6 +109,7 @@ function Visual0() {
   );
 }
 
+// Визуал «Код»: сниппет функции.
 function Visual1() {
   return (
     <pre className="overflow-hidden rounded-xl border border-line bg-[#0B1226] p-3 font-mono text-[11px] leading-relaxed text-[var(--brand-blue-soft)]">
@@ -113,6 +124,7 @@ function Visual1() {
   );
 }
 
+// Визуал «Библиотека»: сетка плиток-материалов.
 function Visual2() {
   return (
     <div className="grid grid-cols-3 gap-1.5">
@@ -129,6 +141,7 @@ function Visual2() {
   );
 }
 
+// Визуал «Конспекты»: строки-абзацы с прогрессом.
 function Visual3() {
   return (
     <div className="space-y-1.5">
@@ -150,6 +163,7 @@ function Visual3() {
   );
 }
 
+// Визуал «Разбор задач»: пошаговая цепочка вычислений.
 function Visual4() {
   return (
     <ol className="flex items-center gap-2 font-mono text-[11px]">
@@ -170,6 +184,7 @@ function Visual4() {
   );
 }
 
+// Визуал «Поиск»: строка поиска по знаниям.
 function Visual5() {
   return (
     <div className="flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-2">

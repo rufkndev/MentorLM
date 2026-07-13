@@ -1,3 +1,9 @@
+/**
+ * Первый экран лендинга (герой).
+ * Крупный заголовок, подзаголовок и главная кнопка; на фоне — светящаяся сфера
+ * и стеклянные чипсы с параллаксом от движения мыши.
+ */
+
 "use client";
 
 import {
@@ -10,12 +16,15 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { hero } from "@/lib/landing-contents";
 
+// Секция героя.
 export function HeroSection() {
+  // Позиция мыши (сглаженная пружиной) — источник параллакса.
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
   const sx = useSpring(mx, { stiffness: 60, damping: 18, mass: 0.6 });
   const sy = useSpring(my, { stiffness: 60, damping: 18, mass: 0.6 });
 
+  // Разные коэффициенты смещения для сферы и боковых чипсов.
   const orbX = useTransform(sx, (v) => v * 24);
   const orbY = useTransform(sy, (v) => v * 24);
   const cardLX = useTransform(sx, (v) => v * -36);
@@ -23,6 +32,7 @@ export function HeroSection() {
   const cardRX = useTransform(sx, (v) => v * 36);
   const cardRY = useTransform(sy, (v) => v * 18);
 
+  // Обновляем координаты параллакса по позиции курсора.
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const w = window.innerWidth;
@@ -50,6 +60,7 @@ export function HeroSection() {
         <Orb />
       </motion.div>
 
+      {/* Центральный блок: заголовок, описание, кнопка */}
       <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col items-center justify-center px-6 text-center">
         <h1 className="text-display max-w-5xl text-[clamp(2.6rem,7.4vw,5.8rem)] font-semibold text-ink">
           <Line delay={0.05}>{first}</Line>
@@ -90,7 +101,7 @@ export function HeroSection() {
         </motion.p>
       </div>
 
-      {/* floating glass chips with mouse parallax */}
+      {/* Плавающие стеклянные чипсы с параллаксом от мыши */}
       <motion.div
         aria-hidden
         style={{ x: cardLX, y: cardLY }}
@@ -150,6 +161,7 @@ export function HeroSection() {
   );
 }
 
+// Строка заголовка с эффектом «выезжания» снизу.
 function Line({
   children,
   delay = 0,
@@ -171,6 +183,7 @@ function Line({
   );
 }
 
+// Плавающий стеклянный чип-метка (Chat/Library и т.п.).
 function FloatingChip({
   label,
   tag,
@@ -197,6 +210,7 @@ function FloatingChip({
   );
 }
 
+// Светящаяся вращающаяся сфера на фоне героя.
 function Orb() {
   return (
     <div className="relative h-full w-full">
@@ -228,6 +242,7 @@ function Orb() {
   );
 }
 
+// Иконка-стрелка для кнопки.
 function Arrow() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -242,6 +257,7 @@ function Arrow() {
   );
 }
 
+// Подсказка прокрутки внизу экрана.
 function ScrollHint() {
   return (
     <motion.div

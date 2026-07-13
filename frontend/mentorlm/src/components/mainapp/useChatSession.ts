@@ -1,0 +1,232 @@
+/*
+ * Оркестрация диалога: состояние сообщений, жизненный цикл диалога, загрузка
+ * истории с кэшем, стриминг ответа и обработка ошибок/лимитов. 
+ * Отделено от рендера — ChatScreen остаётся чисто презентационным и берёт готовое состояние.
+ */
+
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
+import type { ComposerSubmit } from "@/components/mainapp/ChatComposer";
+import type {
+  Message,
+  MessageAttachment,
+} from "@/components/mainapp/ChatMessage";
+import { useConversations } from "@/components/mainapp/ConversationsProvider";
+import { ApiError, useApi } from "@/lib/api";
+import { loadMessages, saveMessages } from "@/lib/chat-cache";
+
+/** Сообщение из истории диалога (см. MessageSerializer на бэке). */
+type ApiMessage = {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  attachments?: MessageAttachment[];
+};
+
+export function useChatSession(defaultScenarioId: string) {
+  const api = useApi();
+  const { userId: clerkUserId } = useAuth();
+  const userId = clerkUserId ?? null;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { mode, create, refresh } = useConversations();
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [sending, setSending] = useState(false);
+  // Выбранный сценарий держим здесь (а не в композере), чтобы он сохранялся на
+  // весь диалог и не сбрасывался при переходе hero→dock композера.
+  const [scenarioId, setScenarioId] = useState(defaultScenarioId);
+  const threadRef = useRef<HTMLDivElement>(null);
+
+  // id активного диалога; ref — чтобы сравнивать с URL без перезагрузки истории.
+  const [convId, setConvId] = useState<string | null>(null);
+  const convIdRef = useRef<string | null>(null);
+  convIdRef.current = convId;
+
+  // Прокручиваем вниз только при ПОЯВЛЕНИИ нового сообщения (отправка, загрузка
+  // истории), а не на каждый токен ответа — иначе экран дёргается вниз при
+  // стриминге. Во время стрима меняется content последнего сообщения, а их
+  // количество — нет, поэтому вид остаётся на месте.
+  useEffect(() => {
+    threadRef.current?.scrollTo({
+      top: threadRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages.length]);
+
+  // Подгрузка истории при переходе на /<mode>?c=<id> (в т.ч. из сайдбара).
+  // Сначала мгновенно показываем кэш, параллельно тянем свежую историю —
+  // переход в чат происходит без пустого экрана и задержки.
+  useEffect(() => {
+    const urlC = searchParams.get("c");
+    if (!urlC) {
+      setConvId(null);
+      setMessages([]);
+      setScenarioId(defaultScenarioId); // новый чат — сценарий на дефолт режима
+      return;
+    }
+    if (urlC === convIdRef.current) return; // уже активен (напр. только создан)
+
+    setConvId(urlC);
+    setScenarioId(defaultScenarioId); // другой чат — сбрасываем сценарий на дефолт
+    const cached = loadMessages(userId, urlC);
+    if (cached) setMessages(cached); // мгновенный рендер из кэша
+
+    let cancelled = false;
+    api
+      .get<{ messages: ApiMessage[] }>(`/api/conversations/${urlC}/`)
+      .then((data) => {
+        if (cancelled) return;
+        const msgs = data.messages.map((m) => ({
+          id: String(m.id),
+          role: m.role,
+          content: m.content,
+          attachments: m.attachments,
+        }));
+        setMessages(msgs);
+        saveMessages(userId, urlC, msgs);
+      })
+      .catch(() => {
+        if (!cancelled && !cached) setMessages([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, api, userId, defaultScenarioId]);
+
+  // На жёстком обновлении страницы userId от Clerk появляется не сразу. Как
+  // только он готов — подставляем кэш, если история ещё не показана (не трогаем
+  // активный стрим: там messages уже непустой).
+  useEffect(() => {
+    const urlC = searchParams.get("c");
+    if (!urlC || !userId) return;
+    setMessages((prev) => (prev.length ? prev : loadMessages(userId, urlC) ?? prev));
+  }, [userId, searchParams]);
+
+  // Кэшируем сообщения активного чата, когда стрим завершён.
+  useEffect(() => {
+    if (!convId || sending) return;
+    const real = messages.filter((m) => !m.thinking);
+    if (real.length) saveMessages(userId, convId, real);
+  }, [convId, sending, messages, userId]);
+
+  const handleSubmit = useCallback(
+    async ({ text, scenarioId, files }: ComposerSubmit) => {
+      if (sending) return;
+
+      setSending(true);
+
+      // Сразу показываем сообщение пользователя (с чипсами файлов) и «думаю» —
+      // без ожидания сети, чтобы переход в чат и индикация были мгновенными.
+      const placeholderId = crypto.randomUUID();
+      const attachments = files.map((f) => ({
+        filename: f.name,
+        size: f.size,
+        content_type: f.type,
+      }));
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "user",
+          content: text,
+          attachments: attachments.length ? attachments : undefined,
+        },
+        { id: placeholderId, role: "assistant", content: "", thinking: true },
+      ]);
+
+      // Создаём диалог при первом сообщении и фиксируем его в URL.
+      let id = convIdRef.current;
+      if (!id) {
+        try {
+          id = await create(mode);
+        } catch {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === placeholderId
+                ? { ...m, thinking: false, content: "Не удалось создать чат." }
+                : m,
+            ),
+          );
+          setSending(false);
+          return;
+        }
+        setConvId(id);
+        convIdRef.current = id;
+        router.replace(`/${mode}?c=${id}`);
+      }
+
+      try {
+        // С файлами — multipart (FormData), иначе JSON. Промпт сценария выбирает
+        // бэк по scenario_id — клиент его не задаёт.
+        let body: unknown;
+        if (files.length) {
+          const fd = new FormData();
+          fd.append("content", text);
+          fd.append("scenario_id", scenarioId);
+          for (const f of files) fd.append("files", f);
+          body = fd;
+        } else {
+          body = { content: text, scenario_id: scenarioId };
+        }
+        await api.stream(
+          `/api/conversations/${id}/messages/`,
+          body,
+          {
+            onDelta: (delta) => {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === placeholderId
+                    ? { ...m, thinking: false, content: m.content + delta }
+                    : m,
+                ),
+              );
+            },
+          },
+        );
+      } catch (err) {
+        // Лимиты тарифа (guard.py) приходят с машинным code — показываем
+        // дружелюбный текст бэка и апселл, а не generic-ошибку.
+        const isLimit = err instanceof ApiError && !!err.code && err.code !== "";
+        let content: string;
+        if (isLimit) {
+          const e = err as ApiError;
+          content =
+            e.code === "rate_limited"
+              ? e.message
+              : `${e.message}\n\n[Посмотреть тарифы](/billing)`;
+        } else {
+          const detail = err instanceof ApiError ? err.message : String(err);
+          content = `Не удалось получить ответ.\n\n${detail}`;
+        }
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === placeholderId ? { ...m, thinking: false, content } : m,
+          ),
+        );
+      } finally {
+        setSending(false);
+        // Обновляем сайдбар: заголовок чата и порядок по последней активности.
+        refresh();
+      }
+    },
+    [api, create, mode, refresh, router, sending],
+  );
+
+  // Если в URL есть ?c=<id> — это открытый чат: сразу показываем тред (без
+  // вспышки приветствия и анимации empty→thread), даже пока грузится история.
+  const isEmpty = !searchParams.get("c") && messages.length === 0;
+
+  return {
+    messages,
+    sending,
+    scenarioId,
+    setScenarioId,
+    threadRef,
+    handleSubmit,
+    isEmpty,
+  };
+}

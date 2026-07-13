@@ -13,7 +13,8 @@ from apps.billing.guard import LimitExceeded, preflight
 from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
 
-from .models import Conversation, Message
+from .attachments import MAX_FILE_SIZE, MAX_FILES, extract_text
+from .models import Attachment, Conversation, Message
 from .serializers import ConversationDetailSerializer, ConversationSerializer
 
 
@@ -78,19 +79,42 @@ class MessageCreateView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         content = (request.data.get("content") or "").strip()
-        if not content:
-            raise ValidationError({"content": "Пустое сообщение."})
         # Системный промпт выбирает бэк по mode + scenario_id; клиент его не задаёт.
         scenario_id = request.data.get("scenario_id") or None
+
+        # Вложения (multipart): валидируем и сразу извлекаем из них текст. Сами
+        # файлы не храним — только извлечённый текст и метаданные (см. attachments).
+        files = request.FILES.getlist("files")
+        if len(files) > MAX_FILES:
+            raise ValidationError({"files": f"Не более {MAX_FILES} файлов за раз."})
+        extracted: list[tuple[str, str, int, str]] = []
+        for f in files:
+            if f.size > MAX_FILE_SIZE:
+                mb = MAX_FILE_SIZE // (1024 * 1024)
+                raise ValidationError(
+                    {"files": f"Файл «{f.name}» больше {mb} МБ."}
+                )
+            extracted.append(
+                (f.name, f.content_type or "", f.size, extract_text(f.name, f.read()))
+            )
+
+        if not content and not extracted:
+            raise ValidationError({"content": "Пустое сообщение."})
 
         user = request.user
 
         # 0. Preflight-лимиты ДО сохранения сообщения — чтобы не плодить
         #    осиротевшие сообщения без ответа. Отдаём JSON с кодом/статусом до
         #    старта SSE: фронтовый api.stream увидит non-200 и покажет апселл.
+        #    В подсчёт длины ввода включаем и текст вложений — он тоже уйдёт модели.
+        attach_text = "\n\n".join(text for *_, text in extracted)
+        preflight_text = f"{content}\n\n{attach_text}" if attach_text else content
         try:
             preflight(
-                user, mode=conversation.mode, scenario=scenario_id, input_text=content
+                user,
+                mode=conversation.mode,
+                scenario=scenario_id,
+                input_text=preflight_text,
             )
         except LimitExceeded as exc:
             return Response(
@@ -98,14 +122,23 @@ class MessageCreateView(APIView):
                 status=exc.status,
             )
 
-        # 1. Сохраняем сообщение пользователя; первое — задаёт заголовок чата.
-        Message.objects.create(
+        # 1. Сохраняем сообщение пользователя и его вложения; первое сообщение
+        #    задаёт заголовок чата (текст, а если его нет — имя первого файла).
+        user_msg = Message.objects.create(
             conversation=conversation,
             role=Message.Role.USER,
             content=content,
         )
+        for name, ctype, size, text in extracted:
+            Attachment.objects.create(
+                message=user_msg,
+                filename=name,
+                content_type=ctype,
+                size=size,
+                extracted_text=text,
+            )
         if not conversation.title:
-            conversation.title = content[:40]
+            conversation.title = content[:40] or (extracted[0][0] if extracted else "")
             conversation.save(update_fields=["title", "updated_at"])
 
         # 2. Готовим запрос к модели до старта стрима (выбор провайдера/промпта

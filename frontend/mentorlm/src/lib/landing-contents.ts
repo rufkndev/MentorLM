@@ -1,8 +1,16 @@
+/**
+ * Тексты лендинга (маркетинговых страниц).
+ * Один экспорт на секцию — заголовки, описания, списки фич, тарифы, футер.
+ * Только контент; сами секции рисуются в src/components/landing/*.
+ */
+
+// Название и слоган бренда.
 export const brand = {
   name: "Mentor LM",
   tagline: "Единая AI-платформа для учёбы",
 } as const;
 
+// Пункты меню и кнопки навигации лендинга.
 export const nav = {
   links: [
     { href: "/#features", label: "Возможности" },
@@ -14,6 +22,7 @@ export const nav = {
   ctaAuthed: { href: "/chat", label: "Открыть Mentor LM" },
 } as const;
 
+// Секция героя (первый экран).
 export const hero = {
   eyebrow: "Quiet intelligence для учёбы",
   title: ["Один интерфейс", "для всей вашей", "учебной работы."],
@@ -22,6 +31,7 @@ export const hero = {
   primary: { href: "/sign-up", label: "Начать бесплатно" },
 } as const;
 
+// Секция «Проблема» — боли студента.
 export const problem = {
   eyebrow: "Проблема",
   title: "Учёба распадается на десятки вкладок.",
@@ -43,6 +53,7 @@ export const problem = {
   ],
 } as const;
 
+// Секция «Решение».
 export const solution = {
   eyebrow: "Решение",
   title: "Единое пространство, которое понимает ваш контекст.",
@@ -55,6 +66,7 @@ export const solution = {
   ],
 } as const;
 
+// Секция «Возможности» — карточки режимов.
 export const features = {
   eyebrow: "Возможности",
   title: "Режимы под каждую учебную задачу.",
@@ -94,6 +106,7 @@ export const features = {
   ],
 } as const;
 
+// Секция «Как это работает» — три шага.
 export const workflow = {
   eyebrow: "Как это работает",
   title: "Три шага до спокойной работы.",
@@ -118,6 +131,7 @@ export const workflow = {
   ],
 } as const;
 
+// Секция соцдоказательства — статистика и логотипы вузов.
 export const socialproof = {
   eyebrow: "Built for learners",
   title: "Создано для тех, кто учится всерьёз.",
@@ -131,6 +145,7 @@ export const socialproof = {
   logos: ["МГУ", "ВШЭ", "ИТМО", "МФТИ", "СПбГУ", "УрФУ"],
 } as const;
 
+// Секция тарифов на лендинге.
 export const pricing = {
   eyebrow: "Тарифы",
   title: "Начните бесплатно. Платите только когда станет тесно.",
@@ -183,6 +198,7 @@ export const pricing = {
   ],
 } as const;
 
+// Финальная секция призыва к действию.
 export const cta = {
   title: "Тише. Сфокусированнее. Умнее.",
   description:
@@ -191,6 +207,7 @@ export const cta = {
   secondary: { label: "Узнать больше", href: "#features" },
 } as const;
 
+// Контент подвала: описание и колонки ссылок.
 export const footer = {
   description:
     "Спокойное AI-пространство для учёбы. Один интерфейс для всех ваших задач, материалов и инструментов.",

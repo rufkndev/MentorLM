@@ -1,8 +1,14 @@
+/**
+ * Layout раздела оплаты (/billing и /billing/checkout).
+ * Добавляет к страницам плавающую кнопку «Назад» поверх контента.
+ */
+
 "use client";
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
+// Каркас страниц биллинга: кнопка «Назад» + контент.
 export default function BillingLayout({
   children,
 }: {
@@ -10,7 +16,7 @@ export default function BillingLayout({
 }) {
   const router = useRouter();
 
-  /* Кнопка "Назад" */
+  // Возврат назад по истории, иначе — в чат.
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
       router.back();
@@ -21,6 +27,7 @@ export default function BillingLayout({
 
   return (
     <>
+      {/* Плавающая кнопка «Назад» в левом верхнем углу */}
       <button
         type="button"
         onClick={handleBack}

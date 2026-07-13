@@ -1,13 +1,9 @@
 /**
- * Клиентский кэш чатов для мгновенного рендера.
- *
- * Список диалогов и сообщения каждого чата кэшируются в localStorage (с
- * подстраховкой in-memory). При обновлении страницы и переходах сайдбар и сам
- * чат показываются сразу из кэша, а сеть подтягивает свежие данные в фоне.
- *
- * Ключи неймспейсятся по userId (Clerk), чтобы на общем устройстве чаты одного
- * пользователя не утекали другому. До загрузки Clerk (userId === null) кэш
- * молчит — это безопасно (просто не мгновенно).
+ * Клиентский кэш чатов в localStorage для мгновенного рендера.
+ * Хранит список диалогов и сообщения каждого чата, чтобы сайдбар и тред
+ * показывались сразу при переходах/обновлении, пока сеть тянет свежие данные.
+ * Ключи неймспейсятся по userId (Clerk), чтобы чаты не утекали между аккаунтами.
+ * Используется в ConversationsProvider и useChatSession.
  */
 
 import type { Message } from "@/components/mainapp/ChatMessage";
@@ -16,6 +12,7 @@ import type { ChatPreview } from "@/lib/mainapp-contents";
 const VERSION = "v1";
 const MAX_CACHED_CONVS = 40; // сколько чатов держим в кэше сообщений (LRU)
 
+// Безопасный доступ к localStorage (null в SSR или при блокировке хранилища).
 function ls(): Storage | null {
   try {
     return typeof window !== "undefined" ? window.localStorage : null;
@@ -24,12 +21,14 @@ function ls(): Storage | null {
   }
 }
 
+// Ключи хранилища, неймспейснутые по версии и userId.
 const listKey = (uid: string) => `mlm.${VERSION}.${uid}.convs`;
 const msgKey = (uid: string, id: string) => `mlm.${VERSION}.${uid}.msg.${id}`;
 const idxKey = (uid: string) => `mlm.${VERSION}.${uid}.msgidx`;
 
 // ── Список диалогов ─────────────────────────────────────────────────────────
 
+// Читает кэшированный список чатов пользователя (или null).
 export function loadConversationList(uid: string | null): ChatPreview[] | null {
   const s = ls();
   if (!s || !uid) return null;
@@ -41,6 +40,7 @@ export function loadConversationList(uid: string | null): ChatPreview[] | null {
   }
 }
 
+// Сохраняет список чатов пользователя в кэш.
 export function saveConversationList(
   uid: string | null,
   list: readonly ChatPreview[],
@@ -56,6 +56,7 @@ export function saveConversationList(
 
 // ── Сообщения чата ──────────────────────────────────────────────────────────
 
+// Читает кэшированные сообщения конкретного чата (или null).
 export function loadMessages(uid: string | null, id: string): Message[] | null {
   const s = ls();
   if (!s || !uid) return null;
@@ -67,6 +68,7 @@ export function loadMessages(uid: string | null, id: string): Message[] | null {
   }
 }
 
+// Сохраняет сообщения чата и обновляет LRU-индекс, вытесняя старьё.
 export function saveMessages(
   uid: string | null,
   id: string,
@@ -76,7 +78,7 @@ export function saveMessages(
   if (!s || !uid) return;
   try {
     s.setItem(msgKey(uid, id), JSON.stringify(messages));
-    // Обновляем LRU-индекс и вытесняем старое, чтобы кэш не рос бесконечно.
+    // LRU-индекс: свежий чат — в начало, лишнее сверх лимита удаляем.
     let idx: string[] = [];
     try {
       idx = JSON.parse(s.getItem(idxKey(uid)) || "[]") as string[];
@@ -94,6 +96,7 @@ export function saveMessages(
   }
 }
 
+// Удаляет кэш сообщений одного чата (при удалении диалога).
 export function dropMessages(uid: string | null, id: string): void {
   const s = ls();
   if (!s || !uid) return;

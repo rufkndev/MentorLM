@@ -1,16 +1,34 @@
+/**
+ * Один пузырёк сообщения в треде чата.
+ * Сообщение пользователя — справа простым текстом; ответ ИИ — слева с аватаром
+ * и Markdown-разметкой; во время генерации показывает индикатор «думаю».
+ */
+
 "use client";
 
 import { motion } from "motion/react";
+import { Paperclip } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Markdown } from "@/components/mainapp/Markdown";
 
+// Метаданные прикреплённого файла (для чипсов в пузырьке).
+export type MessageAttachment = {
+  id?: number;
+  filename: string;
+  size: number;
+  content_type?: string;
+};
+
+// Модель одного сообщения в чате.
 export type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  thinking?: boolean;
+  thinking?: boolean; // true — идёт генерация ответа
+  attachments?: MessageAttachment[]; // прикреплённые файлы (у сообщений пользователя)
 };
 
+// Пузырёк сообщения (пользователь или ассистент).
 export function ChatMessage({ message }: { message: Message }) {
   const isUser = message.role === "user";
 
@@ -24,8 +42,10 @@ export function ChatMessage({ message }: { message: Message }) {
         isUser ? "justify-end" : "justify-start"
       )}
     >
+      {/* Аватар ассистента слева (у сообщений пользователя его нет) */}
       {!isUser && <AssistantAvatar />}
 
+      {/* Тело сообщения: текст пользователя / индикатор / Markdown ответа */}
       <div
         className={cn(
           "chat-text rounded-3xl px-4 py-3",
@@ -37,7 +57,13 @@ export function ChatMessage({ message }: { message: Message }) {
         {message.thinking ? (
           <ThinkingDots />
         ) : isUser ? (
-          message.content
+          <>
+            {/* Чипсы прикреплённых файлов над текстом сообщения */}
+            {message.attachments && message.attachments.length > 0 && (
+              <AttachmentChips items={message.attachments} />
+            )}
+            {message.content}
+          </>
         ) : (
           <Markdown content={message.content} />
         )}
@@ -46,6 +72,32 @@ export function ChatMessage({ message }: { message: Message }) {
   );
 }
 
+// Человекочитаемый размер файла (Б / КБ / МБ).
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+// Ряд чипсов с прикреплёнными файлами (в пузырьке пользователя).
+function AttachmentChips({ items }: { items: MessageAttachment[] }) {
+  return (
+    <div className="mb-2 flex flex-wrap gap-1.5">
+      {items.map((f, i) => (
+        <span
+          key={f.id ?? i}
+          className="flex items-center gap-1.5 rounded-lg bg-white/15 px-2 py-1 text-[12px] text-white/90"
+        >
+          <Paperclip className="h-3 w-3 shrink-0" strokeWidth={1.8} />
+          <span className="max-w-[160px] truncate">{f.filename}</span>
+          <span className="shrink-0 text-white/60">{formatBytes(f.size)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Градиентный аватар ассистента (мини-логотип).
 function AssistantAvatar() {
   return (
     <span
@@ -64,6 +116,7 @@ function AssistantAvatar() {
   );
 }
 
+// Анимированный индикатор «думаю» на время генерации ответа.
 function ThinkingDots() {
   return (
     <span className="inline-flex items-center gap-1.5 text-muted">

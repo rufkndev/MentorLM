@@ -1,13 +1,21 @@
+/**
+ * Подвал маркетинговых страниц.
+ * Логотип с описанием, колонки навигационных ссылок и строка копирайта.
+ * Контент берётся из landing-contents.
+ */
+
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { brand, footer } from "@/lib/landing-contents";
 
+// Подвал лендинга.
 export function MarketingFooter() {
   const year = new Date().getFullYear();
   return (
     <footer className="relative mt-32 border-t border-line">
       <div className="aurora opacity-50" aria-hidden />
       <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+        {/* Левый блок: логотип и описание */}
         <div className="max-w-sm">
           <Logo />
           <p className="mt-4 text-sm leading-relaxed text-muted">
@@ -18,6 +26,7 @@ export function MarketingFooter() {
           </p>
         </div>
 
+        {/* Колонки ссылок (Продукт / Компания / Юридическое) */}
         {footer.columns.map((col) => (
           <nav key={col.title} aria-label={col.title}>
             <h4 className="text-eyebrow">{col.title}</h4>
@@ -38,6 +47,7 @@ export function MarketingFooter() {
         ))}
       </div>
 
+      {/* Нижняя строка: копирайт */}
       <div className="border-t border-line">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 px-6 py-6 text-xs text-muted md:flex-row md:items-center">
           <p>
