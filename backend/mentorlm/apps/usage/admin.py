@@ -12,7 +12,8 @@ class UsageAdmin(admin.ModelAdmin):
         "request_count",
         "tokens_in",
         "tokens_out",
-        "cost_rub",
+        "web_search_calls",
+        "billable_tokens",
     )
     list_filter = ("day", "mode")
     search_fields = ("user__email", "user__clerk_id")
@@ -28,8 +29,8 @@ class UsageEventAdmin(admin.ModelAdmin):
         "model",
         "tokens_in",
         "tokens_out",
-        "cost_usd",
-        "cost_rub",
+        "web_search_calls",
+        "billable_tokens",
         "conversation",
     )
     list_filter = ("mode", "model", "created_at")

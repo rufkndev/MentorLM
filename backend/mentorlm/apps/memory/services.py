@@ -95,13 +95,13 @@ def extract_facts_in_background(user, conversation) -> None:
         return
     thread = threading.Thread(
         target=_extract_and_store,
-        args=(user.id, conversation.id),
+        args=(user.id, conversation.id, conversation.mode),
         daemon=True,
     )
     thread.start()
 
 
-def _extract_and_store(user_id: int, conversation_id: int) -> None:
+def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
     """Фоново: спросить LLM про новые факты и сохранить их. Ошибки не пробрасываем."""
     from apps.conversations.models import Message
     from apps.users.models import UserProfile
@@ -124,8 +124,28 @@ def _extract_and_store(user_id: int, conversation_id: int) -> None:
             UserMemoryFact.objects.filter(user=user).values_list("content", flat=True)
         )
 
-        raw_facts = _call_extractor(recent, existing, user_settings)
+        raw_facts, tokens_in, tokens_out = _call_extractor(
+            recent, existing, user_settings
+        )
         _store_new_facts(user, conversation_id, raw_facts, existing)
+
+        # Учёт расхода фоновой памяти: отдельный платный LLM-вызов. Списываем в
+        # квоту ПОРОДИВШЕГО режима (модель дешёвая, вклад мизерный, но
+        # предохранитель не дырявый). count_as_request=False — служебный вызов не
+        # считается отдельным запросом пользователя.
+        if tokens_in or tokens_out:
+            from apps.usage.services import record_usage
+
+            record_usage(
+                user,
+                mode=mode,
+                model=settings.OPENAI_MEMORY_MODEL,
+                tokens_in=tokens_in,
+                tokens_out=tokens_out,
+                scenario="memory:extract",
+                conversation=None,
+                count_as_request=False,
+            )
     except Exception:  # noqa: BLE001 — фон не должен падать наружу
         logger.exception("Извлечение фактов памяти не удалось")
     finally:
@@ -133,8 +153,14 @@ def _extract_and_store(user_id: int, conversation_id: int) -> None:
         connections.close_all()
 
 
-def _call_extractor(recent_messages, existing_facts, user_settings) -> list[str]:
-    """LLM-запрос: вернуть до 3 новых устойчивых факта о пользователе (JSON)."""
+def _call_extractor(
+    recent_messages, existing_facts, user_settings
+) -> tuple[list[str], int, int]:
+    """LLM-запрос: до 3 новых устойчивых фактов о пользователе (JSON).
+
+    Возвращает `(facts, tokens_in, tokens_out)` — токены нужны, чтобы учесть
+    себестоимость этого фонового вызова на пользователя (см. record_usage).
+    """
     from openai import OpenAI
 
     scope = getattr(user_settings, "memory_scope", "balanced")
@@ -176,7 +202,11 @@ def _call_extractor(recent_messages, existing_facts, user_settings) -> list[str]
     content = resp.choices[0].message.content or "{}"
     data = json.loads(content)
     facts = data.get("facts", []) if isinstance(data, dict) else []
-    return [f for f in facts if isinstance(f, str)]
+
+    usage = getattr(resp, "usage", None)
+    tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
+    tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
+    return [f for f in facts if isinstance(f, str)], tokens_in, tokens_out
 
 
 def _store_new_facts(user, conversation_id, raw_facts, existing_facts) -> None:

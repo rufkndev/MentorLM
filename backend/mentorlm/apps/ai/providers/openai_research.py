@@ -62,17 +62,29 @@ class OpenAIResearchProvider:
                 raise
 
         completion = ""
+        # Вызовы веб-поиска считаем по ходу стрима (устойчиво к обрыву) и уточняем
+        # по final — они платные и идут в расчётную стоимость запроса (billable).
+        usage["web_search_calls"] = 0
         try:
             for event in stream:
                 if event.type == "response.output_text.delta":
                     completion += event.delta
                     yield event.delta
+                elif event.type == "response.output_item.done" and (
+                    getattr(event.item, "type", "") == "web_search_call"
+                ):
+                    usage["web_search_calls"] += 1
             final = stream.get_final_response()
         finally:
             manager.__exit__(None, None, None)
 
         # TODO: достать url_citation annotations из final.output и отдавать
         # источники на фронт (отдельным полем SSE) — пока только текст.
+        usage["web_search_calls"] = sum(
+            1
+            for item in (final.output or [])
+            if getattr(item, "type", "") == "web_search_call"
+        )
         if final.usage is not None:
             usage["prompt_tokens"] = final.usage.input_tokens
             usage["completion_tokens"] = final.usage.output_tokens

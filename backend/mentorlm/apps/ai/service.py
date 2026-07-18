@@ -31,8 +31,14 @@ class AIStream:
     usage: dict
 
 
-def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
+def run_conversation_stream(
+    conversation, scenario_id, user, *, degrade: bool = False
+) -> AIStream:
     """Готовит и запускает потоковую генерацию ответа для диалога.
+
+    `degrade=True` — квота режима исчерпана (см. billing.guard): отвечаем на
+    дешёвой модели режима (registry.degrade_model) без веб-поиска, чтобы дать
+    несколько запросов вместо жёсткого блока.
 
     usage заполняется провайдером по ходу стрима — читать его нужно ПОСЛЕ того,
     как поток deltas полностью исчерпан.
@@ -48,23 +54,26 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
     scenario = get_scenario(conversation.mode, scenario_id)
     prefs = resolve_preferences(mode, scenario, user_settings)
 
+    # При деградации подменяем модель на дешёвую и снимаем веб-поиск.
+    model = mode.degrade_model if degrade else prefs.model
+
     # Глобальная память: подмешиваем известные факты о пользователе (если
     # включено настройкой memory_use). Пусто — блок просто не добавится.
     memory_block = build_memory_block(user_settings)
     system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
     history = build_context(
-        conversation, plan_limits, model=prefs.model,
+        conversation, plan_limits, model=model,
         max_messages=prefs.context_messages,
     )
 
-    # Живой веб-поиск — платная фича. На тарифах без него режим «Исследовать»
-    # работает по знаниям модели (инструмент просто снимаем), а не блокируется.
+    # Живой веб-поиск — платная фича. На тарифах без него (и при деградации) режим
+    # «Исследовать» работает по знаниям модели (инструмент просто снимаем).
     tools = scenario.tools
-    if not plan_limits["allow_web_search"]:
+    if degrade or not plan_limits["allow_web_search"]:
         tools = tuple(t for t in tools if t != "web_search")
 
     params = GenParams(
-        model=prefs.model,
+        model=model,
         temperature=prefs.temperature,
         tools=tools,
         # Усилие рассуждения после согласования сценария с настройкой юзера —
@@ -77,4 +86,4 @@ def run_conversation_stream(conversation, scenario_id, user) -> AIStream:
     deltas = get_provider(mode.provider).stream(
         system=system, history=history, params=params, usage=usage
     )
-    return AIStream(deltas=deltas, model=prefs.model, usage=usage)
+    return AIStream(deltas=deltas, model=model, usage=usage)

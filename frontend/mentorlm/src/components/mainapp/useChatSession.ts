@@ -172,7 +172,7 @@ export function useChatSession(defaultScenarioId: string) {
         } else {
           body = { content: text, scenario_id: scenarioId };
         }
-        await api.stream(
+        const result = await api.stream(
           `/api/conversations/${id}/messages/`,
           body,
           {
@@ -187,6 +187,17 @@ export function useChatSession(defaultScenarioId: string) {
             },
           },
         );
+        // Квота исчерпана — ответ пришёл на упрощённой модели: помечаем сообщение,
+        // чтобы показать плашку деградации.
+        if (result.degraded) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === placeholderId
+                ? { ...m, degraded: true, canUpgrade: result.canUpgrade }
+                : m,
+            ),
+          );
+        }
       } catch (err) {
         // Лимиты тарифа (guard.py) приходят с машинным code — показываем
         // дружелюбный текст бэка и апселл, а не generic-ошибку.

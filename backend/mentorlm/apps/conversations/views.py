@@ -9,9 +9,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.ai import service as ai_service
-from apps.billing.guard import LimitExceeded, preflight
+from apps.billing.guard import (
+    LimitExceeded,
+    acquire_generation_lock,
+    preflight,
+    release_generation_lock,
+)
+from apps.billing.plans import effective_plan
 from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
+from apps.users.models import UserProfile
 
 from .attachments import MAX_FILE_SIZE, MAX_FILES, extract_text
 from .models import Attachment, Conversation, Message
@@ -103,83 +110,122 @@ class MessageCreateView(APIView):
 
         user = request.user
 
-        # 0. Preflight-лимиты ДО сохранения сообщения — чтобы не плодить
-        #    осиротевшие сообщения без ответа. Отдаём JSON с кодом/статусом до
-        #    старта SSE: фронтовый api.stream увидит non-200 и покажет апселл.
-        #    В подсчёт длины ввода включаем и текст вложений — он тоже уйдёт модели.
+        # В подсчёт длины ввода включаем и текст вложений — он тоже уйдёт модели.
         attach_text = "\n\n".join(text for *_, text in extracted)
         preflight_text = f"{content}\n\n{attach_text}" if attach_text else content
-        try:
-            preflight(
-                user,
-                mode=conversation.mode,
-                scenario=scenario_id,
-                input_text=preflight_text,
-            )
-        except LimitExceeded as exc:
+
+        # 0. Лок «идёт генерация»: один пользователь — один активный ответ. Берём
+        #    ДО preflight, поэтому проверка лимитов и последующее списание расхода
+        #    идут под локом — параллельные запросы одного юзера не могут вместе
+        #    проскочить лимит (overshoot). Снимаем лок в finally стрима, а на
+        #    ранних выходах — явно. _GEN_LOCK_TTL страхует от смерти воркера.
+        if not acquire_generation_lock(user):
             return Response(
-                {"code": exc.code, "message": exc.message, **exc.extra},
-                status=exc.status,
+                {
+                    "code": "generation_in_progress",
+                    "message": "Дождитесь окончания предыдущего ответа.",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-        # 1. Сохраняем сообщение пользователя и его вложения; первое сообщение
-        #    задаёт заголовок чата (текст, а если его нет — имя первого файла).
-        user_msg = Message.objects.create(
-            conversation=conversation,
-            role=Message.Role.USER,
-            content=content,
-        )
-        for name, ctype, size, text in extracted:
-            Attachment.objects.create(
-                message=user_msg,
-                filename=name,
-                content_type=ctype,
-                size=size,
-                extracted_text=text,
-            )
-        if not conversation.title:
-            conversation.title = content[:40] or (extracted[0][0] if extracted else "")
-            conversation.save(update_fields=["title", "updated_at"])
+        try:
+            # 1. Preflight-лимиты ДО сохранения сообщения — чтобы не плодить
+            #    осиротевшие сообщения без ответа. Отдаём JSON с кодом/статусом до
+            #    старта SSE: фронтовый api.stream увидит non-200 и покажет апселл.
+            try:
+                decision = preflight(
+                    user,
+                    mode=conversation.mode,
+                    scenario=scenario_id,
+                    input_text=preflight_text,
+                )
+            except LimitExceeded as exc:
+                release_generation_lock(user)
+                return Response(
+                    {"code": exc.code, "message": exc.message, **exc.extra},
+                    status=exc.status,
+                )
+            # Квота исчерпана, но есть grace-запросы → отвечаем на дешёвой модели
+            # и подсвечиваем это плашкой на фронте (can_upgrade — не на топ-тарифе).
+            degraded = decision == "degrade"
+            can_upgrade = effective_plan(user) != UserProfile.Plan.PRO
 
-        # 2. Готовим запрос к модели до старта стрима (выбор провайдера/промпта
-        #    и сборка контекста — в едином ИИ-слое apps.ai).
-        ai = ai_service.run_conversation_stream(conversation, scenario_id, user)
-        model = ai.model
+            # 2. Сохраняем сообщение пользователя и его вложения; первое сообщение
+            #    задаёт заголовок чата (текст, а если его нет — имя первого файла).
+            user_msg = Message.objects.create(
+                conversation=conversation,
+                role=Message.Role.USER,
+                content=content,
+            )
+            for name, ctype, size, text in extracted:
+                Attachment.objects.create(
+                    message=user_msg,
+                    filename=name,
+                    content_type=ctype,
+                    size=size,
+                    extracted_text=text,
+                )
+            if not conversation.title:
+                conversation.title = content[:40] or (
+                    extracted[0][0] if extracted else ""
+                )
+                conversation.save(update_fields=["title", "updated_at"])
+
+            # 3. Готовим запрос к модели до старта стрима (выбор провайдера/промпта
+            #    и сборка контекста — в едином ИИ-слое apps.ai).
+            ai = ai_service.run_conversation_stream(
+                conversation, scenario_id, user, degrade=degraded
+            )
+            model = ai.model
+        except Exception:
+            # Любая ошибка до старта стрима — снять лок, иначе повиснет до TTL.
+            release_generation_lock(user)
+            raise
 
         def event_stream():
             usage = ai.usage
             assistant_content = ""
             try:
+                # Плашка деградации — до текста ответа, чтобы фронт показал её сразу.
+                if degraded:
+                    yield _sse({"degraded": True, "can_upgrade": can_upgrade})
                 for delta in ai.deltas:
                     assistant_content += delta
                     yield _sse({"delta": delta})
             except Exception as exc:  # noqa: BLE001 — отдаём ошибку клиенту
                 yield _sse({"error": str(exc)})
             finally:
-                message_id = None
-                if assistant_content:
-                    msg = Message.objects.create(
-                        conversation=conversation,
-                        role=Message.Role.ASSISTANT,
-                        content=assistant_content,
-                        model=model,
-                    )
-                    message_id = msg.id
-                    conversation.updated_at = timezone.now()
-                    conversation.save(update_fields=["updated_at"])
-                    record_usage(
-                        user,
-                        mode=conversation.mode,
-                        scenario=scenario_id or "",
-                        conversation=conversation,
-                        model=model,
-                        tokens_in=usage.get("prompt_tokens", 0),
-                        tokens_out=usage.get("completion_tokens", 0),
-                    )
-                    # Глобальная память: в фоне извлекаем устойчивые факты о
-                    # пользователе (если включена автопамять). Не блокирует ответ.
-                    extract_facts_in_background(user, conversation)
-                yield _sse({"done": True, "message_id": message_id})
+                try:
+                    message_id = None
+                    if assistant_content:
+                        msg = Message.objects.create(
+                            conversation=conversation,
+                            role=Message.Role.ASSISTANT,
+                            content=assistant_content,
+                            model=model,
+                        )
+                        message_id = msg.id
+                        conversation.updated_at = timezone.now()
+                        conversation.save(update_fields=["updated_at"])
+                        record_usage(
+                            user,
+                            mode=conversation.mode,
+                            scenario=scenario_id or "",
+                            conversation=conversation,
+                            model=model,
+                            tokens_in=usage.get("prompt_tokens", 0),
+                            tokens_out=usage.get("completion_tokens", 0),
+                            web_search_calls=usage.get("web_search_calls", 0),
+                            degraded=degraded,
+                        )
+                        # Глобальная память: в фоне извлекаем устойчивые факты о
+                        # пользователе (если включена автопамять). Не блокирует ответ.
+                        extract_facts_in_background(user, conversation)
+                    yield _sse({"done": True, "message_id": message_id})
+                finally:
+                    # Снимаем лок генерации в самом конце — после списания расхода,
+                    # чтобы следующий запрос увидел уже обновлённые лимиты.
+                    release_generation_lock(user)
 
         response = StreamingHttpResponse(
             event_stream(), content_type="text/event-stream"

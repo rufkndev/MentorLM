@@ -80,7 +80,11 @@ export function useApi() {
         onDelta?: (delta: string) => void;
         signal?: AbortSignal;
       } = {},
-    ): Promise<{ messageId: number | null }> => {
+    ): Promise<{
+      messageId: number | null;
+      degraded: boolean;
+      canUpgrade: boolean;
+    }> => {
       const token = await getToken();
       // С вложениями шлём multipart (FormData) — Content-Type не ставим сами,
       // браузер добавит boundary. Без файлов — как раньше, JSON.
@@ -105,6 +109,8 @@ export function useApi() {
       const decoder = new TextDecoder();
       let buffer = "";
       let messageId: number | null = null;
+      let degraded = false; // квота исчерпана — ответ на упрощённой модели
+      let canUpgrade = false; // показывать ли апселл в плашке деградации
 
       // SSE: события разделены пустой строкой, данные — в строках `data: {...}`.
       for (;;) {
@@ -126,15 +132,21 @@ export function useApi() {
               done?: boolean;
               message_id?: number | null;
               error?: string;
+              degraded?: boolean;
+              can_upgrade?: boolean;
             };
             if (payload.error) throw new ApiError(500, payload.error);
+            if (payload.degraded) {
+              degraded = true;
+              canUpgrade = !!payload.can_upgrade;
+            }
             if (payload.delta) options.onDelta?.(payload.delta);
             if (payload.done) messageId = payload.message_id ?? null;
           }
         }
       }
 
-      return { messageId };
+      return { messageId, degraded, canUpgrade };
     },
     [getToken],
   );

@@ -6,8 +6,10 @@
 
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
-import { Paperclip } from "lucide-react";
+import { AlertTriangle, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Markdown } from "@/components/mainapp/Markdown";
 
@@ -26,6 +28,8 @@ export type Message = {
   content: string;
   thinking?: boolean; // true — идёт генерация ответа
   attachments?: MessageAttachment[]; // прикреплённые файлы (у сообщений пользователя)
+  degraded?: boolean; // ответ на упрощённой модели (квота исчерпана)
+  canUpgrade?: boolean; // показывать ли апселл в плашке деградации
 };
 
 // Пузырёк сообщения (пользователь или ассистент).
@@ -65,10 +69,43 @@ export function ChatMessage({ message }: { message: Message }) {
             {message.content}
           </>
         ) : (
-          <Markdown content={message.content} />
+          <>
+            {message.degraded && (
+              <DegradedNotice canUpgrade={message.canUpgrade} />
+            )}
+            <Markdown content={message.content} />
+          </>
         )}
       </div>
     </motion.div>
+  );
+}
+
+// Плашка «квота исчерпана, отвечаем на упрощённой модели». Закрывается крестиком;
+// апселл показываем только тем, кому есть куда расти (не на топ-тарифе).
+function DegradedNotice({ canUpgrade }: { canUpgrade?: boolean }) {
+  const [hidden, setHidden] = useState(false);
+  if (hidden) return null;
+  return (
+    <div className="mb-2 flex items-start gap-2 rounded-xl border border-amber-300/50 bg-amber-50/70 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200">
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
+      <p className="min-w-0 flex-1">
+        Лимит режима исчерпан — отвечаем на упрощённой модели.{" "}
+        {canUpgrade && (
+          <Link href="/billing" className="font-medium underline underline-offset-2">
+            Перейти на тариф выше
+          </Link>
+        )}
+      </p>
+      <button
+        type="button"
+        onClick={() => setHidden(true)}
+        aria-label="Закрыть"
+        className="shrink-0 rounded-md p-0.5 text-amber-700/70 transition-colors hover:text-amber-900 dark:text-amber-300/70 dark:hover:text-amber-100"
+      >
+        <X className="h-3.5 w-3.5" strokeWidth={2} />
+      </button>
+    </div>
   );
 }
 

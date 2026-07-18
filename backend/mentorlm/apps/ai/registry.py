@@ -54,6 +54,7 @@ class ModeConfig:
     id: str  # "chat" | "code" | "research"
     provider: str  # ключ провайдера: "openai_chat" | "anthropic" | "openai_research"
     model: str  # реальный id модели
+    degrade_model: str  # дешёвая модель на случай исчерпания квоты (деградация)
     base_system_prompt: str
     default_scenario_id: str
     web_search: bool = False
@@ -66,6 +67,7 @@ def _modes() -> dict[str, ModeConfig]:
             id="chat",
             provider="openai_chat",
             model=settings.OPENAI_CHAT_MODEL,
+            degrade_model=settings.OPENAI_CHAT_MODEL_DEGRADE,
             base_system_prompt=CHAT_PROMPT,
             default_scenario_id="chat",
         ),
@@ -73,6 +75,7 @@ def _modes() -> dict[str, ModeConfig]:
             id="code",
             provider="anthropic",
             model=settings.ANTHROPIC_CODE_MODEL,
+            degrade_model=settings.ANTHROPIC_CODE_MODEL_DEGRADE,
             base_system_prompt=CODE_PROMPT,
             default_scenario_id="write-code",
         ),
@@ -80,6 +83,7 @@ def _modes() -> dict[str, ModeConfig]:
             id="research",
             provider="openai_research",
             model=settings.OPENAI_RESEARCH_MODEL,
+            degrade_model=settings.OPENAI_RESEARCH_MODEL_DEGRADE,
             base_system_prompt=RESEARCH_PROMPT,
             default_scenario_id="overview",
             web_search=True,

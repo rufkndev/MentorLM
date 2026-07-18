@@ -6,11 +6,10 @@ from apps.conversations.models import Conversation
 class Usage(models.Model):
     """Дневные счётчики использования ИИ на пользователя и режим.
 
-    Одна строка на тройку (пользователь, день, режим) — дешёвый агрегат для
-    preflight-проверок лимитов: дневной cap сообщений (сумма по режимам),
-    суб-лимиты research/code (строка нужного режима) и месячный бюджет
-    себестоимости (сумма cost_rub за месяц). Журнал отдельных запросов — в
-    `UsageEvent`.
+    Одна строка на тройку (пользователь, день, режим) — дешёвый дневной роллап
+    для админки и аналитики. В КОНТУРЕ ЛИМИТОВ НЕ УЧАСТВУЕТ: квоты считаются по
+    скользящим окнам поверх `UsageEvent` (см. billing.guard). Журнал отдельных
+    запросов — там же, в `UsageEvent`.
     """
 
     user = models.ForeignKey(
@@ -25,7 +24,8 @@ class Usage(models.Model):
     request_count = models.PositiveIntegerField(default=0)
     tokens_in = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
-    cost_rub = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    web_search_calls = models.PositiveIntegerField(default=0)
+    billable_tokens = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -50,11 +50,12 @@ class Usage(models.Model):
 
 
 class UsageEvent(models.Model):
-    """Журнал отдельных ИИ-запросов — ledger для админки и аудита стоимости.
+    """Журнал отдельных ИИ-запросов — источник правды для квот и аудита.
 
-    Append-only: одна строка на успешный запрос. Не участвует в горячих
-    проверках лимитов (для них есть агрегат `Usage`), но даёт полную картину:
-    модель, режим, сценарий, токены и себестоимость в USD и рублях.
+    Append-only: одна строка на успешный запрос. По нему считаются скользящие
+    окна квот (SUM(billable_tokens) за окно, см. billing.guard). Даёт полную
+    картину: модель, режим, сценарий, токены, вызовы веб-поиска и расчётную
+    стоимость запроса в токенах (billable_tokens).
     """
 
     user = models.ForeignKey(
@@ -74,8 +75,10 @@ class UsageEvent(models.Model):
     model = models.CharField(max_length=50, blank=True)
     tokens_in = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
-    cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
-    cost_rub = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    web_search_calls = models.PositiveSmallIntegerField(default=0)
+    billable_tokens = models.PositiveIntegerField(default=0)
+    # Запрос выполнен на дешёвой модели в режиме деградации (квота была исчерпана).
+    degraded = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -88,4 +91,4 @@ class UsageEvent(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.user} — {self.model} [{self.mode}]: {self.cost_rub}₽"
+        return f"{self.user} — {self.model} [{self.mode}]: {self.billable_tokens} т."

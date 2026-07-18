@@ -10,10 +10,16 @@ class UserSettingsInline(admin.StackedInline):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("clerk_id", "email", "plan", "created_at")
-    list_filter = ("plan",)
+    list_display = ("clerk_id", "email", "effective_plan", "created_at")
     search_fields = ("clerk_id", "email")
     inlines = (UserSettingsInline,)
+
+    @admin.display(description="Тариф")
+    def effective_plan(self, obj) -> str:
+        """Актуальный тариф по подпискам (считается на лету, кэша нет)."""
+        from apps.billing.plans import effective_plan
+
+        return effective_plan(obj)
 
 
 @admin.register(UserSettings)

@@ -40,19 +40,25 @@ export function useMemoryFacts() {
 export type SubscriptionInfo = {
   plan: string;
   plan_label: string;
-  daily_messages: number | null;
+  status: string;
+  provider: string | null;
+  current_period_end: string | null;
+  allow_web_search: boolean;
 };
-export type UsageLine = { used: number; limit: number | null };
+// Одно скользящее окно квоты режима: доля исчерпанного + момент восстановления.
+export type UsageWindow = { used_pct: number; resets_at: string | null };
+export type ModeUsage = {
+  label: string;
+  used_pct: number;
+  remaining_pct: number;
+  tightest_window: "burst" | "week";
+  resets_at: string | null;
+  windows: { burst: UsageWindow; week: UsageWindow };
+};
 export type UsageInfo = {
   plan: string;
   plan_label: string;
-  monthly: { used_pct: number; remaining_pct: number; resets_at: string };
-  daily: {
-    messages: UsageLine;
-    research: UsageLine;
-    code: UsageLine;
-    resets_at: string;
-  };
+  modes: { chat: ModeUsage; code: ModeUsage; research: ModeUsage };
 };
 
 export function useSubscriptionUsage() {

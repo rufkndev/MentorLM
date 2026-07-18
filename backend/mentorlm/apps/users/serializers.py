@@ -24,10 +24,19 @@ def settings_defaults() -> dict:
 class UserProfileSerializer(serializers.ModelSerializer):
     """Read-only представление профиля для ЛК (имя/аватар берёт фронт из Clerk)."""
 
+    # Тариф считается на лету из подписок (effective_plan) — отдельного поля plan
+    # в профиле нет, поэтому и протухнуть нечему.
+    plan = serializers.SerializerMethodField()
+
     class Meta:
         model = UserProfile
         fields = ["clerk_id", "email", "plan", "created_at"]
         read_only_fields = fields
+
+    def get_plan(self, obj) -> str:
+        from apps.billing.plans import effective_plan
+
+        return effective_plan(obj)
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):

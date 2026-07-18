@@ -21,6 +21,9 @@ class UserProfile(models.Model):
     привязанную к Clerk по `clerk_id`, и доменные поля приложения.
     """
 
+    # Перечень тарифов. Само поле plan в профиле НЕ храним: тариф — это статус
+    # подписки (billing.Subscription), считается на лету через effective_plan.
+    # Enum остаётся ключами тарифных словарей (billing.limits.PLAN_LIMITS).
     class Plan(models.TextChoices):
         FREE = "free", "Бесплатный"
         PLUS = "plus", "Plus"
@@ -28,16 +31,12 @@ class UserProfile(models.Model):
 
     clerk_id = models.CharField(max_length=255, unique=True, db_index=True)
     email = models.EmailField(blank=True)
-    plan = models.CharField(max_length=20, choices=Plan.choices, default=Plan.FREE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Профиль пользователя"
         verbose_name_plural = "Профили пользователей"
-        indexes = [
-            models.Index(fields=["plan"]),
-        ]
 
     # UserProfile — не django.contrib.auth.User, но именно он становится
     # request.user после ClerkJWTAuthentication. Чтобы DRF-пермишен

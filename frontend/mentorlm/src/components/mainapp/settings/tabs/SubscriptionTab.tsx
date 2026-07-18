@@ -3,15 +3,38 @@
 import Link from "next/link";
 import { Check, Sparkles } from "lucide-react";
 import { Section } from "../controls";
-import { useSubscriptionUsage, type UsageLine } from "../hooks";
+import { useSubscriptionUsage, type ModeUsage } from "../hooks";
 
-function DailyUsageRow({ label, line }: { label: string; line: UsageLine }) {
+// Когда квота начнёт восстанавливаться, в человекочитаемом виде.
+function formatReset(resetsAt: string | null): string | null {
+  if (!resetsAt) return null;
+  const diffMs = new Date(resetsAt).getTime() - Date.now();
+  if (diffMs <= 0) return "скоро";
+  const hours = Math.round(diffMs / 3_600_000);
+  if (hours < 1) return "менее чем через час";
+  if (hours < 24) return `через ~${hours} ч`;
+  return `через ~${Math.round(hours / 24)} дн`;
+}
+
+// Полоска расхода одного режима: доля исчерпанной квоты + время восстановления.
+function ModeUsageBar({ mode }: { mode: ModeUsage }) {
+  const usedPct = mode.used_pct;
+  const reset = usedPct > 0 ? formatReset(mode.resets_at) : null;
   return (
-    <div className="flex items-center justify-between text-[12.5px]">
-      <span className="text-muted">{label}</span>
-      <span className="text-ink-soft">
-        {line.used} / {line.limit === null ? "∞" : line.limit}
-      </span>
+    <div>
+      <div className="flex items-center justify-between text-[12.5px] text-muted">
+        <span>{mode.label}</span>
+        <span>Осталось {mode.remaining_pct}%</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className="h-full rounded-full bg-[var(--brand-primary)] transition-all"
+          style={{ width: `${usedPct}%` }}
+        />
+      </div>
+      {reset && (
+        <p className="mt-1 text-[11px] text-muted">Обновится {reset}</p>
+      )}
     </div>
   );
 }
@@ -20,8 +43,6 @@ export function SubscriptionTab() {
   const { sub, usage } = useSubscriptionUsage();
 
   const planLabel = usage?.plan_label ?? sub?.plan_label ?? "Free";
-  const remainingPct = usage?.monthly.remaining_pct ?? 100;
-  const usedPct = usage?.monthly.used_pct ?? 0;
 
   return (
     <Section title="Подписка">
@@ -32,36 +53,20 @@ export function SubscriptionTab() {
               Текущий план
             </p>
             <p className="mt-1 text-[20px] font-semibold text-ink">{planLabel}</p>
-            <p className="mt-0.5 text-[13px] text-muted">
-              Осталось {remainingPct}% месячного лимита
-            </p>
           </div>
           <span className="rounded-full bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-widest text-muted ring-1 ring-line">
             {planLabel}
           </span>
         </div>
 
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-[12.5px] text-muted">
-            <span>Месячный лимит</span>
-            <span>{usedPct}% использовано</span>
-          </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
-            <div
-              className="h-full rounded-full bg-[var(--brand-primary)] transition-all"
-              style={{ width: `${usedPct}%` }}
-            />
-          </div>
-        </div>
-
         {usage && (
-          <div className="mt-4 space-y-2 border-t border-line pt-4">
+          <div className="mt-4 space-y-3 border-t border-line pt-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
-              Сегодня
+              Использование
             </p>
-            <DailyUsageRow label="Сообщений" line={usage.daily.messages} />
-            <DailyUsageRow label="Исследований" line={usage.daily.research} />
-            <DailyUsageRow label="Запросов кода" line={usage.daily.code} />
+            <ModeUsageBar mode={usage.modes.chat} />
+            <ModeUsageBar mode={usage.modes.code} />
+            <ModeUsageBar mode={usage.modes.research} />
           </div>
         )}
       </div>
