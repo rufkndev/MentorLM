@@ -1,7 +1,8 @@
 """Учёт расхода ИИ: журнал событий + дневные агрегаты по режимам.
 
-Расход считаем в РАСЧЁТНЫХ ТОКЕНАХ (billable_tokens), денег в рантайме нет.
-Формула и её константы — в billing.limits (единственный файл настройки).
+Расход считаем в МИКРО-ДОЛЛАРАХ (µ$) по реальной цене модели. Цены и функция
+`usage_cost` — в billing.limits (единственный файл настройки). Поле БД
+`billable_tokens` исторически так называется, но хранит µ$.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ from __future__ import annotations
 from django.db.models import F
 from django.utils import timezone
 
-from apps.billing.limits import billable_tokens
+from apps.billing.limits import usage_cost
 
 from .models import Usage, UsageEvent
 
@@ -29,18 +30,18 @@ def record_usage(
 ) -> int:
     """Списывает фактический расход: журнал события + дневной агрегат режима.
 
-    Возвращает списанные расчётные токены. Квоты читают ТОЛЬКО UsageEvent;
+    Возвращает списанную стоимость в µ$. Квоты читают ТОЛЬКО UsageEvent;
     дневной агрегат Usage — для админки/аналитики. Дневную строку инкрементируем
     атомарно через F(). Вызывается ПОСЛЕ успешного ответа.
 
     `count_as_request=False` — для СЛУЖЕБНЫХ LLM-вызовов (фоновая память, а в
-    будущем — эмбеддинги RAG, генерация заголовка): их токены всё равно списываем
-    в квоту режима (это реальный расход), НО они не считаются отдельным запросом.
+    будущем — эмбеддинги RAG, генерация заголовка): их расход всё равно списываем
+    в квоту режима (это реальные деньги), НО они не считаются отдельным запросом.
     """
     if not (tokens_in or tokens_out or web_search_calls):
         return 0
 
-    billable = billable_tokens(tokens_in, tokens_out, web_search_calls, model=model)
+    billable = usage_cost(tokens_in, tokens_out, web_search_calls, model=model)
 
     UsageEvent.objects.create(
         user=user,

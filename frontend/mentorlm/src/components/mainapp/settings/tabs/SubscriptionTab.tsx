@@ -82,15 +82,15 @@ export function SubscriptionTab() {
           </p>
         </div>
         <p className="mt-2 text-[18px] font-semibold text-ink">
-          Безлимитные чаты и продвинутые модели
+          Максимальные модели, память и веб-поиск
         </p>
         <ul className="mt-3 space-y-1.5 text-[13px] text-ink-soft">
           {[
-            "До 400 сообщений в день",
-            "Максимальная модель без компромиссов",
-            "Длинный контекст до 128K токенов",
-            "Поиск в интернете",
-            "Приоритетная очередь в часы пик",
+            "Максимальное качество моделей",
+            "Веб-поиск в режиме «Исследовать»",
+            "Глобальная память между диалогами",
+            "Память диалога и вложения",
+            "Увеличенные лимиты запросов",
           ].map((line) => (
             <li key={line} className="flex items-center gap-2">
               <Check
@@ -104,14 +104,14 @@ export function SubscriptionTab() {
         <div className="mt-4 flex items-center justify-between">
           <p className="text-[13px] text-ink">
             <span className="text-muted">от </span>
-            <span className="text-[18px] font-semibold">349 ₽</span>
+            <span className="text-[18px] font-semibold">1499 ₽</span>
             <span className="text-muted"> / месяц</span>
           </p>
           <Link
             href="/billing"
             className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)]"
           >
-            Перейти на Pro
+            Улучшить тариф
           </Link>
         </div>
       </div>

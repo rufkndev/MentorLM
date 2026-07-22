@@ -45,7 +45,7 @@ export function CTASection() {
             />
 
             <h2 className="text-display relative mx-auto max-w-3xl text-[clamp(2rem,5vw,4rem)] font-semibold text-white">
-              Тише. Сфокусированнее.{" "}
+              Спокойнее. Сфокусированнее.{" "}
               <span className="font-editorial bg-gradient-to-r from-[var(--brand-focus)] via-white to-[var(--brand-blue-soft)] bg-clip-text text-transparent">
                 Умнее.
               </span>

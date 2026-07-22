@@ -7,6 +7,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { clerkLocalization } from "@/lib/clerk-localization";
+import { CookieNotice } from "@/components/ui/CookieNotice";
 import { Onest, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -88,6 +89,7 @@ export default function RootLayout({
         </head>
         <body className="min-h-screen text-ink antialiased font-sans">
           {children}
+          <CookieNotice />
         </body>
       </html>
     </ClerkProvider>

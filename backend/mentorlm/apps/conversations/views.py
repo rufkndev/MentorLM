@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import timedelta
 
 from django.http import StreamingHttpResponse
@@ -15,12 +16,13 @@ from apps.billing.guard import (
     preflight,
     release_generation_lock,
 )
+from apps.billing.limits import REQUEST_TIMEOUT_SECONDS, limits_for
 from apps.billing.plans import effective_plan
 from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
 from apps.users.models import UserProfile
 
-from .attachments import MAX_FILE_SIZE, MAX_FILES, extract_text
+from .attachments import attachment_error, extract_text
 from .models import Attachment, Conversation, Message
 from .serializers import ConversationDetailSerializer, ConversationSerializer
 
@@ -89,18 +91,17 @@ class MessageCreateView(APIView):
         # Системный промпт выбирает бэк по mode + scenario_id; клиент его не задаёт.
         scenario_id = request.data.get("scenario_id") or None
 
-        # Вложения (multipart): валидируем и сразу извлекаем из них текст. Сами
-        # файлы не храним — только извлечённый текст и метаданные (см. attachments).
+        # Вложения (multipart): валидируем политику тарифа/потолков ДО извлечения
+        # и сохранения. Сами файлы не храним — только извлечённый текст и
+        # метаданные (см. attachments).
         files = request.FILES.getlist("files")
-        if len(files) > MAX_FILES:
-            raise ValidationError({"files": f"Не более {MAX_FILES} файлов за раз."})
+        max_attachments = limits_for(effective_plan(request.user))["max_attachments"]
+        err = attachment_error(files, max_attachments)
+        if err:
+            code, message, http_status = err
+            return Response({"code": code, "message": message}, status=http_status)
         extracted: list[tuple[str, str, int, str]] = []
         for f in files:
-            if f.size > MAX_FILE_SIZE:
-                mb = MAX_FILE_SIZE // (1024 * 1024)
-                raise ValidationError(
-                    {"files": f"Файл «{f.name}» больше {mb} МБ."}
-                )
             extracted.append(
                 (f.name, f.content_type or "", f.size, extract_text(f.name, f.read()))
             )
@@ -185,11 +186,17 @@ class MessageCreateView(APIView):
         def event_stream():
             usage = ai.usage
             assistant_content = ""
+            started = time.monotonic()
             try:
                 # Плашка деградации — до текста ответа, чтобы фронт показал её сразу.
                 if degraded:
                     yield _sse({"degraded": True, "can_upgrade": can_upgrade})
                 for delta in ai.deltas:
+                    # Wall-clock таймаут генерации: обрываем между дельтами, если
+                    # ответ идёт дольше потолка (зависший/слишком долгий стрим).
+                    if time.monotonic() - started > REQUEST_TIMEOUT_SECONDS:
+                        yield _sse({"error": "Превышено время ответа. Попробуйте снова."})
+                        break
                     assistant_content += delta
                     yield _sse({"delta": delta})
             except Exception as exc:  # noqa: BLE001 — отдаём ошибку клиенту

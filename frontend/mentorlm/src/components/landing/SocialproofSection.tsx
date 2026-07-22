@@ -11,7 +11,7 @@ import { socialproof } from "@/lib/landing-contents";
 // Секция соцдоказательства.
 export function SocialproofSection() {
   return (
-    <section id="faq" className="relative py-28 sm:py-36">
+    <section id="forwho" className="relative py-28 sm:py-36">
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-end">
           {/* Заголовок и описание */}

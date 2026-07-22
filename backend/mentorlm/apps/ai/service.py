@@ -10,7 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterator
 
-from apps.billing.limits import limits_for
+from apps.billing.limits import (
+    MAX_CONTEXT_MESSAGES,
+    MAX_OUTPUT_TOKENS,
+    limits_for,
+)
 from apps.billing.plans import effective_plan
 from apps.memory.services import build_memory_block
 
@@ -57,14 +61,16 @@ def run_conversation_stream(
     # При деградации подменяем модель на дешёвую и снимаем веб-поиск.
     model = mode.degrade_model if degrade else prefs.model
 
-    # Глобальная память: подмешиваем известные факты о пользователе (если
-    # включено настройкой memory_use). Пусто — блок просто не добавится.
-    memory_block = build_memory_block(user_settings)
-    system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
-    history = build_context(
-        conversation, plan_limits, model=model,
-        max_messages=prefs.context_messages,
+    # Глобальная память — платная фича: только если тариф её даёт И включена
+    # настройкой memory_use. Пусто — блок просто не добавится.
+    memory_block = (
+        build_memory_block(user_settings) if plan_limits["allow_memory"] else ""
     )
+    system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
+    # Длину истории задаёт тариф (число сообщений), с глобальным потолком.
+    # Free → 0: каждый запрос с чистого листа.
+    max_messages = min(plan_limits["context_messages"], MAX_CONTEXT_MESSAGES)
+    history = build_context(conversation, max_messages=max_messages)
 
     # Живой веб-поиск — платная фича. На тарифах без него (и при деградации) режим
     # «Исследовать» работает по знаниям модели (инструмент просто снимаем).
@@ -79,8 +85,8 @@ def run_conversation_stream(
         # Усилие рассуждения после согласования сценария с настройкой юзера —
         # провайдеры OpenAI передают его в API нативно, а не только через промпт.
         reasoning_effort=prefs.reasoning_effort,
-        # Потолок длины ответа задаёт тариф (жёсткий финансовый предохранитель).
-        max_output_tokens=plan_limits["max_output_tokens"],
+        # Потолок длины ответа — единый глобальный runaway-предохранитель.
+        max_output_tokens=MAX_OUTPUT_TOKENS,
     )
     usage: dict = {}
     deltas = get_provider(mode.provider).stream(

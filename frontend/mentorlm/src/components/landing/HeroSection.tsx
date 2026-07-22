@@ -90,15 +90,6 @@ export function HeroSection() {
             <Arrow />
           </Button>
         </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.7, delay: 0.7 }}
-          className="text-eyebrow mt-14"
-        >
-          {hero.eyebrow}
-        </motion.p>
       </div>
 
       {/* Плавающие стеклянные чипсы с параллаксом от мыши */}

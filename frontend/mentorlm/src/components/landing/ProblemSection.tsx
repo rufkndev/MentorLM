@@ -20,7 +20,7 @@ export function ProblemSection() {
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
               Учёба{" "}
               <span className="font-editorial text-muted">распадается</span>{" "}
-              на десятки вкладок.
+              на десятки сервисов.
             </h2>
           </Reveal>
           <Reveal delay={0.1}>

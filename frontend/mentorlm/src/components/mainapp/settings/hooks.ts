@@ -44,6 +44,9 @@ export type SubscriptionInfo = {
   provider: string | null;
   current_period_end: string | null;
   allow_web_search: boolean;
+  allow_memory: boolean;
+  context_messages: number;
+  max_attachments: number;
 };
 // Одно скользящее окно квоты режима: доля исчерпанного + момент восстановления.
 export type UsageWindow = { used_pct: number; resets_at: string | null };

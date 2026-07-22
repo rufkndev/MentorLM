@@ -90,7 +90,15 @@ def build_memory_block(user_settings) -> str:
 # ── ЗАПИСЬ ───────────────────────────────────────────────────────────────────
 
 def extract_facts_in_background(user, conversation) -> None:
-    """Запустить извлечение фактов в фоне (не блокирует ответ)."""
+    """Запустить извлечение фактов в фоне (не блокирует ответ).
+
+    Глобальная память — платная фича: на тарифах без `allow_memory` не пишем.
+    """
+    from apps.billing.limits import limits_for
+    from apps.billing.plans import effective_plan
+
+    if not limits_for(effective_plan(user))["allow_memory"]:
+        return
     if not getattr(user.settings, "auto_memory", False):
         return
     thread = threading.Thread(

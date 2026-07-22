@@ -34,8 +34,10 @@ from apps.usage.models import UsageEvent
 
 from .limits import (
     DEGRADE_REQUESTS,
+    MAX_INPUT_TOKENS,
     MODE_LABEL,
     QUOTA_WINDOWS,
+    RATE_PER_MIN,
     limits_for,
     quota_for,
 )
@@ -139,9 +141,9 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
             tier=chosen_tier,
         )
 
-    # 3. Rate limit — фиксированное окно в минуту (django.core.cache).
+    # 3. Rate limit — единый для всех тарифов, фиксированное окно в минуту.
     # В prod кэш должен быть общий (Redis); LocMem ок для одного воркера в dev.
-    rate = limits["rate_per_min"]
+    rate = RATE_PER_MIN
     minute = now.strftime("%Y%m%d%H%M")
     key = f"rl:{user.pk}:{minute}"
     cache.add(key, 0, timeout=60)
@@ -157,15 +159,14 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
             status=429,
         )
 
-    # 4. Слишком длинный ввод (защита от разового дорогого запроса).
-    max_input = max(1, limits["context_tokens"] // 2)
-    if count_tokens(input_text, "gpt-4o") > max_input:
+    # 4. Слишком длинный ввод — единый глобальный потолок (анти-абуз, экстрим).
+    # Reject до вызова модели, поэтому запрос не тратится.
+    if count_tokens(input_text, "gpt-4o") > MAX_INPUT_TOKENS:
         raise LimitExceeded(
             "input_too_long",
-            "Сообщение слишком длинное для вашего тарифа. "
-            "Сократите его или перейдите на тариф выше.",
+            "Сообщение слишком длинное. Сократите его или разбейте на части.",
             status=413,
-            limit=max_input,
+            limit=MAX_INPUT_TOKENS,
         )
 
     # 5. Квоты режима по скользящим окнам — главный предохранитель.

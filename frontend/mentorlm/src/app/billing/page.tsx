@@ -10,7 +10,7 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { billingPlans, type BillingPlan } from "@/lib/billing-contents";
+import { billingHero, billingPlans, type BillingPlan } from "@/lib/billing-contents";
 
 // Страница тарифов: герой + сетка планов.
 export default function BillingPage() {
@@ -39,21 +39,23 @@ function HeroSection() {
 
       <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
         <Reveal>
-          <p className="text-eyebrow">Mentor Pro</p>
+          <p className="text-eyebrow">{billingHero.eyebrow}</p>
         </Reveal>
 
         <Reveal delay={0.05}>
           <h1 className="text-display mt-5 text-[clamp(2.4rem,5.4vw,3.8rem)] font-semibold leading-[1.1] text-ink">
-            Учитесь{" "}
-            <span className="font-editorial text-gradient">глубже</span>.
-            <br className="hidden sm:block" /> Без лимитов и компромиссов.
+            {billingHero.titleLead}{" "}
+            <span className="font-editorial text-gradient">
+              {billingHero.titleAccent}
+            </span>
+            .
+            <br className="hidden sm:block" /> {billingHero.titleRest}
           </h1>
         </Reveal>
 
         <Reveal delay={0.12}>
           <p className="mx-auto mt-6 max-w-xl text-[16px] leading-relaxed text-ink-soft sm:text-[17px]">
-            Безлимит сообщений, продвинутые модели Mentor Pro и Vision,
-            контекст до 200K токенов, веб-поиск, PDF и приоритетная очередь.
+            {billingHero.description}
           </p>
         </Reveal>
       </div>
@@ -74,10 +76,6 @@ function PlansSection() {
             </Reveal>
           ))}
         </div>
-
-        <p className="mt-7 text-center text-[12.5px] text-muted">
-          Цены в рублях, НДС включён · Отмена в один клик в любой момент
-        </p>
       </div>
     </section>
   );

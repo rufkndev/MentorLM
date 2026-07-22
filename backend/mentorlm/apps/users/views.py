@@ -147,9 +147,10 @@ class SubscriptionView(APIView):
                     if sub and sub.current_period_end
                     else None
                 ),
-                "context_tokens": limits["context_tokens"],
-                "max_output_tokens": limits["max_output_tokens"],
                 "allow_web_search": limits["allow_web_search"],
+                "allow_memory": limits["allow_memory"],
+                "context_messages": limits["context_messages"],
+                "max_attachments": limits["max_attachments"],
                 "allowed_tiers": sorted(limits["allowed_tiers"]),
                 "quotas": {
                     mode: {"burst": q.burst, "week": q.week}
