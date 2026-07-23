@@ -99,8 +99,8 @@ export function HeroSection() {
         className="pointer-events-none absolute left-[6%] top-[30%] hidden lg:block"
       >
         <FloatingChip
-          label="Chat"
-          tag="active"
+          label="AI-powered"
+          tag="чат"
           accent
           className="animate-float"
         />
@@ -112,8 +112,8 @@ export function HeroSection() {
         className="pointer-events-none absolute right-[7%] top-[28%] hidden lg:block"
       >
         <FloatingChip
-          label="Library"
-          tag="32 PDF"
+          label="Исследовательский"
+          tag="веб-поиск"
           className="animate-float [animation-delay:-2.5s]"
         />
       </motion.div>
@@ -124,8 +124,8 @@ export function HeroSection() {
         className="pointer-events-none absolute right-[10%] bottom-[18%] hidden lg:block"
       >
         <FloatingChip
-          label="Notes · Markdown"
-          tag="ctx"
+          label="Память диалогов"
+          tag="контекст"
           className="animate-float [animation-delay:-5s]"
         />
       </motion.div>
@@ -136,8 +136,8 @@ export function HeroSection() {
         className="pointer-events-none absolute left-[8%] bottom-[20%] hidden lg:block"
       >
         <FloatingChip
-          label="Solve · step by step"
-          tag="run"
+          label="Профессиональный"
+          tag="код"
           className="animate-float [animation-delay:-3.5s]"
         />
       </motion.div>
@@ -147,7 +147,6 @@ export function HeroSection() {
         className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-paper"
       />
 
-      <ScrollHint />
     </section>
   );
 }
@@ -245,30 +244,5 @@ function Arrow() {
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-
-// Подсказка прокрутки внизу экрана.
-function ScrollHint() {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 1.2, duration: 0.8 }}
-      className="absolute bottom-6 left-1/2 -translate-x-1/2"
-    >
-      <div className="flex items-center gap-2 rounded-full border border-line/80 bg-white/40 px-3 py-1 backdrop-blur">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
-          scroll
-        </span>
-        <motion.span
-          animate={{ y: [0, 4, 0] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          className="text-[10px] text-muted"
-        >
-          ↓
-        </motion.span>
-      </div>
-    </motion.div>
   );
 }

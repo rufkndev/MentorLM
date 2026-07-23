@@ -30,9 +30,9 @@ export function FeaturesSection() {
           <Reveal>
             <p className="text-eyebrow">{features.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Режимы под{" "}
-              <span className="font-editorial text-gradient">каждую</span>{" "}
-              учебную задачу.
+              Всё для учёбы в{" "}
+              <span className="font-editorial text-gradient">одном</span>{" "}
+              окне.
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
@@ -85,13 +85,13 @@ export function FeaturesSection() {
 
 // ── Абстрактные мини-визуалы карточек (лёгкие, в стиле бренда) ──
 
-// Визуал «Чат»: пузырьки диалога.
+// Визуал «Общий чат»: пузырьки диалога.
 function Visual0() {
   return (
     <div className="flex items-center gap-2">
       {[
-        "Привет. Объясни тему по моим лекциям",
-        "Конечно. Возьму конспект 04 и…",
+        "Объясни тему простыми словами",
+        "Конечно. Начнём с главного…",
       ].map((t, i) => (
         <div
           key={i}
@@ -124,88 +124,99 @@ function Visual1() {
   );
 }
 
-// Визуал «Библиотека»: сетка плиток-материалов.
+// Визуал «Сценарии»: чипы-пресеты под задачу.
 function Visual2() {
   return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {Array.from({ length: 9 }).map((_, i) => (
+    <div className="flex flex-wrap gap-1.5">
+      {["Изучить", "Практика", "Ревью", "Источники"].map((s, i) => (
         <span
-          key={i}
-          className={cn(
-            "h-5 rounded",
-            i % 4 === 0 ? "bg-[var(--brand-primary)]" : "bg-[var(--brand-line)]"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
-// Визуал «Конспекты»: строки-абзацы с прогрессом.
-function Visual3() {
-  return (
-    <div className="space-y-1.5">
-      {[80, 56, 72].map((w, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-muted">¶ {i + 1}</span>
-          <span
-            className="h-1.5 rounded-full bg-[var(--brand-line)]"
-            style={{ width: `${w}%` }}
-          >
-            <span
-              className="block h-full rounded-full bg-[var(--brand-ink)]"
-              style={{ width: `${w * 0.7}%` }}
-            />
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Визуал «Разбор задач»: пошаговая цепочка вычислений.
-function Visual4() {
-  return (
-    <ol className="flex items-center gap-2 font-mono text-[11px]">
-      {["x = 2", "→ 4", "→ 16", "= 256"].map((s, i) => (
-        <li
           key={s}
           className={cn(
-            "rounded-full border px-2.5 py-1",
-            i === 3
+            "rounded-full border px-2.5 py-1 text-[11px]",
+            i === 0
               ? "border-transparent bg-[var(--brand-primary)] text-white"
               : "border-line bg-white/70 text-ink-soft"
           )}
         >
           {s}
-        </li>
+        </span>
       ))}
-    </ol>
+    </div>
   );
 }
 
-// Визуал «Поиск»: строка поиска по знаниям.
+// Визуал «Исследовать»: строка запроса и найденные источники.
+function Visual3() {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1.5">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+          <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+          <path
+            d="M11 11l3 3"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="font-mono text-[11px] text-muted">актуальные источники по теме</span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {["[1] arxiv.org", "[2] habr.com", "[3] cyberleninka"].map((s) => (
+          <span
+            key={s}
+            className="rounded-md border border-line bg-white/70 px-2 py-0.5 font-mono text-[10px] text-[var(--brand-primary)]"
+          >
+            {s}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Визуал «Память»: сохранённые факты о пользователе.
+function Visual4() {
+  return (
+    <ul className="space-y-1.5">
+      {[
+        "Учится на 3 курсе прикладной математики",
+        "Предпочитает короткие ответы с примерами",
+      ].map((t) => (
+        <li
+          key={t}
+          className="flex items-center gap-2 rounded-lg border border-line bg-white/70 px-2.5 py-1.5 text-[12px] text-ink-soft"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-violet)]" />
+          {t}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Визуал «Вложения»: прикреплённые к сообщению файлы.
 function Visual5() {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-2">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden>
-        <circle
-          cx="7"
-          cy="7"
-          r="4.5"
-          stroke="currentColor"
-          strokeWidth="1.4"
-        />
-        <path
-          d="M11 11l3 3"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        />
-      </svg>
-      <span className="font-mono text-[11px] text-muted">
-        теорема о промежуточном значении
-      </span>
+    <div className="space-y-1.5">
+      {["Лекция_04.pdf", "Конспект.docx"].map((name) => (
+        <div
+          key={name}
+          className="flex items-center gap-2 rounded-lg border border-line bg-white/70 px-2.5 py-1.5"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
+            <path
+              d="M9 2H4v12h8V5L9 2z"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinejoin="round"
+              className="text-[var(--brand-primary)]"
+            />
+            <path d="M9 2v3h3" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" className="text-[var(--brand-primary)]" />
+          </svg>
+          <span className="font-mono text-[11px] text-muted">{name}</span>
+        </div>
+      ))}
     </div>
   );
 }
