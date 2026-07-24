@@ -76,7 +76,7 @@ function FeaturedPlan({ plan }: { plan: Plan }) {
       className="lift relative flex h-full flex-col rounded-[var(--radius-lg)] p-7 text-white shadow-[0_30px_80px_-30px_rgba(7,27,77,0.55)]"
       style={{
         background:
-          "radial-gradient(120% 80% at 0% 0%, rgba(86,217,255,0.4) 0%, transparent 50%), radial-gradient(120% 80% at 100% 100%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0E1F58 100%)",
+          "radial-gradient(120% 80% at 15% 0%, rgba(86,217,255,0.2) 0%, transparent 55%), radial-gradient(120% 80% at 100% 100%, rgba(23,70,245,0.35) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0D2158 100%)",
       }}
     >
       <span className="absolute left-7 top-0 z-10 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-3 py-1 text-[11px] font-medium uppercase tracking-widest text-white shadow-[0_8px_20px_-6px_rgba(23,70,245,0.6)]">

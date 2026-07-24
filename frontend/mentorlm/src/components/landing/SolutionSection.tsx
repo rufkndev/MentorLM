@@ -28,10 +28,10 @@ export function SolutionSection() {
             </p>
 
             {/* Три ключевые метрики решения */}
-            <dl className="mt-10 grid grid-cols-3 gap-3">
+            <dl className="mt-10 grid gap-3 sm:grid-cols-3">
               {solution.highlights.map((h, i) => (
                 <Reveal key={h.label} delay={0.06 * (i + 1)}>
-                  <div className="rounded-2xl border border-line bg-paper-2/70 p-4 backdrop-blur">
+                  <div className="glass h-full !rounded-2xl p-4">
                     <dt className="text-eyebrow">{h.label}</dt>
                     <dd className="mt-2 text-base font-medium text-ink">
                       {h.value}
@@ -66,7 +66,7 @@ function SolutionAppPreview() {
         className="absolute -inset-4 rounded-[32px]"
         style={{
           background:
-            "radial-gradient(120% 80% at 15% 10%, var(--brand-blue-soft) 0%, transparent 55%), radial-gradient(120% 80% at 95% 95%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, var(--brand-paper-2), var(--brand-paper))",
+            "radial-gradient(120% 80% at 15% 10%, var(--brand-blue-soft) 0%, transparent 55%), radial-gradient(120% 80% at 95% 95%, var(--brand-ice) 0%, transparent 55%), linear-gradient(180deg, var(--brand-paper-2), var(--brand-paper))",
         }}
       />
 
@@ -106,7 +106,7 @@ function SolutionAppPreview() {
           </div>
 
           {/* Ответ модели */}
-          <div className="max-w-[85%] self-start rounded-2xl rounded-bl-sm border border-line bg-white/70 px-3.5 py-2.5 text-[12px] leading-relaxed text-ink-soft">
+          <div className="max-w-[85%] self-start rounded-2xl rounded-bl-sm border border-line bg-surface/80 px-3.5 py-2.5 text-[12px] leading-relaxed text-ink-soft">
             <p>Конечно. Разберём по шагам, опираясь на ваш конспект:</p>
             <div className="mt-2 space-y-1.5">
               {[92, 78, 64].map((w, i) => (
@@ -129,14 +129,14 @@ function SolutionAppPreview() {
                 className={`rounded-full border px-2.5 py-1 text-[11px] ${
                   i === 0
                     ? "border-transparent bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]"
-                    : "border-line bg-white/60 text-muted"
+                    : "border-line bg-surface/70 text-muted"
                 }`}
               >
                 {s}
               </span>
             ))}
           </div>
-          <div className="flex items-center gap-2 rounded-full border border-line bg-white/70 px-3.5 py-2">
+          <div className="flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3.5 py-2">
             <span className="flex-1 text-[12px] text-muted">
               Спросите что угодно по учёбе…
             </span>

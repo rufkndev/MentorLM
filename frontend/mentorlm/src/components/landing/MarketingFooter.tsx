@@ -12,9 +12,18 @@ import { brand, footer } from "@/lib/landing-contents";
 export function MarketingFooter() {
   const year = new Date().getFullYear();
   return (
-    <footer className="relative mt-32 border-t border-line">
-      <div className="aurora opacity-50" aria-hidden />
-      <div className="mx-auto grid max-w-6xl gap-12 px-6 py-16 md:grid-cols-[1.4fr_repeat(3,1fr)]">
+    <footer className="relative mt-32">
+      {/* Собственная подложка футера: плавный переход из фона страницы в чуть
+          более глубокий тон — убирает цветной «шов» на стыке с секциями. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-paper-2/60 to-paper-2/90"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-line to-transparent"
+      />
+      <div className="mx-auto grid max-w-6xl gap-12 px-6 pt-20 pb-16 md:grid-cols-[1.4fr_repeat(3,1fr)]">
         {/* Левый блок: логотип и описание */}
         <div className="max-w-sm">
           <Logo />
@@ -48,7 +57,7 @@ export function MarketingFooter() {
       </div>
 
       {/* Нижняя строка: копирайт */}
-      <div className="border-t border-line">
+      <div className="border-t border-line/70">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 px-6 py-6 text-xs text-muted md:flex-row md:items-center">
           <p>
             © {year} {brand.name}. Все права защищены.

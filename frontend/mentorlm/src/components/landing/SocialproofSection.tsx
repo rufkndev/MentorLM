@@ -27,7 +27,7 @@ export function SocialproofSection() {
           </Reveal>
 
           {/* Метрики-карточки */}
-          <dl className="grid grid-cols-3 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-3">
             {socialproof.stats.map((s, i) => (
               <Reveal key={s.label} delay={0.1 * (i + 1)}>
                 <GlassCard className="flex h-full flex-col items-start p-5">

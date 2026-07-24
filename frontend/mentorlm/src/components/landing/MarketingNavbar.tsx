@@ -43,7 +43,7 @@ export function MarketingNavbar() {
         {/* Логотип-ссылка на главную */}
         <Link
           href="/"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/40 transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-ink/5 transition-colors"
         >
           <Logo />
         </Link>
@@ -54,7 +54,7 @@ export function MarketingNavbar() {
             <li key={l.href}>
               <Link
                 href={l.href}
-                className="rounded-full px-4 py-2 text-sm text-ink-soft hover:text-ink hover:bg-white/55 transition-colors"
+                className="rounded-full px-4 py-2 text-[15px] font-medium text-ink-soft hover:text-ink hover:bg-ink/5 transition-colors"
               >
                 {l.label}
               </Link>

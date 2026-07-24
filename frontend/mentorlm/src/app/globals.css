@@ -45,14 +45,13 @@
   --shadow-soft: 0 1px 2px rgba(9, 15, 31, 0.04), 0 8px 24px rgba(9, 15, 31, 0.06);
   --shadow-lift: 0 24px 60px -20px rgba(7, 27, 77, 0.25);
 
-  /* набор теней для «жидкого стекла» */
-  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.9),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.18),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.42),
-    inset 1px 0 0 rgba(255, 255, 255, 0.4),
-    inset -1px 0 0 rgba(255, 255, 255, 0.4);
-  --glass-shadow: 0 1px 2px rgba(9, 15, 31, 0.04),
-    0 24px 60px -20px rgba(7, 27, 77, 0.18);
+  /* набор теней для «жидкого стекла»: яркая верхняя кромка (блик преломления),
+     тонкое светлое кольцо по периметру и мягкая нижняя граница */
+  --glass-rim: inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  --glass-shadow: 0 1px 1px rgba(9, 15, 31, 0.03),
+    0 16px 40px -16px rgba(7, 27, 77, 0.16);
 
   --ease-spring: cubic-bezier(0.22, 1, 0.36, 1);
 
@@ -79,6 +78,7 @@
   --brand-primary-soft: #1a2444; /* тёмный кобальтовый оттенок */
 
   --brand-blue-soft: #2a3b66;
+  --brand-ice: #22335c;
   --brand-warm: #1c1b22;
 
   /* кромка стекла и тени под тёмный фон */
@@ -116,7 +116,7 @@
   --color-warm: var(--brand-warm);
   --color-focus: var(--brand-focus);
 
-  --font-sans: var(--font-onest), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+  --font-sans: var(--font-sans-src), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -132,44 +132,29 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Сдержанный фон: холодный свет сверху и едва тёплый угол снизу.
+   Без цветных пятен по центру — контент и стекло дают глубину сами. */
 html {
   background:
     radial-gradient(
-      42% 32% at 12% 6%,
-      rgba(210, 222, 240, 0.55) 0%,
-      transparent 60%
+      56% 38% at 50% 0%,
+      rgba(216, 230, 250, 0.5) 0%,
+      transparent 70%
     ),
     radial-gradient(
-      36% 28% at 88% 18%,
-      rgba(190, 180, 215, 0.3) 0%,
-      transparent 62%
-    ),
-    radial-gradient(
-      48% 36% at 50% 60%,
-      rgba(200, 220, 232, 0.28) 0%,
-      transparent 60%
-    ),
-    radial-gradient(
-      40% 30% at 92% 88%,
-      rgba(170, 190, 225, 0.25) 0%,
-      transparent 62%
-    ),
-    radial-gradient(
-      36% 28% at 8% 96%,
-      rgba(245, 235, 220, 0.55) 0%,
+      38% 28% at 6% 96%,
+      rgba(246, 238, 226, 0.4) 0%,
       transparent 65%
     ),
     var(--brand-paper);
   color: var(--brand-ink);
 }
 
-/* тёмный фон: приглушаем цветные пятна, держим глубокий navy */
+/* тёмный фон: один холодный свет сверху, глубокий navy */
 :root[data-theme="dark"] html,
 html[data-theme="dark"] {
   background:
-    radial-gradient(42% 32% at 12% 6%, rgba(40, 60, 110, 0.35) 0%, transparent 60%),
-    radial-gradient(36% 28% at 88% 18%, rgba(70, 55, 110, 0.28) 0%, transparent 62%),
-    radial-gradient(48% 36% at 50% 60%, rgba(30, 50, 80, 0.25) 0%, transparent 60%),
+    radial-gradient(56% 38% at 50% 0%, rgba(38, 56, 100, 0.35) 0%, transparent 70%),
     var(--brand-paper);
   color: var(--brand-ink);
 }
@@ -385,7 +370,8 @@ html[data-theme="dark"] {
 body {
   background: transparent;
   font-family: var(--font-sans);
-  font-feature-settings: "ss01", "cv11";
+  font-weight: 450;
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
@@ -466,41 +452,73 @@ body {
 
 /* ── Типографика (утилиты заголовков/акцентов) ── */
 .text-display {
-  font-feature-settings: "ss01", "ss02";
-  letter-spacing: -0.035em;
+  letter-spacing: -0.04em;
   line-height: 0.98;
+  font-weight: 700;
 }
 
 .text-eyebrow {
   text-transform: uppercase;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.2em;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--brand-muted);
 }
 
+/* Акцентное «редакторское» слово: курсив основного шрифта (как было).
+   Переливание задаётся отдельно классом .text-gradient. */
 .font-editorial {
-  font-feature-settings: "ss01", "ss02", "cv11";
+  font-family: var(--font-sans);
   font-style: italic;
-  font-weight: 400;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   display: inline-block;
-  padding-inline-end: 0.28em;
-  margin-inline-end: -0.16em;
-  padding-block-end: 0.14em;
-  margin-block-end: -0.14em;
+  padding-inline-end: 0.24em;
+  margin-inline-end: -0.14em;
+  padding-block-end: 0.12em;
+  margin-block-end: -0.12em;
   vertical-align: baseline;
 }
 
+/* сдержанный акцент: глубокий navy → кобальт → холодный блик, без фиолетового.
+   Фон шире текста и медленно смещается — слово мягко «переливается». */
 .text-gradient {
   background: linear-gradient(
     100deg,
     var(--brand-blue-deep) 0%,
-    var(--brand-primary) 45%,
-    var(--brand-violet) 100%
+    var(--brand-primary) 42%,
+    var(--brand-focus) 60%,
+    var(--brand-primary) 78%,
+    var(--brand-blue-deep) 100%
   );
+  background-size: 220% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  animation: text-shimmer 9s ease-in-out infinite;
+}
+
+:root[data-theme="dark"] .text-gradient {
+  background-image: linear-gradient(
+    100deg,
+    #7f9cff 0%,
+    #a9c2ff 42%,
+    #d8e6ff 60%,
+    #a9c2ff 78%,
+    #7f9cff 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* маска строки заголовка: клипует выезд снизу, но не срезает выносные
+   элементы — запас по вертикали компенсирован отрицательным margin */
+.line-mask {
+  display: block;
+  overflow: hidden;
+  padding-block: 0.12em;
+  margin-block: -0.12em;
 }
 
 /* ── «Жидкое стекло»: полупрозрачные поверхности с блюром ── */
@@ -513,40 +531,54 @@ body {
   isolation: isolate;
 }
 
+/* Настоящее «жидкое стекло»: `url(#glass-refract)` преломляет (искажает) фон
+   как линза, а не только размывает. Блюр держим умеренным — сильный блюр
+   «съедает» искажение и стекло опять выглядит просто матовым. Высокая сатурация
+   и лёгкая яркость дают «толщину» стекла. Поверхности статичны — фильтр
+   пересчитывается один раз, без нагрузки на кадры. */
 .glass {
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.65) 0%,
-    rgba(255, 255, 255, 0.32) 100%
+    155deg,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.24) 100%
   );
-  backdrop-filter: blur(36px) saturate(115%);
-  -webkit-backdrop-filter: blur(36px) saturate(115%);
+  backdrop-filter: url(#glass-refract) blur(11px) saturate(180%) brightness(1.05);
+  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(1.05);
   box-shadow: var(--glass-rim), var(--glass-shadow);
 }
 
 .glass-strong {
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.82) 0%,
-    rgba(255, 255, 255, 0.5) 100%
+    155deg,
+    rgba(255, 255, 255, 0.58) 0%,
+    rgba(255, 255, 255, 0.4) 100%
   );
-  backdrop-filter: blur(40px) saturate(120%);
-  -webkit-backdrop-filter: blur(40px) saturate(120%);
-  box-shadow: var(--glass-rim), 0 1px 2px rgba(9, 15, 31, 0.04),
-    0 18px 50px -16px rgba(7, 27, 77, 0.22);
+  backdrop-filter: url(#glass-refract) blur(15px) saturate(185%) brightness(1.06);
+  -webkit-backdrop-filter: blur(22px) saturate(185%) brightness(1.06);
+  box-shadow: var(--glass-rim), 0 1px 1px rgba(9, 15, 31, 0.03),
+    0 14px 36px -14px rgba(7, 27, 77, 0.2);
 }
 
 .glass-card {
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.7) 0%,
-    rgba(255, 255, 255, 0.42) 100%
+    155deg,
+    rgba(255, 255, 255, 0.52) 0%,
+    rgba(255, 255, 255, 0.36) 100%
   );
-  backdrop-filter: blur(36px) saturate(118%);
-  -webkit-backdrop-filter: blur(36px) saturate(118%);
+  backdrop-filter: url(#glass-refract-soft) blur(16px) saturate(182%)
+    brightness(1.04);
+  -webkit-backdrop-filter: blur(24px) saturate(182%) brightness(1.04);
   box-shadow: var(--glass-rim), var(--glass-shadow);
   transition: transform 320ms var(--ease-spring),
     box-shadow 320ms var(--ease-spring);
+}
+
+/* Модификатор для ДВИЖУЩихся стеклянных элементов (напр. чипсы героя):
+   убираем дорогое SVG-преломление, оставляем только блюр. На мелких подвижных
+   элементах искажение почти не читается, зато движение остаётся дешёвым. */
+.glass-plain {
+  backdrop-filter: blur(16px) saturate(185%) brightness(1.06);
+  -webkit-backdrop-filter: blur(16px) saturate(185%) brightness(1.06);
 }
 
 /* тёмная тема: стекло становится тёмным полупрозрачным */
@@ -571,33 +603,42 @@ body {
     rgba(11, 16, 32, 0.5) 100%
   );
 }
-/* приглушаем белые блики на тёмном фоне */
+/* блик на тёмном стекле — мягче, но заметный */
 :root[data-theme="dark"] .glass::before,
 :root[data-theme="dark"] .glass-strong::before,
 :root[data-theme="dark"] .glass-card::before {
-  opacity: 0.18;
+  opacity: 0.32;
 }
 
-/* статичные блики на стекле */
+/* Переливающийся световой блик, медленно скользящий по стеклу.
+   Анимируется только transform (skew + translateX) — композитор-дружелюбно,
+   без пересчёта блюра, поэтому не влияет на FPS. */
 .glass::before,
 .glass-strong::before,
 .glass-card::before {
   content: "";
   position: absolute;
-  inset: 0;
+  top: -20%;
+  bottom: -20%;
+  left: -70%;
+  width: 45%;
   pointer-events: none;
-  background: radial-gradient(
-      120% 80% at 0% 0%,
-      rgba(255, 255, 255, 0.55) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      80% 50% at 100% 100%,
-      rgba(255, 255, 255, 0.18) 0%,
-      transparent 60%
-    );
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 100%
+  );
+  transform: skewX(-16deg) translateX(0);
+  animation: glass-streak 9s var(--ease-spring) infinite;
   mix-blend-mode: screen;
   z-index: 0;
+}
+.glass-strong::before {
+  animation-duration: 11s;
+}
+.glass-card::before {
+  animation-duration: 10s;
 }
 
 /* блик, следящий за курсором (для .glass-card) */
@@ -608,8 +649,8 @@ body {
   pointer-events: none;
   border-radius: inherit;
   background: radial-gradient(
-    280px circle at var(--mx, 50%) var(--my, 0%),
-    rgba(255, 255, 255, 0.6) 0%,
+    320px circle at var(--mx, 50%) var(--my, 0%),
+    rgba(255, 255, 255, 0.35) 0%,
     rgba(255, 255, 255, 0) 60%
   );
   opacity: 0;
@@ -651,34 +692,36 @@ body {
   content: "";
   position: absolute;
   border-radius: 50%;
-  filter: blur(90px);
-  will-change: transform;
+  filter: blur(70px);
 }
 
+/* Статичные ambient-пятна (без анимации): большой размытый слой, который
+   двигался бы каждый кадр, — лишняя постоянная нагрузка. «Жизнь» в герое даёт
+   вращающаяся сфера, а не аврора. */
 .aurora::before {
-  width: 720px;
-  height: 720px;
-  top: -260px;
-  left: -180px;
+  width: 680px;
+  height: 680px;
+  top: -240px;
+  left: -160px;
   background: radial-gradient(
     closest-side,
-    var(--brand-blue-soft) 0%,
+    color-mix(in srgb, var(--brand-blue-soft) 65%, transparent) 0%,
     rgba(191, 216, 255, 0) 70%
   );
-  animation: drift 26s ease-in-out infinite alternate;
+  filter: blur(70px);
 }
 
 .aurora::after {
-  width: 640px;
-  height: 640px;
-  right: -200px;
+  width: 600px;
+  height: 600px;
+  right: -180px;
   top: 5%;
   background: radial-gradient(
     closest-side,
-    rgba(123, 97, 255, 0.4) 0%,
-    rgba(123, 97, 255, 0) 70%
+    color-mix(in srgb, var(--brand-ice) 50%, transparent) 0%,
+    transparent 70%
   );
-  animation: drift 22s ease-in-out -10s infinite alternate-reverse;
+  filter: blur(70px);
 }
 
 .grid-paper {
@@ -738,6 +781,37 @@ body {
   }
 }
 
+/* переливающийся блик по стеклу: медленный проход, пауза, повтор */
+@keyframes glass-streak {
+  0% {
+    transform: skewX(-16deg) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  42% {
+    transform: skewX(-16deg) translateX(560%);
+    opacity: 0.55;
+  }
+  55%,
+  100% {
+    transform: skewX(-16deg) translateX(760%);
+    opacity: 0;
+  }
+}
+
+/* лёгкое мерцание градиентного текста заголовков */
+@keyframes text-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
 @keyframes float {
   0%,
   100% {
@@ -748,6 +822,7 @@ body {
   }
 }
 
+/* вращение цветного ядра сферы (по кэшированной размытой текстуре — дёшево) */
 @keyframes orb-spin {
   from {
     transform: rotate(0deg);
@@ -793,4 +868,23 @@ body {
     #000 88%,
     transparent 100%
   );
+}
+
+/* Уважаем системную настройку «уменьшить движение»: гасим фоновые циклы
+   (блик стекла, мерцание текста, дрейф авроры, бегущую строку). */
+@media (prefers-reduced-motion: reduce) {
+  .glass::before,
+  .glass-strong::before,
+  .glass-card::before,
+  .text-gradient,
+  .aurora::before,
+  .aurora::after,
+  .animate-marquee,
+  .animate-float,
+  .thinking-dot {
+    animation: none !important;
+  }
+  html {
+    scroll-behavior: auto;
+  }
 }

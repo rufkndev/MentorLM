@@ -32,8 +32,9 @@ function HeroSection() {
         className="pointer-events-none absolute left-1/2 top-[-80px] -z-0 h-[440px] w-[760px] -translate-x-1/2"
         style={{
           background:
-            "radial-gradient(closest-side, rgba(86,217,255,0.20), rgba(123,97,255,0.16) 45%, transparent 70%)",
-          filter: "blur(40px)",
+            "radial-gradient(closest-side, var(--brand-ice) 0%, transparent 70%)",
+          filter: "blur(48px)",
+          opacity: 0.7,
         }}
       />
 
@@ -99,7 +100,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
         featured
           ? {
               background:
-                "radial-gradient(120% 80% at 0% 0%, rgba(86,217,255,0.4) 0%, transparent 50%), radial-gradient(120% 80% at 100% 100%, rgba(123,97,255,0.45) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0E1F58 100%)",
+                "radial-gradient(120% 80% at 15% 0%, rgba(86,217,255,0.2) 0%, transparent 55%), radial-gradient(120% 80% at 100% 100%, rgba(23,70,245,0.35) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0D2158 100%)",
             }
           : undefined
       }

@@ -47,7 +47,7 @@ export function WorkflowSection() {
               <div className="relative mx-auto h-full w-px bg-[var(--brand-line)]">
                 <motion.div
                   style={{ height: lineHeight }}
-                  className="absolute left-0 top-0 w-px origin-top bg-gradient-to-b from-[var(--brand-primary)] to-[var(--brand-violet)]"
+                  className="absolute left-0 top-0 w-px origin-top bg-gradient-to-b from-[var(--brand-primary)] to-[var(--brand-primary-hover)]"
                 />
               </div>
             </div>

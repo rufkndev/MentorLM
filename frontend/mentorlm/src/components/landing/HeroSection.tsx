@@ -1,7 +1,13 @@
 /**
  * Первый экран лендинга (герой).
  * Крупный заголовок, подзаголовок и главная кнопка; на фоне — светящаяся сфера
- * и стеклянные чипсы с параллаксом от движения мыши.
+ * с лёгким параллаксом от мыши и стеклянные чипсы-метки.
+ *
+ * Производительность: параллакс применяется ТОЛЬКО к сфере (у неё нет
+ * backdrop-filter, поэтому смещение дёшево). Стеклянные чипсы статичны — двигать
+ * элемент с backdrop-filter значит пересчитывать блюр фона каждый кадр, что и
+ * вызывало просадку FPS. Вращение сферы идёт через transform: rotate по уже
+ * размытому слою (кэшированная текстура) — тоже дёшево.
  */
 
 "use client";
@@ -9,8 +15,10 @@
 import {
   motion,
   useMotionValue,
+  useReducedMotion,
   useSpring,
   useTransform,
+  type MotionStyle,
 } from "motion/react";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
@@ -18,22 +26,27 @@ import { hero } from "@/lib/landing-contents";
 
 // Секция героя.
 export function HeroSection() {
-  // Позиция мыши (сглаженная пружиной) — источник параллакса.
+  const reduce = useReducedMotion();
+
+  // Позиция мыши (сглаженная пружиной) — источник параллакса сферы и чипсов.
   const mx = useMotionValue(0);
   const my = useMotionValue(0);
-  const sx = useSpring(mx, { stiffness: 60, damping: 18, mass: 0.6 });
-  const sy = useSpring(my, { stiffness: 60, damping: 18, mass: 0.6 });
-
-  // Разные коэффициенты смещения для сферы и боковых чипсов.
-  const orbX = useTransform(sx, (v) => v * 24);
-  const orbY = useTransform(sy, (v) => v * 24);
-  const cardLX = useTransform(sx, (v) => v * -36);
-  const cardLY = useTransform(sy, (v) => v * -18);
-  const cardRX = useTransform(sx, (v) => v * 36);
-  const cardRY = useTransform(sy, (v) => v * 18);
+  const sx = useSpring(mx, { stiffness: 55, damping: 20, mass: 0.6 });
+  const sy = useSpring(my, { stiffness: 55, damping: 20, mass: 0.6 });
+  const orbX = useTransform(sx, (v) => v * 26);
+  const orbY = useTransform(sy, (v) => v * 26);
+  // Чипсы смещаются в противоположные стороны — глубина параллакса.
+  // Двигаются только при движении мыши (без постоянной анимации) — это держит
+  // FPS: элемент с backdrop-filter пересчитывает преломление лишь когда реально
+  // сдвигается, а не каждый кадр.
+  const chipLX = useTransform(sx, (v) => v * -34);
+  const chipLY = useTransform(sy, (v) => v * -16);
+  const chipRX = useTransform(sx, (v) => v * 34);
+  const chipRY = useTransform(sy, (v) => v * 16);
 
   // Обновляем координаты параллакса по позиции курсора.
   useEffect(() => {
+    if (reduce) return;
     const onMove = (e: MouseEvent) => {
       const w = window.innerWidth;
       const h = window.innerHeight;
@@ -42,47 +55,50 @@ export function HeroSection() {
     };
     window.addEventListener("mousemove", onMove);
     return () => window.removeEventListener("mousemove", onMove);
-  }, [mx, my]);
+  }, [mx, my, reduce]);
 
   const [first, second, third] = hero.title;
 
   return (
-    <section className="relative h-screen min-h-[760px] w-full overflow-hidden">
+    <section className="relative flex h-screen min-h-[720px] w-full items-center overflow-hidden">
       <div className="aurora" aria-hidden />
-      <div className="absolute inset-0 grid-paper opacity-[0.3]" aria-hidden />
-      <div className="noise absolute inset-0" aria-hidden />
+      <div className="absolute inset-0 grid-paper opacity-[0.25]" aria-hidden />
 
       <motion.div
         aria-hidden
         style={{ x: orbX, y: orbY }}
-        className="pointer-events-none absolute left-1/2 top-1/2 -z-0 h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2"
+        className="pointer-events-none absolute left-1/2 top-1/2 -z-0 h-[620px] w-[620px] -translate-x-1/2 -translate-y-1/2 will-change-transform"
       >
-        <Orb />
+        <Orb spin={!reduce} />
       </motion.div>
 
       {/* Центральный блок: заголовок, описание, кнопка */}
-      <div className="relative z-10 mx-auto flex h-full max-w-6xl flex-col items-center justify-center px-6 text-center">
-        <h1 className="text-display max-w-5xl text-[clamp(2.6rem,7.4vw,5.8rem)] font-semibold text-ink">
-          <Line delay={0.05}>{first}</Line>
-          <Line delay={0.15}>{second}</Line>
-          <Line delay={0.25}>
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center px-6 text-center">
+        <h1 className="text-display max-w-5xl text-[clamp(2.7rem,7.6vw,6rem)] font-bold text-ink">
+          <Line delay={0.05} reduce={reduce}>
+            {first}
+          </Line>
+          <Line delay={0.14} reduce={reduce}>
+            {second}
+          </Line>
+          <Line delay={0.23} reduce={reduce}>
             <span className="font-editorial text-gradient">{third}</span>
           </Line>
         </h1>
 
         <motion.p
-          initial={{ opacity: 0, y: 12 }}
+          initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-7 max-w-2xl text-[17px] leading-relaxed text-ink-soft"
+          transition={{ duration: 0.7, delay: 0.36, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-7 max-w-xl text-[17px] leading-relaxed text-ink-soft"
         >
           {hero.description}
         </motion.p>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
+          initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.7, delay: 0.46, ease: [0.22, 1, 0.36, 1] }}
           className="mt-10 flex justify-center"
         >
           <Button href={hero.primary.href} size="lg">
@@ -92,61 +108,37 @@ export function HeroSection() {
         </motion.div>
       </div>
 
-      {/* Плавающие стеклянные чипсы с параллаксом от мыши */}
-      <motion.div
-        aria-hidden
-        style={{ x: cardLX, y: cardLY }}
-        className="pointer-events-none absolute left-[6%] top-[30%] hidden lg:block"
-      >
-        <FloatingChip
-          label="AI-powered"
-          tag="чат"
-          accent
-          className="animate-float"
-        />
-      </motion.div>
-
-      <motion.div
-        aria-hidden
-        style={{ x: cardRX, y: cardRY }}
-        className="pointer-events-none absolute right-[7%] top-[28%] hidden lg:block"
-      >
-        <FloatingChip
-          label="Исследовательский"
-          tag="веб-поиск"
-          className="animate-float [animation-delay:-2.5s]"
-        />
-      </motion.div>
-
-      <motion.div
-        aria-hidden
-        style={{ x: cardRX, y: cardRY }}
-        className="pointer-events-none absolute right-[10%] bottom-[18%] hidden lg:block"
-      >
-        <FloatingChip
-          label="Память диалогов"
-          tag="контекст"
-          className="animate-float [animation-delay:-5s]"
-        />
-      </motion.div>
-
-      <motion.div
-        aria-hidden
-        style={{ x: cardLX, y: cardLY }}
-        className="pointer-events-none absolute left-[8%] bottom-[20%] hidden lg:block"
-      >
-        <FloatingChip
-          label="Профессиональный"
-          tag="код"
-          className="animate-float [animation-delay:-3.5s]"
-        />
-      </motion.div>
+      {/* Стеклянные чипсы-метки с параллаксом от мыши (как у сферы) */}
+      <FloatingChip
+        pos={{ left: "5%", top: "27%" }}
+        style={{ x: chipLX, y: chipLY }}
+        label="AI-powered"
+        tag="чат"
+        accent
+      />
+      <FloatingChip
+        pos={{ right: "5%", top: "24%" }}
+        style={{ x: chipRX, y: chipRY }}
+        label="Исследование"
+        tag="веб-поиск"
+      />
+      <FloatingChip
+        pos={{ right: "6%", bottom: "22%" }}
+        style={{ x: chipRX, y: chipRY }}
+        label="Память диалогов"
+        tag="контекст"
+      />
+      <FloatingChip
+        pos={{ left: "7%", bottom: "24%" }}
+        style={{ x: chipLX, y: chipLY }}
+        label="Работа с кодом"
+        tag="код"
+      />
 
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-paper"
       />
-
     </section>
   );
 }
@@ -155,14 +147,16 @@ export function HeroSection() {
 function Line({
   children,
   delay = 0,
+  reduce,
 }: {
   children: React.ReactNode;
   delay?: number;
+  reduce?: boolean | null;
 }) {
   return (
     <span className="line-mask block">
       <motion.span
-        initial={{ y: "115%" }}
+        initial={reduce ? false : { y: "115%" }}
         animate={{ y: 0 }}
         transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
         className="block"
@@ -173,59 +167,72 @@ function Line({
   );
 }
 
-// Плавающий стеклянный чип-метка (Chat/Library и т.п.).
+// Плавающий стеклянный чип-метка с параллаксом (style: x/y — MotionValue).
 function FloatingChip({
   label,
   tag,
   accent,
-  className,
+  pos,
+  style,
 }: {
   label: string;
   tag: string;
   accent?: boolean;
-  className?: string;
+  pos: {
+    left?: string;
+    right?: string;
+    top?: string;
+    bottom?: string;
+  };
+  style?: MotionStyle;
 }) {
   return (
-    <div
-      className={`glass-strong flex items-center gap-3 rounded-full px-4 py-2 ${className ?? ""}`}
+    // position:absolute задаём inline — правило .glass-strong (position:relative)
+    // перебивает одноимённую утилиту Tailwind, а inline-стиль сильнее их обоих.
+    <motion.div
+      style={{ position: "absolute", ...pos, ...style }}
+      className="glass-strong glass-plain pointer-events-none z-[5] hidden items-center gap-2.5 whitespace-nowrap rounded-full px-4 py-2 will-change-transform xl:flex"
     >
       <span
-        className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[var(--brand-primary)]" : "bg-[var(--brand-violet)]"}`}
+        className={`h-1.5 w-1.5 rounded-full ${accent ? "bg-[var(--brand-primary)]" : "bg-[var(--brand-blue-soft)]"}`}
       />
       <span className="text-[13px] font-medium text-ink">{label}</span>
       <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
         {tag}
       </span>
-    </div>
+    </motion.div>
   );
 }
 
-// Светящаяся вращающаяся сфера на фоне героя.
-function Orb() {
+// Светящаяся сфера на фоне героя. Приглушённая; вращение через transform.
+function Orb({ spin }: { spin?: boolean }) {
   return (
     <div className="relative h-full w-full">
+      {/* мягкое внешнее сияние */}
       <div
-        className="absolute inset-0 rounded-full opacity-90"
+        className="absolute inset-0 rounded-full opacity-60"
         style={{
           background:
-            "radial-gradient(closest-side, rgba(86,217,255,0.55), rgba(123,97,255,0.35) 45%, transparent 70%)",
-          filter: "blur(20px)",
+            "radial-gradient(closest-side, rgba(86,217,255,0.4), rgba(23,70,245,0.24) 46%, transparent 72%)",
+          filter: "blur(28px)",
         }}
       />
+      {/* цветное ядро — вращается как кэшированная текстура (дёшево) */}
       <div
-        className="absolute inset-[18%] rounded-full"
+        className="absolute inset-[16%] rounded-full opacity-70"
         style={{
           background:
-            "conic-gradient(from 220deg at 50% 50%, rgba(23,70,245,0.55), rgba(86,217,255,0.65), rgba(123,97,255,0.55), rgba(23,70,245,0.55))",
-          filter: "blur(30px)",
-          animation: "orb-spin 28s linear infinite",
+            "conic-gradient(from 210deg at 50% 50%, rgba(23,70,245,0.5), rgba(86,217,255,0.55), rgba(120,150,255,0.5), rgba(23,70,245,0.5))",
+          filter: "blur(34px)",
+          animation: spin ? "orb-spin 40s linear infinite" : "none",
         }}
       />
+      {/* стеклянная сердцевина */}
       <div
-        className="absolute inset-[28%] rounded-full bg-white/20 backdrop-blur-2xl"
+        className="absolute inset-[30%] rounded-full bg-white/15 backdrop-blur-2xl"
         style={{
           boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.6), inset 0 0 0 1px rgba(255,255,255,0.25)",
+            "inset 0 1px 0 rgba(255,255,255,0.55), inset 0 0 0 1px rgba(255,255,255,0.2)",
         }}
       />
     </div>

@@ -17,7 +17,7 @@ export function CTASection() {
             className="relative overflow-hidden rounded-[var(--radius-xl)] px-8 py-24 text-center sm:px-16"
             style={{
               background:
-                "radial-gradient(120% 80% at 20% 0%, rgba(86,217,255,0.35) 0%, transparent 50%), radial-gradient(120% 80% at 100% 100%, rgba(123,97,255,0.55) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0E1F58 100%)",
+                "radial-gradient(120% 80% at 20% 0%, rgba(86,217,255,0.22) 0%, transparent 55%), radial-gradient(120% 80% at 100% 100%, rgba(23,70,245,0.4) 0%, transparent 55%), linear-gradient(180deg, #071B4D 0%, #0D2158 100%)",
             }}
           >
             <div className="noise pointer-events-none absolute inset-0" aria-hidden />
@@ -28,8 +28,8 @@ export function CTASection() {
               className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full"
               style={{
                 background:
-                  "radial-gradient(closest-side, rgba(86,217,255,0.4), rgba(123,97,255,0.25) 50%, transparent 70%)",
-                filter: "blur(20px)",
+                  "radial-gradient(closest-side, rgba(86,217,255,0.3), rgba(23,70,245,0.18) 50%, transparent 70%)",
+                filter: "blur(24px)",
                 animation: "drift 26s ease-in-out infinite alternate",
               }}
             />

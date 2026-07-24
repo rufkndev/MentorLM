@@ -41,7 +41,7 @@ export function CookieNotice() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4">
-      <div className="glass-strong flex w-full max-w-3xl flex-col items-start gap-4 rounded-2xl border border-line px-5 py-4 shadow-[0_16px_40px_-16px_rgba(0,0,0,0.35)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="glass-strong flex w-full max-w-3xl flex-col items-start gap-4 rounded-2xl px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-relaxed text-ink-soft">
           Мы используем технически необходимые cookie для работы сервиса.
           Подробнее — в{" "}

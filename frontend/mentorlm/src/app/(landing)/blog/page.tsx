@@ -43,11 +43,11 @@ export default function BlogPage() {
         {posts.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2">
             {posts.map((post, i) => (
-              <Reveal key={post.slug} delay={0.05 * (i + 1)}>
+              <Reveal key={post.slug} delay={0.05 * (i + 1)} className="h-full">
                 <Link href={`/blog/${post.slug}`} className="block h-full">
                   <GlassCard
                     as="article"
-                    className="group flex h-full flex-col p-6 lift"
+                    className="group flex h-full flex-col p-6"
                   >
                     <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.18em] text-muted">
                       <span className="text-[var(--brand-primary)]">
@@ -84,7 +84,7 @@ export default function BlogPage() {
 // Состояние-анонс: показывается, пока в blog-contents.ts нет статей.
 function EmptyState() {
   return (
-    <div className="glass-card flex flex-col items-center gap-4 px-6 py-16 text-center">
+    <div className="glass flex flex-col items-center gap-4 px-6 py-16 text-center">
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
         скоро
       </p>

@@ -17,14 +17,15 @@ type Props = {
 };
 
 // Анимационные состояния: скрыто → видно.
+// Только opacity + transform (без анимации filter: blur) — компоновка на GPU,
+// плавно даже при появлении множества секций сразу.
 const variants: Variants = {
-  hidden: { opacity: 0, y: 16, filter: "blur(6px)" },
+  hidden: { opacity: 0, y: 18 },
   visible: {
     opacity: 1,
     y: 0,
-    filter: "blur(0px)",
     transition: {
-      duration: 0.7,
+      duration: 0.6,
       ease: [0.22, 1, 0.36, 1],
     },
   },

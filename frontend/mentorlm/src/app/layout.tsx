@@ -8,12 +8,14 @@ import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { clerkLocalization } from "@/lib/clerk-localization";
 import { CookieNotice } from "@/components/ui/CookieNotice";
-import { Onest, JetBrains_Mono } from "next/font/google";
+import { GlassFilters } from "@/components/ui/GlassFilters";
+import { Golos_Text, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-// Основной шрифт интерфейса (с кириллицей).
-const onest = Onest({
-  variable: "--font-onest",
+// Основной шрифт интерфейса: Golos Text — гротеск с образцовой кириллицей,
+// плотный и хорошо читаемый в русском тексте (переменные начертания).
+const golos = Golos_Text({
+  variable: "--font-sans-src",
   subsets: ["latin", "cyrillic"],
   display: "swap",
 });
@@ -69,7 +71,7 @@ export default function RootLayout({
     <ClerkProvider localization={clerkLocalization}>
       <html
         lang="ru"
-        className={`${onest.variable} ${jetbrains.variable}`}
+        className={`${golos.variable} ${jetbrains.variable}`}
         suppressHydrationWarning
       >
         <head>
@@ -88,6 +90,8 @@ export default function RootLayout({
           />
         </head>
         <body className="min-h-screen text-ink antialiased font-sans">
+          {/* SVG-фильтры преломления для «жидкого стекла» (см. GlassFilters) */}
+          <GlassFilters />
           {children}
           <CookieNotice />
         </body>

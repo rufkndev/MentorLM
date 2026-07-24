@@ -98,7 +98,7 @@ function Visual0() {
           className={cn(
             "rounded-2xl border px-3 py-2 text-[12px]",
             i === 0
-              ? "border-line bg-white/70 text-ink-soft"
+              ? "border-line bg-surface/80 text-ink-soft"
               : "border-transparent bg-[var(--brand-primary)] text-white"
           )}
         >
@@ -117,7 +117,7 @@ function Visual1() {
         {"function "}
         <span className="text-[var(--brand-focus)]">solve</span>
         {"(n) {\n  "}
-        <span className="text-[var(--brand-violet)]">return</span>
+        <span className="text-[#9db8ff]">return</span>
         {" n * (n + 1) / 2;\n}"}
       </code>
     </pre>
@@ -135,7 +135,7 @@ function Visual2() {
             "rounded-full border px-2.5 py-1 text-[11px]",
             i === 0
               ? "border-transparent bg-[var(--brand-primary)] text-white"
-              : "border-line bg-white/70 text-ink-soft"
+              : "border-line bg-surface/80 text-ink-soft"
           )}
         >
           {s}
@@ -149,7 +149,7 @@ function Visual2() {
 function Visual3() {
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 rounded-full border border-line bg-white/70 px-3 py-1.5">
+      <div className="flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3 py-1.5">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
           <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
           <path
@@ -165,7 +165,7 @@ function Visual3() {
         {["[1] arxiv.org", "[2] habr.com", "[3] cyberleninka"].map((s) => (
           <span
             key={s}
-            className="rounded-md border border-line bg-white/70 px-2 py-0.5 font-mono text-[10px] text-[var(--brand-primary)]"
+            className="rounded-md border border-line bg-surface/80 px-2 py-0.5 font-mono text-[10px] text-[var(--brand-primary)]"
           >
             {s}
           </span>
@@ -185,9 +185,9 @@ function Visual4() {
       ].map((t) => (
         <li
           key={t}
-          className="flex items-center gap-2 rounded-lg border border-line bg-white/70 px-2.5 py-1.5 text-[12px] text-ink-soft"
+          className="flex items-center gap-2 rounded-lg border border-line bg-surface/80 px-2.5 py-1.5 text-[12px] text-ink-soft"
         >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-violet)]" />
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--brand-primary)]" />
           {t}
         </li>
       ))}
@@ -202,7 +202,7 @@ function Visual5() {
       {["Лекция_04.pdf", "Конспект.docx"].map((name) => (
         <div
           key={name}
-          className="flex items-center gap-2 rounded-lg border border-line bg-white/70 px-2.5 py-1.5"
+          className="flex items-center gap-2 rounded-lg border border-line bg-surface/80 px-2.5 py-1.5"
         >
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden>
             <path
