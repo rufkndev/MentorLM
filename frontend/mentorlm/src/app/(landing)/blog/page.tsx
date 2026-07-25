@@ -7,6 +7,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GlassCard } from "@/components/ui/GlassCard";
+import { Mascot } from "@/components/ui/Mascot";
 import { Reveal } from "@/components/ui/Reveal";
 import { formatPostDate, sortedPosts } from "@/lib/blog-contents";
 
@@ -28,15 +29,24 @@ export default function BlogPage() {
 
       <div className="relative mx-auto max-w-4xl px-6">
         {/* Шапка раздела */}
-        <header className="mb-12">
-          <p className="text-eyebrow">Блог</p>
-          <h1 className="mt-4 text-[clamp(2rem,4.6vw,3.4rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ink">
-            Материалы Mentor LM
-          </h1>
-          <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-ink-soft">
-            Гайды о том, как использовать AI для учёбы по делу, разборы режимов
-            платформы, практические сценарии и обновления продукта.
-          </p>
+        <header className="mb-12 flex items-start justify-between gap-8">
+          <div className="min-w-0">
+            <p className="text-eyebrow">Блог</p>
+            <h1 className="mt-4 text-[clamp(2rem,4.6vw,3.4rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ink">
+              Материалы Mentor LM
+            </h1>
+            <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-ink-soft">
+              Гайды о том, как использовать AI для учёбы по делу, разборы режимов
+              платформы, практические сценарии и обновления продукта.
+            </p>
+          </div>
+          {/* Маскот читает материалы */}
+          <Mascot
+            size={96}
+            expression="curious"
+            float="fly"
+            className="hidden shrink-0 lg:inline-flex"
+          />
         </header>
 
         {/* Список статей или состояние-анонс */}
@@ -85,6 +95,7 @@ export default function BlogPage() {
 function EmptyState() {
   return (
     <div className="glass flex flex-col items-center gap-4 px-6 py-16 text-center">
+      <Mascot size={92} expression="thinking" float="bob" className="mb-2" />
       <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
         скоро
       </p>

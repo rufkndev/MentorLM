@@ -10,6 +10,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Check, CreditCard, Shield } from "lucide-react";
+import { BrandMark } from "@/components/ui/BrandMark";
 import { billingPlans, type BillingPlan } from "@/lib/billing-contents";
 
 // Оборачиваем в Suspense — useSearchParams требует CSR-границы.
@@ -66,7 +67,8 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
         {/* Сводка выбранного плана */}
         <div className="mt-6 rounded-2xl border border-line bg-surface/70 p-5">
           <div className="flex items-baseline justify-between">
-            <span className="text-[15px] font-semibold tracking-tight text-ink">
+            <span className="inline-flex items-center gap-2 text-[15px] font-semibold tracking-tight text-ink">
+              <BrandMark size={18} />
               Mentor LM {plan.name}
             </span>
             {plan.price !== null && (

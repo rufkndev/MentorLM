@@ -18,6 +18,8 @@ export const metadata: Metadata = {
 export default function ContactsPage() {
   return (
     <DocPage
+      showMascot
+      mascotExpression="calm"
       eyebrow="Контакты"
       title="Связаться с Mentor LM"
       description="Каналы связи для пользователей и партнёров, а также юридические реквизиты. Реквизиты в квадратных скобках — шаблон: окончательные данные будут опубликованы после регистрации."

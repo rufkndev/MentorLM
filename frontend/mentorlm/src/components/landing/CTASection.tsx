@@ -4,6 +4,7 @@
  */
 
 import { LandingChatTeaser } from "@/components/landing/LandingChatTeaser";
+import { Mascot } from "@/components/ui/Mascot";
 import { Reveal } from "@/components/ui/Reveal";
 import { cta } from "@/lib/landing-contents";
 
@@ -43,6 +44,11 @@ export function CTASection() {
                 animation: "drift 30s ease-in-out -8s infinite alternate-reverse",
               }}
             />
+
+            {/* Маскот-компаньон на тёмной панели */}
+            <div className="relative mb-8 flex justify-center">
+              <Mascot size={104} tone="dark" expression="wink" float="bob" />
+            </div>
 
             <h2 className="text-display relative mx-auto max-w-3xl text-[clamp(2rem,5vw,4rem)] font-semibold text-white">
               Спокойнее. Сфокусированнее.{" "}

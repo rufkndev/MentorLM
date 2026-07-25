@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
+import { Mascot } from "@/components/ui/Mascot";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import { billingHero, billingPlans, type BillingPlan } from "@/lib/billing-contents";
@@ -40,6 +41,12 @@ function HeroSection() {
 
       <div className="relative z-10 mx-auto max-w-3xl px-6 text-center">
         <Reveal>
+          <div className="mb-6 flex justify-center">
+            <Mascot size={92} expression="happy" float="fly" />
+          </div>
+        </Reveal>
+
+        <Reveal delay={0.03}>
           <p className="text-eyebrow">{billingHero.eyebrow}</p>
         </Reveal>
 

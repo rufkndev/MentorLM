@@ -51,9 +51,8 @@ export const metadata: Metadata = {
     type: "website",
     locale: "ru_RU",
   },
-  icons: {
-    icon: "/favicon.ico",
-  },
+  // Иконки (favicon/apple-icon) и og:image подхватываются из app/icon.svg,
+  // app/apple-icon.tsx и app/opengraph-image.tsx по file-convention Next.
 };
 
 // Цвет темы браузера и масштабирование вьюпорта.

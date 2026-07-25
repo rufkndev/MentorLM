@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <DocPage
+      showMascot
       eyebrow="О проекте"
       title="Mentor LM — единое AI-пространство для учёбы"
       description="Спокойное рабочее место с тремя режимами под учебные задачи: общий чат, работа с кодом и исследования с веб-поиском. Один интерфейс вместо десятка вкладок и сервисов."

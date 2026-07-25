@@ -22,6 +22,7 @@ import {
 } from "motion/react";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { Mascot } from "@/components/ui/Mascot";
 import { hero } from "@/lib/landing-contents";
 
 // Секция героя.
@@ -101,10 +102,17 @@ export function HeroSection() {
           transition={{ duration: 0.7, delay: 0.46, ease: [0.22, 1, 0.36, 1] }}
           className="mt-10 flex justify-center"
         >
-          <Button href={hero.primary.href} size="lg">
-            {hero.primary.label}
-            <Arrow />
-          </Button>
+          {/* Кнопка остаётся строго по центру; маскот-компаньон парит слева от неё
+              (absolute → не влияет на центрирование и не перекрывает кнопку) */}
+          <div className="relative">
+            <div className="pointer-events-none absolute right-full top-1/2 mr-6 hidden -translate-y-1/2 md:block">
+              <Mascot size={88} expression="happy" float="fly" />
+            </div>
+            <Button href={hero.primary.href} size="lg">
+              {hero.primary.label}
+              <Arrow />
+            </Button>
+          </div>
         </motion.div>
       </div>
 
