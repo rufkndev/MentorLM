@@ -15,6 +15,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
+import { useConversations } from "@/components/mainapp/ConversationsProvider";
+import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
+import { billingPlans } from "@/lib/billing-contents";
 import { cn } from "@/lib/cn";
 import { modes } from "@/lib/mainapp-contents";
 
@@ -44,7 +47,10 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
 export function ModeSwitcher({ pathname }: { pathname: string | null }) {
   return (
     <div className="px-3 pt-2">
-      <div className="flex flex-col gap-0.5 rounded-2xl bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] p-1">
+      {/* Дорожка — «ниша», вырезанная в стекле сайдбара (.inset-well), а не
+          наклеенная сверху плашка. Отступ дорожки (4px) + отступ пункта (8px)
+          дают те же 12px до текста, что у кнопки нового чата и строк чатов. */}
+      <div className="inset-well flex flex-col gap-0.5 rounded-2xl p-1">
         {modes.map((mode) => {
           const active = pathname?.startsWith(mode.href);
           return (
@@ -52,7 +58,7 @@ export function ModeSwitcher({ pathname }: { pathname: string | null }) {
               key={mode.id}
               href={mode.href}
               className={cn(
-                "relative flex h-9 items-center rounded-xl px-3 text-[13.5px] font-medium transition-colors",
+                "relative flex h-9 items-center rounded-xl px-2 text-[13.5px] font-semibold transition-colors",
                 active
                   ? "text-white"
                   : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
@@ -82,9 +88,6 @@ export function NewChatButton() {
     >
       <Plus className="h-[14px] w-[14px]" strokeWidth={2} />
       Новый чат
-      <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-white/55">
-        ⌘K
-      </span>
     </Link>
   );
 }
@@ -97,14 +100,53 @@ export function SearchInput({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="mt-2 flex h-9 items-center gap-2 rounded-xl bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] px-3">
-      <Search className="h-[14px] w-[14px] text-muted" strokeWidth={1.7} />
+    <div className="inset-well mt-2 flex h-9 items-center gap-2 rounded-xl px-3 outline-2 outline-offset-0 outline-transparent transition-[outline-color] duration-200 focus-within:outline-[color-mix(in_srgb,var(--brand-primary)_35%,transparent)]">
+      <Search
+        className="h-[14px] w-[14px] shrink-0 text-muted"
+        strokeWidth={1.8}
+      />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Поиск по чатам"
-        className="flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
+        className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
       />
+    </div>
+  );
+}
+
+// Компактный индикатор расхода текущего режима. Обновляется вместе с расходом
+// в провайдере (после каждого ответа и по фоновому таймеру), поэтому остаток
+// виден сразу — не нужно открывать настройки или перезагружать страницу.
+function UsageMeter() {
+  const { usage } = useSubscription();
+  const { mode } = useConversations();
+  const current = usage?.modes?.[mode];
+  if (!current) return null;
+
+  const remaining = current.remaining_pct;
+  // Цвет включается, только когда остаток реально мал — иначе шкала спокойная.
+  const tone =
+    remaining <= 10
+      ? "#d4334a"
+      : remaining <= 25
+        ? "#e08a1e"
+        : "var(--brand-primary)";
+
+  return (
+    <div className="mb-1 px-3 py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+          {current.label}
+        </span>
+        <span className="text-[11.5px] text-muted">осталось {remaining}%</span>
+      </div>
+      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_10%,transparent)]">
+        <div
+          className="h-full rounded-full transition-[width] duration-700 ease-out"
+          style={{ width: `${Math.max(2, remaining)}%`, background: tone }}
+        />
+      </div>
     </div>
   );
 }
@@ -114,28 +156,38 @@ export function SidebarFooter({
 }: {
   onOpenSettings: () => void;
 }) {
+  // Апселл — только тем, кому есть куда расти: Free → Plus, Plus → Pro, на Pro
+  // его нет вовсе. Пока тариф не загружен (plan === null) кнопку не рисуем,
+  // чтобы платному пользователю не мигало «перейти на тариф».
+  const { plan } = useSubscription();
+  const upsellId = plan === "free" ? "plus" : plan === "plus" ? "pro" : null;
+  const upsell = billingPlans.find((p) => p.id === upsellId);
+
   return (
     <div className="p-3">
+      <UsageMeter />
       <button
         type="button"
         onClick={onOpenSettings}
-        className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
+        className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       >
         <Settings className="h-[14px] w-[14px]" strokeWidth={1.7} />
         Настройки
       </button>
-      <Link
-        href="/billing"
-        className="mt-1 flex h-10 items-center justify-between gap-2 rounded-2xl bg-[var(--brand-primary-soft)] px-3 text-[13.5px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-soft)]/80"
-      >
-        <span className="flex items-center gap-2">
-          <Sparkles className="h-[14px] w-[14px]" strokeWidth={1.7} />
-          Перейти на Pro
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]/70">
-          490₽
-        </span>
-      </Link>
+      {upsell && (
+        <Link
+          href={upsell.cta.href ?? "/billing"}
+          className="mt-1 flex h-10 items-center justify-between gap-2 rounded-2xl bg-[var(--brand-primary-soft)] px-3 text-[13.5px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-soft)]/80"
+        >
+          <span className="flex items-center gap-2">
+            <Sparkles className="h-[14px] w-[14px]" strokeWidth={1.7} />
+            Перейти на {upsell.name}
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]/70">
+            {upsell.price}₽
+          </span>
+        </Link>
+      )}
     </div>
   );
 }

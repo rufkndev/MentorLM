@@ -64,6 +64,12 @@ DEFAULT_PRICE = (5.00, 15.00)
 # токенов — это цена инструмента, не токенов.
 WEB_SEARCH_CALL_COST = 10_000
 
+# Сколько поисков модель может сделать в ОДНОМ ответе. Без потолка «дотошный»
+# ответ мог уйти в десятки поисков и в одиночку съесть недельную квоту режима:
+# 8 вызовов = $0.08 сверх токенов. Отдаём его провайдеру как max_tool_calls, а
+# если модель/API его не примет — режем на своей стороне (см. openai_research).
+WEB_SEARCH_CALLS_PER_ANSWER = 8
+
 
 def usage_cost(
     tokens_in: int,
@@ -87,7 +93,22 @@ RATE_PER_MIN = 5  # запросов в минуту, анти-спам (нуж�
 MAX_OUTPUT_TOKENS = 30_000  # потолок ответа — обрез на уровне провайдера
 MAX_INPUT_TOKENS = 100_000  # потолок ввода — reject до вызова модели
 MAX_CONTEXT_MESSAGES = 30  # абсолютный потолок длины истории
-REQUEST_TIMEOUT_SECONDS = 180  # wall-clock таймаут генерации
+
+# Wall-clock таймаут генерации — по режимам, потому что их «нормальная» длина
+# отличается на порядок. «Исследовать» с веб-поиском может молчать минутами:
+# модель ходит по сайтам и рассуждает, текст в это время не идёт. Общие 180 с
+# обрывали такие ответы ошибкой посреди работы. Проверяется между дельтами.
+REQUEST_TIMEOUT_SECONDS = {"chat": 180, "code": 300, "research": 900}
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 180
+
+
+def request_timeout(mode: str) -> int:
+    """Потолок времени генерации для режима (секунды)."""
+    return REQUEST_TIMEOUT_SECONDS.get(mode, DEFAULT_REQUEST_TIMEOUT_SECONDS)
+
+
+# Самый долгий возможный ответ — по нему выставляется TTL лока генерации.
+MAX_REQUEST_TIMEOUT_SECONDS = max(REQUEST_TIMEOUT_SECONDS.values())
 
 # Скользящие окна квоты: ключ → (длительность, человекочитаемое имя).
 QUOTA_WINDOWS: dict[str, tuple[timedelta, str]] = {

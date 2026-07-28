@@ -25,7 +25,7 @@ export function ChatEmpty() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6, delay: 0.15 }}
-        className="mt-4 text-[15px] text-ink-soft"
+        className="mt-4 max-w-lg text-[15px] font-medium leading-relaxed text-ink-soft"
       >
         Задайте вопрос, прикрепите материалы или выберите подсказку ниже.
       </motion.p>

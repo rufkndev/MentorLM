@@ -55,8 +55,12 @@ def build_context(conversation, *, max_messages: int) -> list[dict]:
 
     # prefetch вложений — их извлечённый текст подмешиваем в контент сообщения,
     # чтобы модель «видела» прикреплённые файлы (в текущем и прошлых ходах).
+    # Уведомления (kind=notice, напр. «лимит исчерпан») в контекст не берём:
+    # это сообщения от системы пользователю, модели они только мешают.
     qs = list(
-        conversation.messages.prefetch_related("attachments").order_by("created_at")
+        conversation.messages.filter(kind="text")
+        .prefetch_related("attachments")
+        .order_by("created_at")
     )
     recent = qs[-max_messages:]
     return [

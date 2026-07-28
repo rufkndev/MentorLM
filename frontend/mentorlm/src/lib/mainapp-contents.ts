@@ -30,11 +30,13 @@ export const modes: readonly Mode[] = [
 ] as const;
 
 // Идентификаторы иконок сценариев (маппятся на lucide в ChatComposer).
+// Названы по смыслу сценария, а не по картинке: иконку можно поменять, не
+// трогая контент, и наоборот — по id всегда видно, о какой задаче речь.
 export type ScenarioIconId =
-  | "book"
-  | "wrench"
-  | "text"
-  | "chat"
+  | "study"
+  | "assignment"
+  | "writing"
+  | "talk"
   | "write-code"
   | "refactor"
   | "explain"
@@ -61,25 +63,25 @@ export const chatScenarios: readonly Scenario[] = [
     id: "study",
     label: "Изучить",
     description: "Объяснение темы шаг за шагом",
-    icon: "book",
+    icon: "study",
   },
   {
     id: "practice",
     label: "Практическая работа",
     description: "Готовая практическая работа под сдачу",
-    icon: "wrench",
+    icon: "assignment",
   },
   {
     id: "text",
     label: "Текст",
     description: "Работа с текстом: написание, редактирование, конспект",
-    icon: "text",
+    icon: "writing",
   },
   {
     id: "chat",
     label: "Обычный чат",
     description: "Спокойный понятный ответ без лишнего",
-    icon: "chat",
+    icon: "talk",
   },
 ] as const;
 

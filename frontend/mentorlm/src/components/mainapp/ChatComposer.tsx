@@ -16,21 +16,22 @@ import {
 import { motion } from "motion/react";
 import {
   ArrowUp,
-  BookOpen,
-  CheckCheck,
+  BadgeCheck,
+  BookOpenText,
+  ClipboardList,
   Code2,
-  Columns2,
-  FileCode2,
-  FileSearch,
+  FlaskConical,
   GraduationCap,
-  ListChecks,
-  MessageCircle,
-  Microscope,
+  Library,
+  Lightbulb,
+  MessagesSquare,
   Paperclip,
-  RefreshCw,
-  ShieldCheck,
-  Type,
-  Wrench,
+  PenLine,
+  Scale,
+  SearchCheck,
+  Square,
+  Telescope,
+  Wand2,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -53,29 +54,37 @@ type Props = {
   onScenarioChange: (id: string) => void;
   /** "hero" — большой по центру (empty state); "dock" — снизу в трэде. */
   variant?: "hero" | "dock";
+  /** Отправка недоступна (идёт ответ). Поле ввода при этом остаётся активным:
+   *  следующий вопрос можно набирать, не дожидаясь конца генерации. */
   disabled?: boolean;
+  /** Идёт генерация ответа — кнопка отправки превращается в «Стоп». */
+  streaming?: boolean;
+  onStop?: () => void;
   placeholder?: string;
   /** Подставить черновик вопроса с лендинга (только на пустом hero-экране). */
   seedDraft?: boolean;
 };
 
 // Соответствие id сценария → иконке lucide (для чипов сценариев).
+// Набор подобран по действию, а не по предмету: «объяснить» — лампочка, а не
+// файл кода; «сравнить» — весы, а не две колонки; «проверить факты» — знак
+// подтверждения, а не щит. Так чип читается с одного взгляда, без подписи.
 const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
-  book: BookOpen,
-  wrench: Wrench,
-  text: Type,
-  chat: MessageCircle,
+  study: BookOpenText,
+  assignment: ClipboardList,
+  writing: PenLine,
+  talk: MessagesSquare,
   "write-code": Code2,
-  refactor: RefreshCw,
-  explain: FileCode2,
-  review: CheckCheck,
+  refactor: Wand2,
+  explain: Lightbulb,
+  review: SearchCheck,
   teach: GraduationCap,
-  tests: ListChecks,
-  sources: FileSearch,
-  deep: Microscope,
+  tests: FlaskConical,
+  sources: Library,
+  deep: Telescope,
   overview: Zap,
-  compare: Columns2,
-  facts: ShieldCheck,
+  compare: Scale,
+  facts: BadgeCheck,
 };
 
 // Ограничения вложений — совпадают с бэком (apps/conversations/attachments.py).
@@ -93,6 +102,8 @@ export function ChatComposer({
   onScenarioChange,
   variant = "dock",
   disabled,
+  streaming = false,
+  onStop,
   placeholder = "Спросите что угодно по учёбе…",
   seedDraft = false,
 }: Props) {
@@ -128,7 +139,8 @@ export function ChatComposer({
     if (textareaRef.current) textareaRef.current.style.height = "auto";
   };
 
-  // Enter — отправка, Shift+Enter — перенос строки.
+  // Enter — отправка, Shift+Enter — перенос строки. Во время ответа модели
+  // Enter ничего не отправляет, но набранный текст сохраняется в поле.
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -186,12 +198,15 @@ export function ChatComposer({
       <div
         className={cn(
           "glass-strong relative flex flex-col rounded-3xl p-2.5",
-          "shadow-[0_18px_60px_-22px_rgba(7,27,77,0.25)]"
+          // Подсветка фокуса — через outline, а не ring: у .glass-strong свой
+          // box-shadow (кромка стекла), и ring его бы просто не пересилил.
+          "outline-2 outline-offset-0 outline-transparent transition-[outline-color] duration-300",
+          "focus-within:outline-[color-mix(in_srgb,var(--brand-primary)_28%,transparent)]"
         )}
       >
         {/* Чипсы прикреплённых файлов (если есть) */}
         {files.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-1.5 pb-2 pt-1">
+          <div className="flex flex-wrap gap-1.5 px-2.5 pb-2 pt-1">
             {files.map((file, i) => (
               <FileChip key={i} file={file} onRemove={() => removeFile(i)} />
             ))}
@@ -212,16 +227,15 @@ export function ChatComposer({
           onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          disabled={disabled}
           rows={variant === "hero" ? 2 : 1}
           className={cn(
-            "min-h-[44px] w-full resize-none bg-transparent px-3 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-muted",
+            "thin-scroll min-h-[44px] w-full resize-none bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-muted",
             variant === "hero" && "min-h-[80px] text-[16px]"
           )}
         />
 
         {/* Нижний ряд: прикрепить файл (слева) и отправить (справа) */}
-        <div className="mt-1 flex items-center gap-1.5 px-1">
+        <div className="mt-1 flex items-center gap-1.5">
           <input
             ref={fileRef}
             type="file"
@@ -238,7 +252,12 @@ export function ChatComposer({
           </ToolButton>
 
           <div className="ml-auto flex items-center gap-1.5">
-            <SendButton onClick={handleSubmit} disabled={!canSend} />
+            {/* Во время ответа та же кнопка останавливает генерацию (как в Claude) */}
+            {streaming ? (
+              <StopButton onClick={() => onStop?.()} />
+            ) : (
+              <SendButton onClick={handleSubmit} disabled={!canSend} />
+            )}
           </div>
         </div>
       </div>
@@ -282,11 +301,14 @@ function ScenarioRow({
             type="button"
             onClick={() => onChange(s.id)}
             title={s.description}
+            aria-pressed={isActive}
             className={cn(
               "relative flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] transition-colors",
               isActive
                 ? "bg-[var(--brand-ink)] text-white"
-                : "bg-[color-mix(in_srgb,var(--brand-ink)_6%,transparent)] text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_12%,transparent)] hover:text-ink"
+                // Невыбранные чипы — стекло: они лежат прямо на фоне страницы,
+                // и материал делает ряд лёгким, не добавляя ни одной линии.
+                : "glass-chip text-ink-soft hover:text-ink"
             )}
           >
             <Icon className="h-[14px] w-[14px]" strokeWidth={1.7} />
@@ -347,8 +369,25 @@ function SendButton({
   );
 }
 
+// Кнопка остановки генерации — занимает место кнопки отправки, пока идёт ответ.
+function StopButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Остановить ответ"
+      title="Остановить ответ"
+      className="grid h-9 w-9 place-items-center rounded-full bg-[var(--brand-ink)] text-white shadow-[0_10px_24px_-10px_rgba(7,27,77,0.6)] transition-all duration-300 hover:bg-[var(--brand-ink-soft)]"
+    >
+      <Square className="h-[13px] w-[13px] fill-current" strokeWidth={0} />
+    </button>
+  );
+}
+
 // Чип прикреплённого файла с крестиком удаления.
 function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
+  // Внутри композера стекла уже достаточно: чип лежит НА стеклянной панели,
+  // второй слой блюра там не читается — оставляем простую заливку.
   return (
     <span className="flex items-center gap-1.5 rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] px-2.5 py-1 text-[12px] text-ink-soft">
       <Paperclip className="h-[13px] w-[13px]" strokeWidth={1.7} />

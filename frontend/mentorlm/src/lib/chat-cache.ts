@@ -26,6 +26,71 @@ const listKey = (uid: string) => `mlm.${VERSION}.${uid}.convs`;
 const msgKey = (uid: string, id: string) => `mlm.${VERSION}.${uid}.msg.${id}`;
 const idxKey = (uid: string) => `mlm.${VERSION}.${uid}.msgidx`;
 
+// ── Выбранный сценарий диалога ──────────────────────────────────────────────
+// Сценарий — свойство КОНКРЕТНОГО чата, а не режима: вернувшись в старый чат,
+// пользователь застаёт тот же пресет, а новый чат всегда начинается с дефолта
+// режима. Бэк хранит его же на диалоге (Conversation.scenario_id); локальная
+// карта нужна для мгновенного рендера и для смены сценария до первой отправки.
+// Одна запись на все чаты (а не ключ на чат) — так проще держать размер под
+// контролем; id диалогов уникальны глобально, поэтому userId в ключе не нужен.
+
+const scenariosKey = `mlm.${VERSION}.scenarios`;
+const MAX_CACHED_SCENARIOS = 200;
+
+// Читает карту «id диалога → id сценария» (или пустую при любой проблеме).
+function readScenarios(): Record<string, string> {
+  const s = ls();
+  if (!s) return {};
+  try {
+    const raw = s.getItem(scenariosKey);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Сценарий конкретного диалога (или null, если пользователь его не выбирал).
+export function loadScenario(conversationId: string | null): string | null {
+  if (!conversationId) return null;
+  return readScenarios()[conversationId] ?? null;
+}
+
+// Запоминает сценарий диалога — он держится, пока пользователь сам его не сменит.
+export function saveScenario(
+  conversationId: string,
+  scenarioId: string,
+): void {
+  const s = ls();
+  if (!s) return;
+  try {
+    const map = readScenarios();
+    if (map[conversationId] === scenarioId) return;
+    delete map[conversationId]; // переносим в конец: свежие записи — последние
+    map[conversationId] = scenarioId;
+    const ids = Object.keys(map);
+    for (const stale of ids.slice(0, Math.max(0, ids.length - MAX_CACHED_SCENARIOS))) {
+      delete map[stale];
+    }
+    s.setItem(scenariosKey, JSON.stringify(map));
+  } catch {
+    // localStorage недоступен — сценарий просто не переживёт перезагрузку
+  }
+}
+
+// Забывает сценарий удалённого диалога.
+export function dropScenario(conversationId: string): void {
+  const s = ls();
+  if (!s) return;
+  try {
+    const map = readScenarios();
+    if (!(conversationId in map)) return;
+    delete map[conversationId];
+    s.setItem(scenariosKey, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
 // ── Список диалогов ─────────────────────────────────────────────────────────
 
 // Читает кэшированный список чатов пользователя (или null).

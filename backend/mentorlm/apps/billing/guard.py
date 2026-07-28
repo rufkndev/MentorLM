@@ -35,6 +35,7 @@ from apps.usage.models import UsageEvent
 from .limits import (
     DEGRADE_REQUESTS,
     MAX_INPUT_TOKENS,
+    MAX_REQUEST_TIMEOUT_SECONDS,
     MODE_LABEL,
     QUOTA_WINDOWS,
     RATE_PER_MIN,
@@ -65,8 +66,9 @@ class LimitExceeded(Exception):
 # Аварийный потолок времени жизни лока генерации. При нормальной работе лок
 # снимается сразу после ответа (release_generation_lock в finally стрима); TTL
 # нужен только на случай, если воркер умрёт и finally не выполнится — иначе юзер
-# завис бы навсегда. Держать чуть больше самого долгого ответа (research + web).
-_GEN_LOCK_TTL = 180
+# завис бы навсегда. Держим с запасом над самым долгим ответом (research + web),
+# иначе лок отпустит посреди живой генерации.
+_GEN_LOCK_TTL = MAX_REQUEST_TIMEOUT_SECONDS + 60
 
 
 def acquire_generation_lock(user) -> bool:
@@ -83,6 +85,37 @@ def acquire_generation_lock(user) -> bool:
 def release_generation_lock(user) -> None:
     """Снять лок генерации (после завершения ответа или ошибки)."""
     cache.delete(f"genlock:{user.pk}")
+
+
+def generation_in_progress(user) -> bool:
+    """Идёт ли прямо сейчас ответ для этого пользователя (лок взят).
+
+    Нужно фронту: если страницу перезагрузили посреди генерации, живого стрима
+    в браузере уже нет, и по этому признаку экран знает, что ответ дописывается
+    на сервере, и дожидается его, а не показывает пустой диалог.
+    """
+    return bool(cache.get(f"genlock:{user.pk}"))
+
+
+def request_stop(user) -> None:
+    """Попросить остановить текущую генерацию пользователя (кнопка «Стоп»).
+
+    Флаг ставится отдельным коротким запросом; сам стрим проверяет его между
+    дельтами и корректно завершается — сохраняет уже сгенерированную часть,
+    списывает расход и снимает лок. Без флага пришлось бы ждать, пока сервер
+    заметит обрыв соединения, и следующий запрос ловил бы «идёт генерация».
+    """
+    cache.set(f"genstop:{user.pk}", 1, timeout=_GEN_LOCK_TTL)
+
+
+def stop_requested(user) -> bool:
+    """Просил ли пользователь остановить текущую генерацию."""
+    return bool(cache.get(f"genstop:{user.pk}"))
+
+
+def clear_stop(user) -> None:
+    """Снять флаг остановки (перед новой генерацией и после её завершения)."""
+    cache.delete(f"genstop:{user.pk}")
 
 
 def _window_usage(user, mode: str, now) -> dict[str, int]:

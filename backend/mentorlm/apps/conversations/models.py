@@ -15,6 +15,11 @@ class Conversation(models.Model):
         related_name="conversations",
     )
     mode = models.CharField(max_length=20, choices=Mode.choices)
+    # Сценарий диалога: он живёт вместе с чатом, а не с режимом — вернувшись в
+    # старый чат, пользователь застаёт тот же пресет, с которым его вёл. Пустая
+    # строка — сценарий ещё не выбран, значит действует дефолт режима.
+    # Проверяется на бэке (apps.ai.scenarios), поэтому здесь просто строка.
+    scenario_id = models.CharField(max_length=40, blank=True)
     title = models.CharField(max_length=255, blank=True)
     pinned = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,13 +48,25 @@ class Message(models.Model):
         USER = "user", "Пользователь"
         ASSISTANT = "assistant", "Ассистент"
 
+    class Kind(models.TextChoices):
+        TEXT = "text", "Ответ"
+        NOTICE = "notice", "Уведомление системы"
+
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
         related_name="messages",
     )
     role = models.CharField(max_length=20, choices=Role.choices)
+    # Уведомление (исчерпан лимит тарифа и т.п.) — часть переписки для
+    # пользователя, но НЕ часть контекста модели: build_context их пропускает.
+    # Раньше такие плашки жили только в состоянии фронта и пропадали при
+    # возврате в чат — теперь они хранятся вместе с диалогом.
+    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.TEXT)
     content = models.TextField()
+    # Служебные детали для UI: код лимита, показывать ли апселл, признак ответа
+    # на упрощённой модели. Только для отрисовки — на генерацию не влияет.
+    meta = models.JSONField(default=dict, blank=True)
     model = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

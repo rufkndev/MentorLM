@@ -19,7 +19,18 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ["id", "role", "content", "model", "created_at", "attachments"]
+        # kind/meta нужны фронту, чтобы отрисовать плашки (лимит тарифа, ответ
+        # на упрощённой модели) при возврате в чат, а не только в момент ответа.
+        fields = [
+            "id",
+            "role",
+            "kind",
+            "content",
+            "meta",
+            "model",
+            "created_at",
+            "attachments",
+        ]
         read_only_fields = fields
 
 
@@ -28,10 +39,19 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ["id", "mode", "title", "pinned", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "mode",
+            "scenario_id",
+            "title",
+            "pinned",
+            "created_at",
+            "updated_at",
+        ]
         # title/pinned можно менять через PATCH (переименование, закрепление);
-        # mode задаётся при создании во вьюхе.
-        read_only_fields = ["id", "created_at", "updated_at"]
+        # mode задаётся при создании во вьюхе, scenario_id — при отправке
+        # сообщения (клиент не выставляет его отдельным запросом).
+        read_only_fields = ["id", "scenario_id", "created_at", "updated_at"]
 
 
 class ConversationDetailSerializer(ConversationSerializer):

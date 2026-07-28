@@ -67,15 +67,21 @@ class MeSettingsDefaultsView(APIView):
         return Response(settings_defaults())
 
 
-def _window_view(used: int, limit, resets_at) -> dict:
-    """Одно скользящее окно для ЛК: проценты + время начала восстановления.
-    Абсолютные токены наружу не отдаём — только доля и момент сброса."""
+def _window_view(used: int, limit, resets_at, human: str) -> dict:
+    """Одно скользящее окно для ЛК: проценты + точный момент восстановления.
+
+    Абсолютные токены наружу не отдаём — только доля, подпись окна («5 часов»)
+    и ISO-время, когда лимит начнёт восстанавливаться (фронт печатает его в
+    локальной зоне пользователя). Время отдаём при ЛЮБОМ расходе, даже если
+    доля округлилась до 0% — иначе на малом расходе оно бы пропадало.
+    """
     if limit is None:  # безлимит
-        return {"used_pct": 0, "resets_at": None}
+        return {"used_pct": 0, "resets_at": None, "window_label": human}
     used_pct = min(100, round(used / limit * 100)) if limit else 0
     return {
         "used_pct": used_pct,
-        "resets_at": resets_at.isoformat() if used_pct > 0 else None,
+        "resets_at": resets_at.isoformat() if used > 0 else None,
+        "window_label": human,
     }
 
 
@@ -86,10 +92,10 @@ def _mode_usage(user, plan: str, mode: str, now) -> dict:
 
     windows = {}
     tightest, top_pct = None, -1
-    for window, _ in QUOTA_WINDOWS.items():
+    for window, (_, human) in QUOTA_WINDOWS.items():
         limit = quota.limit(window)
         resets_at = _window_reset(user, mode, window, now) if used[window] else now
-        view = _window_view(used[window], limit, resets_at)
+        view = _window_view(used[window], limit, resets_at, human)
         windows[window] = view
         if view["used_pct"] > top_pct:
             tightest, top_pct = window, view["used_pct"]
@@ -100,6 +106,7 @@ def _mode_usage(user, plan: str, mode: str, now) -> dict:
         "remaining_pct": max(0, 100 - max(0, top_pct)),
         "tightest_window": tightest,
         "resets_at": windows[tightest]["resets_at"],
+        "window_label": windows[tightest]["window_label"],
         "windows": windows,
     }
 

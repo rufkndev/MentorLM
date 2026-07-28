@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from django.conf import settings
-
 from ..context import count_tokens
+from ._clients import openai_client
 from ._openai import create_with_optional
 from .base import GenParams
 
@@ -24,9 +23,9 @@ class OpenAIChatProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
-        from openai import BadRequestError, OpenAI
+        from openai import BadRequestError
 
-        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        client = openai_client()
         messages = [{"role": "system", "content": system}, *history]
 
         completion = ""

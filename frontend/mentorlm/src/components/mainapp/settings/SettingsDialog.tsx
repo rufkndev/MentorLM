@@ -67,7 +67,8 @@ export function SettingsDialog({ open, onClose }: Props) {
             className="relative flex h-[620px] w-[860px] max-h-[92vh] max-w-full overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_80px_-24px_rgba(7,27,77,0.4)]"
           >
             <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-paper-2/40 p-3">
-              <h2 className="px-2 pb-3 pt-1 text-[15px] font-semibold text-ink">
+              {/* Заголовок выровнен по тексту пунктов навигации (те же 10px) */}
+              <h2 className="px-2.5 pb-3 pt-1 text-[15px] font-semibold text-ink">
                 Настройки
               </h2>
               <nav className="flex flex-col gap-0.5">
@@ -94,7 +95,7 @@ export function SettingsDialog({ open, onClose }: Props) {
               </nav>
             </aside>
 
-            <div className="relative flex-1 overflow-y-auto">
+            <div className="thin-scroll relative flex-1 overflow-y-auto">
               <button
                 type="button"
                 onClick={onClose}

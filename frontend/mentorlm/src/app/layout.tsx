@@ -9,12 +9,16 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { clerkLocalization } from "@/lib/clerk-localization";
 import { CookieNotice } from "@/components/ui/CookieNotice";
 import { GlassFilters } from "@/components/ui/GlassFilters";
-import { Golos_Text, JetBrains_Mono } from "next/font/google";
+import { JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
-// Основной шрифт интерфейса: Golos Text — гротеск с образцовой кириллицей,
-// плотный и хорошо читаемый в русском тексте (переменные начертания).
-const golos = Golos_Text({
+// Основной шрифт интерфейса: Manrope — современный геометрический гротеск с
+// родной кириллицей (её рисовал автор шрифта, а не «дотягивали» позже). Высокий
+// x-height и открытые формы держат мелкий UI разборчивым, а средние веса
+// (500–600) выглядят собранно и дорого — на них и построена вся иерархия
+// названий чатов, режимов и заголовков. Вариант из дизайн-системы
+// (dev_docs/branding_design/global.md). Переменный — один файл на все веса.
+const sans = Manrope({
   variable: "--font-sans-src",
   subsets: ["latin", "cyrillic"],
   display: "swap",
@@ -70,7 +74,7 @@ export default function RootLayout({
     <ClerkProvider localization={clerkLocalization}>
       <html
         lang="ru"
-        className={`${golos.variable} ${jetbrains.variable}`}
+        className={`${sans.variable} ${jetbrains.variable}`}
         suppressHydrationWarning
       >
         <head>

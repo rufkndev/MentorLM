@@ -35,11 +35,13 @@ export function ChatGroup({
   ...actions
 }: { label: string; chats: ChatPreview[] } & ChatRowActions) {
   return (
+    // Заголовок группы выровнен по тексту строк чатов (те же 12px внутри),
+    // а не по краю списка — колонка названий читается одной вертикалью.
     <div className="mt-4 first:mt-2">
-      <p className="px-2 pb-1 font-mono text-[10px] uppercase tracking-widest text-muted">
+      <p className="px-3 pb-1.5 font-mono text-[10px] uppercase tracking-widest text-muted">
         {label}
       </p>
-      <ul>
+      <ul className="flex flex-col gap-px">
         {chats.map((chat) => (
           <ChatRow key={chat.id} chat={chat} {...actions} />
         ))}
@@ -73,9 +75,11 @@ function ChatRow({
 
   return (
     <li>
+      {/* Отступы строки: 12px слева до названия и столько же справа до иконки
+          меню (6px поля + 6px внутри кнопки) — текст не липнет к скруглению. */}
       <div
         className={cn(
-          "group flex items-center gap-2 rounded-xl py-1.5 pl-2 pr-1 text-[13.5px] transition-colors",
+          "group flex items-center gap-2 rounded-xl py-2 pl-3 pr-1.5 text-[13.5px] transition-colors",
           active
             ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
             : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink",
@@ -86,7 +90,7 @@ function ChatRow({
         <Link
           href={`/${chat.mode}?c=${chat.id}`}
           prefetch
-          className="flex min-w-0 flex-1 flex-col gap-0.5"
+          className="flex min-w-0 flex-1 flex-col gap-1"
         >
           <span className="flex min-w-0 items-center gap-1.5">
             {chat.pinned && (
@@ -95,9 +99,9 @@ function ChatRow({
                 strokeWidth={2}
               />
             )}
-            <span className="truncate">{chat.title}</span>
+            <span className="truncate font-medium leading-tight">{chat.title}</span>
           </span>
-          <span className="truncate font-mono text-[9.5px] uppercase tracking-wider text-muted">
+          <span className="truncate font-mono text-[10px] uppercase leading-none tracking-[0.14em] text-muted">
             {labelForMode(chat.mode)}
           </span>
         </Link>

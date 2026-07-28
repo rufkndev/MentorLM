@@ -14,6 +14,7 @@ import { AppSidebar } from "@/components/mainapp/sidebar";
 import { ConversationsProvider } from "@/components/mainapp/ConversationsProvider";
 import { SettingsDialog } from "@/components/mainapp/settings";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
+import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
 
 // Каркас приложения: сайдбар + контент + аккаунт + настройки.
 export default function ModesLayout({
@@ -27,6 +28,7 @@ export default function ModesLayout({
 
   return (
     <SettingsProvider>
+      <SubscriptionProvider>
       <ConversationsProvider>
       <div className="relative flex min-h-screen text-ink">
       {/* Сайдбар со списком чатов и навигацией по режимам */}
@@ -85,6 +87,7 @@ export default function ModesLayout({
         />
       </div>
       </ConversationsProvider>
+      </SubscriptionProvider>
     </SettingsProvider>
   );
 }

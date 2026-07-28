@@ -3,6 +3,9 @@
  * Хук useApi() отдаёт get/post/patch/delete и stream() для SSE-ответов ИИ,
  * автоматически подставляя Clerk-токен в заголовок Authorization.
  * Используется везде, где нужны данные с бэка (чат, настройки, память, тарифы).
+ *
+ * Здесь же — политика устойчивости: повтор безопасных запросов при сетевом
+ * сбое, один повтор со свежим токеном на 401 и терпимость к битым SSE-событиям.
  */
 
 "use client";
@@ -14,7 +17,13 @@ import { useCallback, useMemo } from "react";
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
 
+// Повторяем только идемпотентные запросы (GET): повтор POST создал бы второй
+// диалог или второе сообщение. Пауза растёт линейно — сбой обычно короткий.
+const GET_RETRIES = 2;
+const RETRY_DELAY_MS = 600;
+
 // Ошибка API с HTTP-статусом и машинным кодом лимита от бэка (guard.py).
+// code "offline" — до сервера не достучались; "unauthorized" — сессия истекла.
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -25,6 +34,8 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Собирает ApiError из тела ответа: у лимитов бэк отдаёт JSON {code, message}.
 async function apiErrorFrom(res: Response): Promise<ApiError> {
@@ -40,35 +51,105 @@ async function apiErrorFrom(res: Response): Promise<ApiError> {
   return new ApiError(res.status, text || res.statusText);
 }
 
+const offlineError = () =>
+  new ApiError(0, "Нет связи с сервером. Проверьте интернет.", "offline");
+
+const expiredError = () =>
+  new ApiError(401, "Сессия истекла — обновите страницу и войдите заново.", "unauthorized");
+
 // Главный хук доступа к API: собирает запросы с токеном Clerk.
 export function useApi() {
   const { getToken } = useAuth();
 
-  // Базовый запрос: подставляет токен, парсит JSON, кидает ApiError на !ok.
+  // Один сетевой вызов с токеном. fresh=true — просим Clerk обновить токен
+  // (нужно ровно один раз, когда бэк ответил 401 на протухший).
+  const send = useCallback(
+    async (
+      path: string,
+      init: { method: string; body?: unknown; signal?: AbortSignal },
+      fresh = false,
+    ): Promise<Response> => {
+      const token = await getToken(fresh ? { skipCache: true } : undefined);
+      const isForm = init.body instanceof FormData;
+      return fetch(`${API_URL}${path}`, {
+        method: init.method,
+        // С вложениями шлём multipart — Content-Type не ставим сами, браузер
+        // добавит boundary. Заголовок Accept намеренно не ставим: DRF (только
+        // JSON-рендерер) иначе вернёт 406 ещё до обработчика.
+        headers: {
+          ...(isForm ? {} : { "Content-Type": "application/json" }),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body:
+          init.body === undefined
+            ? undefined
+            : isForm
+              ? (init.body as FormData)
+              : JSON.stringify(init.body),
+        signal: init.signal,
+      });
+    },
+    [getToken],
+  );
+
+  // Запрос с политикой устойчивости: обновление токена на 401 и повтор
+  // безопасных запросов при сетевом сбое/5xx.
+  const fetchResilient = useCallback(
+    async (
+      path: string,
+      init: { method: string; body?: unknown; signal?: AbortSignal },
+    ): Promise<Response> => {
+      const retries = init.method === "GET" ? GET_RETRIES : 0;
+      let lastError: ApiError = offlineError();
+
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        if (attempt) await sleep(RETRY_DELAY_MS * attempt);
+        let res: Response;
+        try {
+          res = await send(path, init);
+        } catch (err) {
+          // Прерывание пользователем — не сетевой сбой, наверх как есть.
+          if (init.signal?.aborted) throw err;
+          lastError = offlineError();
+          continue; // сети нет — пробуем ещё раз (для GET)
+        }
+        // Токен протух — повторяем ровно один раз со свежим.
+        if (res.status === 401) {
+          const retried = await send(path, init, true).catch(() => null);
+          if (!retried) throw offlineError();
+          if (retried.status === 401) throw expiredError();
+          return retried;
+        }
+        // 5xx у GET считаем временным сбоем и пробуем ещё раз.
+        if (res.status >= 500 && attempt < retries) {
+          lastError = await apiErrorFrom(res);
+          continue;
+        }
+        return res;
+      }
+      throw lastError;
+    },
+    [send],
+  );
+
+  // Базовый запрос: парсит JSON, кидает ApiError на !ok.
   const request = useCallback(
     async <T = unknown>(
       path: string,
       options: { method?: string; body?: unknown } = {},
     ): Promise<T> => {
-      const token = await getToken();
-      const res = await fetch(`${API_URL}${path}`, {
+      const res = await fetchResilient(path, {
         method: options.method ?? "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: options.body ? JSON.stringify(options.body) : undefined,
+        body: options.body,
       });
 
-      if (!res.ok) {
-        throw await apiErrorFrom(res);
-      }
+      if (!res.ok) throw await apiErrorFrom(res);
 
       // 204 No Content — тела нет.
       if (res.status === 204) return undefined as T;
       return (await res.json()) as T;
     },
-    [getToken],
+    [fetchResilient],
   );
 
   // Стриминг ответа ИИ: читает SSE и отдаёт токены через onDelta.
@@ -85,19 +166,9 @@ export function useApi() {
       degraded: boolean;
       canUpgrade: boolean;
     }> => {
-      const token = await getToken();
-      // С вложениями шлём multipart (FormData) — Content-Type не ставим сами,
-      // браузер добавит boundary. Без файлов — как раньше, JSON.
-      const isForm = body instanceof FormData;
-      const res = await fetch(`${API_URL}${path}`, {
+      const res = await fetchResilient(path, {
         method: "POST",
-        // Заголовок Accept намеренно не ставим: DRF (только JSON-рендерер)
-        // иначе вернёт 406 на согласовании формата ещё до обработчика.
-        headers: {
-          ...(isForm ? {} : { "Content-Type": "application/json" }),
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: isForm ? body : JSON.stringify(body),
+        body,
         signal: options.signal,
       });
 
@@ -127,7 +198,9 @@ export function useApi() {
             if (!line.startsWith("data:")) continue;
             const json = line.slice(5).trim();
             if (!json) continue;
-            const payload = JSON.parse(json) as {
+            // Битое событие пропускаем: одна повреждённая строка не должна
+            // обрывать весь ответ, который в остальном приходит нормально.
+            let payload: {
               delta?: string;
               done?: boolean;
               message_id?: number | null;
@@ -135,6 +208,11 @@ export function useApi() {
               degraded?: boolean;
               can_upgrade?: boolean;
             };
+            try {
+              payload = JSON.parse(json);
+            } catch {
+              continue;
+            }
             if (payload.error) throw new ApiError(500, payload.error);
             if (payload.degraded) {
               degraded = true;
@@ -148,7 +226,7 @@ export function useApi() {
 
       return { messageId, degraded, canUpgrade };
     },
-    [getToken],
+    [fetchResilient],
   );
 
   // Готовый набор методов, стабильный по ссылке между рендерами.

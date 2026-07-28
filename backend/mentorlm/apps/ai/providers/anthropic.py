@@ -8,9 +8,8 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from django.conf import settings
-
 from ..context import count_tokens
+from ._clients import anthropic_client
 from .base import GenParams
 
 
@@ -23,9 +22,7 @@ class AnthropicProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
-        from anthropic import Anthropic
-
-        client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client = anthropic_client()
 
         # max_tokens у Anthropic обязателен — берём потолок тарифа (финансовый
         # предохранитель); это лимит сверху, а не цель, модель остановится сама.

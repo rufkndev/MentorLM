@@ -13,6 +13,17 @@ import { ChatEmpty } from "@/components/mainapp/ChatEmpty";
 import { ChatMessage } from "@/components/mainapp/ChatMessage";
 import { useChatSession } from "@/components/mainapp/useChatSession";
 import type { Scenario } from "@/lib/mainapp-contents";
+import { useOnline } from "@/lib/use-online";
+
+// Честное «нет связи» вместо непонятной ошибки при отправке.
+function OfflineNotice({ online }: { online: boolean }) {
+  if (online) return null;
+  return (
+    <div className="glass-chip mx-auto mb-2 w-fit rounded-full px-3 py-1 text-[12px] text-muted">
+      Нет соединения — сообщение не отправится
+    </div>
+  );
+}
 
 type Props = {
   scenarios: readonly Scenario[];
@@ -42,8 +53,11 @@ function ChatScreenInner({
     setScenarioId,
     threadRef,
     handleSubmit,
+    stop,
+    retry,
     isEmpty,
-  } = useChatSession(defaultScenarioId);
+  } = useChatSession(defaultScenarioId, scenarios);
+  const online = useOnline();
 
   return (
     <div className="flex h-[calc(100vh-1.5rem)] flex-col">
@@ -60,6 +74,7 @@ function ChatScreenInner({
           >
             <ChatEmpty />
             <div className="mt-10 w-full">
+              <OfflineNotice online={online} />
               <ChatComposer
                 variant="hero"
                 seedDraft
@@ -69,6 +84,8 @@ function ChatScreenInner({
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}
+                streaming={sending}
+                onStop={stop}
               />
             </div>
           </motion.section>
@@ -85,17 +102,18 @@ function ChatScreenInner({
             {/* Прокручиваемая лента сообщений */}
             <div
               ref={threadRef}
-              className="flex-1 overflow-y-auto px-4 [scrollbar-width:thin]"
+              className="thin-scroll flex-1 overflow-y-auto px-4"
             >
               <div className="mx-auto flex max-w-5xl flex-col gap-5 py-6">
                 {messages.map((m) => (
-                  <ChatMessage key={m.id} message={m} />
+                  <ChatMessage key={m.id} message={m} onRetry={retry} />
                 ))}
               </div>
             </div>
 
             {/* Композер внизу треда */}
             <div className="px-4 pb-5 pt-2">
+              <OfflineNotice online={online} />
               <ChatComposer
                 scenarios={scenarios}
                 scenarioId={scenarioId}
@@ -103,6 +121,8 @@ function ChatScreenInner({
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}
+                streaming={sending}
+                onStop={stop}
               />
             </div>
           </motion.section>

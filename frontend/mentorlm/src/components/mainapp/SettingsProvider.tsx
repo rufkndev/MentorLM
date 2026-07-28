@@ -84,7 +84,9 @@ const FALLBACK_SETTINGS: Settings = {
   auto_memory: true,
   memory_scope: "balanced",
   memory_use: "auto",
-  chat_retention_days: 0,
+  // Дефолт хранения диалогов — 30 дней (канонический источник: DEFAULTS в
+  // apps/ai/preferences.py, значение приходит с /api/me/settings/defaults/).
+  chat_retention_days: 30,
 };
 
 // Ключи localStorage для темы, шрифта и полного объекта настроек.

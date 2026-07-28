@@ -66,7 +66,7 @@ export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
               <SearchInput value={query} onChange={setQuery} />
             </div>
 
-            <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-3 [scrollbar-width:thin]">
+            <nav className="thin-scroll mt-2 flex-1 overflow-y-auto px-3 pb-3">
               {grouped.length === 0 ? (
                 // Пока идёт первая загрузка — молчим, чтобы не мигало «нет чатов».
                 loading ? null : (
