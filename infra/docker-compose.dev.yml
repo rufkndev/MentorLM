@@ -1,4 +1,9 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: mentorlm-redis-dev
+    restart: unless-stopped
+
   backend:
     build:
       context: ../backend
@@ -8,8 +13,12 @@ services:
       - ./env/.env
     environment:
       DEBUG: "True"
+      # Общий кэш воркеров: лок генерации, rate limit, «Стоп» (billing.guard).
+      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
       - ../backend/mentorlm:/app
+    depends_on:
+      - redis
     restart: unless-stopped

@@ -1,10 +1,12 @@
+"""Сериализаторы диалогов: список для сайдбара и полная переписка с историей."""
+
 from rest_framework import serializers
 
 from .models import Attachment, Conversation, Message
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
-    """Метаданные вложения для UI (сам текст файла наружу не отдаём)."""
+    """Метаданные вложения для UI; извлечённый текст наружу не отдаём."""
 
     class Meta:
         model = Attachment
@@ -13,14 +15,14 @@ class AttachmentSerializer(serializers.ModelSerializer):
 
 
 class MessageSerializer(serializers.ModelSerializer):
-    """Сообщение диалога (read-only — создаётся бэком в процессе чата)."""
+    """Сообщение диалога; создаётся бэком в процессе чата, поэтому read-only."""
 
     attachments = AttachmentSerializer(many=True, read_only=True)
 
     class Meta:
         model = Message
-        # kind/meta нужны фронту, чтобы отрисовать плашки (лимит тарифа, ответ
-        # на упрощённой модели) при возврате в чат, а не только в момент ответа.
+        # kind и meta нужны фронту, чтобы отрисовать плашки (лимит тарифа, ответ
+        # на упрощённой модели) не только в момент ответа, но и при возврате.
         fields = [
             "id",
             "role",
@@ -48,14 +50,13 @@ class ConversationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        # title/pinned можно менять через PATCH (переименование, закрепление);
-        # mode задаётся при создании во вьюхе, scenario_id — при отправке
-        # сообщения (клиент не выставляет его отдельным запросом).
+        # title и pinned меняются через PATCH; mode задаётся при создании во
+        # вьюхе, scenario_id — при отправке сообщения.
         read_only_fields = ["id", "scenario_id", "created_at", "updated_at"]
 
 
 class ConversationDetailSerializer(ConversationSerializer):
-    """Диалог вместе с историей сообщений (память диалога)."""
+    """Диалог вместе с историей сообщений — «память» чата для фронта."""
 
     messages = MessageSerializer(many=True, read_only=True)
 

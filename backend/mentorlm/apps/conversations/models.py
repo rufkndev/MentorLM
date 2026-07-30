@@ -1,8 +1,10 @@
+"""Модели переписки: диалог, сообщение и вложение к нему."""
+
 from django.db import models
 
 
 class Conversation(models.Model):
-    """Диалог в одном из режимов MentorLM (Общий / Код / Модели)."""
+    """Диалог пользователя в одном из режимов MentorLM."""
 
     class Mode(models.TextChoices):
         CHAT = "chat", "Общий"
@@ -15,10 +17,9 @@ class Conversation(models.Model):
         related_name="conversations",
     )
     mode = models.CharField(max_length=20, choices=Mode.choices)
-    # Сценарий диалога: он живёт вместе с чатом, а не с режимом — вернувшись в
-    # старый чат, пользователь застаёт тот же пресет, с которым его вёл. Пустая
-    # строка — сценарий ещё не выбран, значит действует дефолт режима.
-    # Проверяется на бэке (apps.ai.scenarios), поэтому здесь просто строка.
+    # Сценарий живёт вместе с чатом, а не с режимом: вернувшись в старый чат,
+    # пользователь застаёт тот же пресет. Пустая строка — дефолт режима.
+    # Значение проверяет ai.scenarios, поэтому здесь просто строка.
     scenario_id = models.CharField(max_length=40, blank=True)
     title = models.CharField(max_length=255, blank=True)
     pinned = models.BooleanField(default=False)
@@ -28,12 +29,12 @@ class Conversation(models.Model):
     class Meta:
         verbose_name = "Диалог"
         verbose_name_plural = "Диалоги"
-        # Закреплённые — выше, затем по свежести.
+        # Закреплённые — выше, дальше по свежести.
         ordering = ("-pinned", "-updated_at")
         indexes = [
             # список чатов пользователя в конкретном режиме
             models.Index(fields=["user", "mode"]),
-            # последние чаты пользователя (для сайдбара)
+            # последние чаты пользователя (сайдбар)
             models.Index(fields=["user", "-updated_at"]),
         ]
 
@@ -42,7 +43,7 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
-    """Одно сообщение внутри диалога."""
+    """Одно сообщение диалога — вопрос, ответ модели или уведомление системы."""
 
     class Role(models.TextChoices):
         USER = "user", "Пользователь"
@@ -58,14 +59,13 @@ class Message(models.Model):
         related_name="messages",
     )
     role = models.CharField(max_length=20, choices=Role.choices)
-    # Уведомление (исчерпан лимит тарифа и т.п.) — часть переписки для
-    # пользователя, но НЕ часть контекста модели: build_context их пропускает.
-    # Раньше такие плашки жили только в состоянии фронта и пропадали при
-    # возврате в чат — теперь они хранятся вместе с диалогом.
+    # Уведомление (исчерпан лимит и т.п.) — часть переписки для пользователя, но
+    # не часть контекста модели: ai.context их пропускает. Храним в БД, иначе
+    # плашка пропадала бы при возврате в чат.
     kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.TEXT)
     content = models.TextField()
-    # Служебные детали для UI: код лимита, показывать ли апселл, признак ответа
-    # на упрощённой модели. Только для отрисовки — на генерацию не влияет.
+    # Детали для отрисовки: код лимита, показывать ли апселл, признак ответа на
+    # упрощённой модели. На генерацию не влияет.
     meta = models.JSONField(default=dict, blank=True)
     model = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -75,7 +75,7 @@ class Message(models.Model):
         verbose_name_plural = "Сообщения"
         ordering = ("created_at",)
         indexes = [
-            # выборка истории диалога по порядку — основа "памяти" ИИ
+            # выборка истории по порядку — основа «памяти» диалога
             models.Index(fields=["conversation", "created_at"]),
         ]
 
@@ -84,11 +84,10 @@ class Message(models.Model):
 
 
 class Attachment(models.Model):
-    """Файл, прикреплённый к сообщению пользователя.
+    """Файл при сообщении пользователя: храним не сам файл, а извлечённый текст.
 
-    Сам файл не храним (медиа-хранилища в MVP нет) — сохраняем извлечённый
-    текст и метаданные. Текст подмешивается в контекст модели (build_context),
-    поэтому вложения «видны» ей и в текущем, и в последующих ходах диалога.
+    Медиа-хранилища в MVP нет, а текст подмешивается в контекст (ai.context),
+    поэтому вложения «видны» модели и в следующих ходах диалога.
     """
 
     message = models.ForeignKey(

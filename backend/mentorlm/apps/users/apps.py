@@ -1,3 +1,5 @@
+"""Конфиг приложения `users` — профиль-зеркало Clerk и настройки пользователя."""
+
 from django.apps import AppConfig
 
 

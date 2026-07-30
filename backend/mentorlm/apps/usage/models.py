@@ -1,15 +1,15 @@
+"""Хранилище расхода ИИ: журнал запросов для квот и дневной роллап для аналитики."""
+
 from django.db import models
 
 from apps.conversations.models import Conversation
 
 
 class Usage(models.Model):
-    """Дневные счётчики использования ИИ на пользователя и режим.
+    """Дневной агрегат расхода на пользователя и режим.
 
-    Одна строка на тройку (пользователь, день, режим) — дешёвый дневной роллап
-    для админки и аналитики. В КОНТУРЕ ЛИМИТОВ НЕ УЧАСТВУЕТ: квоты считаются по
-    скользящим окнам поверх `UsageEvent` (см. billing.guard). Журнал отдельных
-    запросов — там же, в `UsageEvent`.
+    Дешёвый роллап для админки и аналитики. В контуре лимитов НЕ участвует:
+    квоты считаются по скользящим окнам поверх `UsageEvent`.
     """
 
     user = models.ForeignKey(
@@ -25,6 +25,7 @@ class Usage(models.Model):
     tokens_in = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
     web_search_calls = models.PositiveIntegerField(default=0)
+    # Историческое имя: хранит стоимость в µ$ (см. billing.limits.usage_cost).
     billable_tokens = models.PositiveBigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -40,7 +41,7 @@ class Usage(models.Model):
             ),
         ]
         indexes = [
-            # суб-лимит режима за день и месячная сумма по всем режимам
+            # расход режима за день и суммы по всем режимам
             models.Index(fields=["user", "day", "mode"]),
             models.Index(fields=["user", "day"]),
         ]
@@ -52,10 +53,8 @@ class Usage(models.Model):
 class UsageEvent(models.Model):
     """Журнал отдельных ИИ-запросов — источник правды для квот и аудита.
 
-    Append-only: одна строка на успешный запрос. По нему считаются скользящие
-    окна квот (SUM(billable_tokens) за окно, см. billing.guard). Даёт полную
-    картину: модель, режим, сценарий, токены, вызовы веб-поиска и расчётную
-    стоимость запроса в токенах (billable_tokens).
+    Append-only, одна строка на успешный запрос: по нему считаются скользящие
+    окна (billing.guard) и видно, чем именно был потрачен бюджет.
     """
 
     user = models.ForeignKey(
@@ -76,8 +75,9 @@ class UsageEvent(models.Model):
     tokens_in = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
     web_search_calls = models.PositiveSmallIntegerField(default=0)
+    # Историческое имя: стоимость запроса в µ$ — единица, в которой идут квоты.
     billable_tokens = models.PositiveIntegerField(default=0)
-    # Запрос выполнен на дешёвой модели в режиме деградации (квота была исчерпана).
+    # Ответ выдан на дешёвой модели, потому что квота была исчерпана.
     degraded = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -87,6 +87,7 @@ class UsageEvent(models.Model):
         ordering = ("-created_at",)
         indexes = [
             models.Index(fields=["user", "created_at"]),
+            # основной индекс окон квоты
             models.Index(fields=["user", "mode", "created_at"]),
         ]
 

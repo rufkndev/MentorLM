@@ -1,14 +1,16 @@
+"""Сериализаторы ЛК: профиль (только чтение) и настройки (частичное обновление)."""
+
 from rest_framework import serializers
 
 from .models import UserProfile, UserSettings
 
 
 def settings_defaults() -> dict:
-    """Канонические дефолты настроек, выведенные из модели UserSettings.
+    """Дефолты настроек, выведенные прямо из полей модели.
 
-    Единый источник — сами поля модели: значения по умолчанию берём прямо из
-    них для тех полей, что сериализатор отдаёт наружу и разрешает менять. Так
-    фронт не держит копию значений (иначе они тихо расходятся с бэком).
+    Единый источник — сама модель: так фронт не держит копию значений, которая
+    тихо разъезжается с бэком. Берём только то, что сериализатор отдаёт наружу
+    и разрешает менять.
     """
     read_only = set(UserSettingsSerializer.Meta.read_only_fields)
     writable = [f for f in UserSettingsSerializer.Meta.fields if f not in read_only]
@@ -22,10 +24,9 @@ def settings_defaults() -> dict:
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Read-only представление профиля для ЛК (имя/аватар берёт фронт из Clerk)."""
+    """Профиль для ЛК; имя и аватар фронт берёт из Clerk, а не отсюда."""
 
-    # Тариф считается на лету из подписок (effective_plan) — отдельного поля plan
-    # в профиле нет, поэтому и протухнуть нечему.
+    # Тариф считается из подписок на лету, поэтому протухнуть ему негде.
     plan = serializers.SerializerMethodField()
 
     class Meta:
@@ -34,13 +35,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_plan(self, obj) -> str:
+        """Действующий тариф пользователя."""
         from apps.billing.plans import effective_plan
 
         return effective_plan(obj)
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
-    """Продуктовые настройки пользователя. Поддерживает частичное обновление (PATCH)."""
+    """Настройки пользователя; набор полей совпадает с фронтовым типом Settings."""
 
     class Meta:
         model = UserSettings

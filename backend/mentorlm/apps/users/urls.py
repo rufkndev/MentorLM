@@ -1,3 +1,5 @@
+"""Маршруты личного кабинета — всё под префиксом /api/me/."""
+
 from django.urls import path
 
 from .views import (

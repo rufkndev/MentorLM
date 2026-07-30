@@ -1,3 +1,5 @@
+"""Админка расхода: дневные агрегаты и подробный журнал ИИ-запросов."""
+
 from django.contrib import admin
 
 from .models import Usage, UsageEvent
@@ -5,6 +7,8 @@ from .models import Usage, UsageEvent
 
 @admin.register(Usage)
 class UsageAdmin(admin.ModelAdmin):
+    """Дневной срез: сколько запросов и денег ушло по режимам."""
+
     list_display = (
         "user",
         "day",
@@ -21,6 +25,8 @@ class UsageAdmin(admin.ModelAdmin):
 
 @admin.register(UsageEvent)
 class UsageEventAdmin(admin.ModelAdmin):
+    """Журнал запросов — по нему считаются квоты, поэтому только для чтения."""
+
     list_display = (
         "user",
         "created_at",

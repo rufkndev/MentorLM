@@ -1,7 +1,7 @@
-"""Провайдер Anthropic — режим «Код» (Claude Sonnet 4.6).
+"""Провайдер Anthropic — режим «Код».
 
-Простой стриминг текста без thinking (решение для MVP). system передаётся
-top-level параметром, история — в messages. Usage берём из финального сообщения.
+Простой стриминг текста без thinking: system идёт отдельным параметром,
+история — в messages, usage приходит в финальном сообщении.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from .base import GenParams
 
 
 class AnthropicProvider:
+    """Claude через Messages API; история нормализована в ai.context."""
+
     def stream(
         self,
         *,
@@ -22,13 +24,14 @@ class AnthropicProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
+        """Отдаёт дельты текста; usage готов после исчерпания потока."""
         client = anthropic_client()
 
-        # max_tokens у Anthropic обязателен — берём потолок тарифа (финансовый
-        # предохранитель); это лимит сверху, а не цель, модель остановится сама.
         completion = ""
         with client.messages.stream(
             model=params.model,
+            # max_tokens у Anthropic обязателен: это потолок, а не цель —
+            # модель останавливается сама.
             max_tokens=params.max_output_tokens,
             temperature=params.temperature,
             system=system,
@@ -39,10 +42,9 @@ class AnthropicProvider:
                 yield text
             final = stream.get_final_message()
 
-        # У Anthropic usage всегда есть в финальном сообщении.
         if final.usage is not None:
             usage["prompt_tokens"] = final.usage.input_tokens
             usage["completion_tokens"] = final.usage.output_tokens
-        else:  # pragma: no cover - на всякий случай
+        else:  # pragma: no cover - подстраховка, usage тут есть всегда
             usage["prompt_tokens"] = count_tokens(system, params.model)
             usage["completion_tokens"] = count_tokens(completion, params.model)

@@ -1,3 +1,5 @@
+"""Корневая карта URL: админка и API приложений под общим префиксом /api/."""
+
 from django.contrib import admin
 from django.urls import include, path
 

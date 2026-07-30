@@ -1,3 +1,5 @@
+"""Конфиг приложения `usage` — учёт расхода ИИ."""
+
 from django.apps import AppConfig
 
 

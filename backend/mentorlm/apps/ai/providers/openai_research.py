@@ -1,8 +1,7 @@
 """Провайдер OpenAI Responses API + web_search — режим «Исследовать».
 
-Стримит текст ответа, модель сама решает, когда искать в интернете. Источники
-(url_citation annotations) в MVP не отдаём на фронт — оставлен задел (TODO).
-system передаётся как instructions, история — как input.
+Модель сама решает, когда искать в интернете; system идёт как instructions,
+история — как input. Вызовы поиска считаем: они платные.
 """
 
 from __future__ import annotations
@@ -16,20 +15,18 @@ from ..context import count_tokens
 from ._clients import openai_client
 from .base import GenParams
 
-# Модель иногда «проговаривает» свои поисковые запросы прямо в текст —
-# псевдо-тегами вида <web_search_query query="..."/>. Это служебный шум:
-# пользователю он не нужен и выглядит как сломанный ответ, поэтому вырезаем.
+# Модель иногда «проговаривает» поисковые запросы прямо в текст псевдо-тегами
+# <web_search_query .../> — служебный шум, который выглядит как сломанный ответ.
 _TOOL_TAG = re.compile(r"<\s*/?\s*web_search_query\b[^>]*/?>", re.IGNORECASE)
-# Начало такого тега может прийти в одной дельте, а конец — в следующей,
-# поэтому «хвост», который ещё может дорасти до тега, придерживаем в буфере.
+# Начало тега может прийти в одной дельте, а конец — в следующей.
 _TOOL_TAG_START = "<web_search_query"
 
 
 def _split_visible(buffer: str) -> tuple[str, str]:
-    """Разделить накопленный текст на «можно отдать» и «придержать».
+    """Разделить буфер на «можно отдать сейчас» и «придержать».
 
-    Придерживаем только незакрытый хвост, который может оказаться началом
-    служебного тега; обычный текст со знаком «<» проходит без задержки.
+    Придерживаем только незакрытый хвост, способный дорасти до служебного тега;
+    обычный текст со знаком «<» проходит без задержки.
     """
     buffer = _TOOL_TAG.sub("", buffer)
     start = buffer.rfind("<")
@@ -44,6 +41,8 @@ def _split_visible(buffer: str) -> tuple[str, str]:
 
 
 class OpenAIResearchProvider:
+    """Responses API: текстовые дельты плюс учёт вызовов веб-поиска."""
+
     def stream(
         self,
         *,
@@ -52,12 +51,13 @@ class OpenAIResearchProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
+        """Отдаёт очищенные дельты текста; usage готов после исчерпания потока."""
         from openai import BadRequestError
 
         client = openai_client()
 
-        # Веб-поиск включаем только если сценарий его запросил (напр. «обзор»
-        # отвечает по знаниям модели без поиска).
+        # Поиск включаем, только если его запросил сценарий (обзор обходится
+        # знаниями модели).
         searching = "web_search" in params.tools
         tools = [{"type": "web_search"}] if searching else []
 
@@ -66,13 +66,11 @@ class OpenAIResearchProvider:
             instructions=system,
             input=history,
             tools=tools,
-            # Потолок вывода — финансовый предохранитель тарифа (сверху).
             max_output_tokens=params.max_output_tokens,
         )
-        # Необязательные параметры: reasoning понимают только reasoning-модели,
-        # max_tool_calls — не все версии API. Пробуем со всеми и по тексту 400
-        # снимаем ровно те, на которые ругается провайдер (тот же приём, что в
-        # _openai.create_with_optional, но здесь вызов идёт на __enter__).
+        # reasoning понимают не все модели, max_tool_calls — не все версии API.
+        # Приём тот же, что в _openai.create_with_optional, но вызов идёт на
+        # __enter__ контекст-менеджера, поэтому цикл здесь свой.
         optional = {}
         if params.reasoning_effort:
             optional["reasoning"] = {"effort": params.reasoning_effort}
@@ -95,8 +93,7 @@ class OpenAIResearchProvider:
         pending = ""  # хвост, который ещё может оказаться служебным тегом
         capped = False  # упёрлись в потолок поисков и оборвали чтение сами
         final = None
-        # Вызовы веб-поиска считаем по ходу стрима (устойчиво к обрыву) и уточняем
-        # по final — они платные и идут в расчётную стоимость запроса (billable).
+        # Считаем поиски по ходу стрима — устойчиво к обрыву; ниже уточним по final.
         usage["web_search_calls"] = 0
         try:
             for event in stream:
@@ -109,9 +106,8 @@ class OpenAIResearchProvider:
                     getattr(event.item, "type", "") == "web_search_call"
                 ):
                     usage["web_search_calls"] += 1
-                    # Страховка на случай, если max_tool_calls не поддержан:
-                    # прекращаем читать ответ, чтобы поиски не жгли квоту
-                    # дальше. Написанная часть сохранится как обычно.
+                    # Страховка, если max_tool_calls не поддержан: прекращаем
+                    # читать, чтобы поиски не жгли квоту дальше.
                     if usage["web_search_calls"] >= WEB_SEARCH_CALLS_PER_ANSWER:
                         capped = True
                         break
@@ -120,22 +116,20 @@ class OpenAIResearchProvider:
             if tail:
                 completion += tail
                 yield tail
-            # Финальный ответ есть только у дочитанного стрима; если оборвали
-            # сами (потолок поисков) — запрашивать его нельзя.
+            # Финальный ответ есть только у дочитанного стрима.
             if not capped:
                 final = stream.get_final_response()
         finally:
             manager.__exit__(None, None, None)
 
         if final is None:
-            # Стрим оборван на потолке поисков: расход считаем по своим числам,
-            # web_search_calls уже посчитаны по ходу.
+            # Оборвали сами на потолке поисков — расход считаем своими числами.
             usage["prompt_tokens"] = count_tokens(system, params.model)
             usage["completion_tokens"] = count_tokens(completion, params.model)
             return
 
-        # TODO: достать url_citation annotations из final.output и отдавать
-        # источники на фронт (отдельным полем SSE) — пока только текст.
+        # TODO: доставать url_citation annotations из final.output и отдавать
+        # источники на фронт отдельным полем SSE — пока только текст.
         usage["web_search_calls"] = sum(
             1
             for item in (final.output or [])

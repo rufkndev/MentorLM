@@ -1,3 +1,5 @@
+"""Конфиг приложения `memory` — глобальная память о пользователе."""
+
 from django.apps import AppConfig
 
 

@@ -1,17 +1,26 @@
+"""Модели тарификации: перечень тарифов и подписка пользователя."""
+
 from django.db import models
 
 
-class Subscription(models.Model):
-    """Подписка пользователя. ЕДИНСТВЕННЫЙ источник правды о тарифе и его статусе.
+class Plan(models.TextChoices):
+    """Тарифы — единственное объявление на весь проект.
 
-    Тариф пользователя = план живой подписки (billing.plans.effective_plan);
-    отдельного кэша в профиле нет. Провайдер оплаты — YooKassa.
+    Этим enum'ом ключуются тарифные словари (limits.PLAN_LIMITS) и хранится
+    план подписки.
     """
 
-    class Plan(models.TextChoices):
-        FREE = "free", "Бесплатный"
-        PLUS = "plus", "Plus"
-        PRO = "pro", "Pro"
+    FREE = "free", "Бесплатный"
+    PLUS = "plus", "Plus"
+    PRO = "pro", "Pro"
+
+
+class Subscription(models.Model):
+    """Подписка — источник правды о тарифе пользователя и его статусе.
+
+    Действующий тариф считается из подписок на лету (plans.effective_plan),
+    кэша в профиле нет. Провайдер оплаты — YooKassa.
+    """
 
     class Status(models.TextChoices):
         PENDING = "pending", "Ожидает оплаты"
@@ -42,7 +51,7 @@ class Subscription(models.Model):
         verbose_name_plural = "Подписки"
         ordering = ("-created_at",)
         indexes = [
-            # активная подписка пользователя
+            # поиск действующей подписки пользователя
             models.Index(fields=["user", "status"]),
         ]
 

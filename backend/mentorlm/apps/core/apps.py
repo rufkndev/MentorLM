@@ -1,3 +1,5 @@
+"""Конфиг приложения `core` — служебные эндпоинты (health-check)."""
+
 from django.apps import AppConfig
 
 

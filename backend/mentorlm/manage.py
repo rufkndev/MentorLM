@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-"""Django's command-line utility for administrative tasks."""
+"""Точка входа для management-команд Django (runserver, migrate и прочее)."""
 import os
 import sys
 
 
 def main():
-    """Run administrative tasks."""
+    """Выполнить команду из argv с настройками проекта."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorlm_api.settings')
     try:
         from django.core.management import execute_from_command_line

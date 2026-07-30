@@ -1,9 +1,7 @@
 """Какой тариф реально применять к пользователю — единственное место решения.
 
-`Subscription` — ЕДИНСТВЕННЫЙ источник правды о тарифе. Нет живой подписки → Free.
-Никакого кэша плана в профиле нет: тариф всегда считается на лету из подписок,
-чтобы не было рассинхрона (истёкшая подписка сразу перестаёт действовать). Ручная
-выдача тарифа = `Subscription(provider="manual", status=active)`.
+Считается на лету из подписок, без кэша в профиле: истёкшая подписка сразу
+перестаёт действовать. Ручная выдача тарифа = Subscription(provider="manual").
 """
 
 from __future__ import annotations
@@ -13,19 +11,17 @@ from datetime import timedelta
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.users.models import UserProfile
+from .models import Plan, Subscription
 
-from .models import Subscription
-
-# Грейс-период на неуспешную оплату: не отключаем тариф сразу при past_due.
+# Грейс на неуспешную оплату: не отключаем тариф сразу при past_due.
 PAST_DUE_GRACE = timedelta(days=3)
 
 
 def active_subscription(user) -> Subscription | None:
-    """Живая подписка пользователя (свежайшая из подходящих) или None.
+    """Действующая подписка пользователя (свежайшая из подходящих) или None.
 
-    Живой считаем: active и (нет срока ИЛИ срок не истёк), плюс past_due внутри
-    грейс-периода. Иначе тариф считается неактивным.
+    Действующая — active с неистёкшим сроком (или вовсе без срока), а также
+    past_due внутри грейс-периода.
     """
     now = timezone.now()
     alive = Q(status=Subscription.Status.ACTIVE) & (
@@ -43,6 +39,6 @@ def active_subscription(user) -> Subscription | None:
 
 
 def effective_plan(user) -> str:
-    """Тариф, лимиты которого реально применяем к пользователю."""
+    """Тариф, лимиты которого применяем к пользователю; без подписки — Free."""
     sub = active_subscription(user)
-    return sub.plan if sub else UserProfile.Plan.FREE
+    return sub.plan if sub else Plan.FREE

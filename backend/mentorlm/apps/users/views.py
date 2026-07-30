@@ -1,3 +1,5 @@
+"""Личный кабинет: профиль, настройки, расход по режимам и статус подписки."""
+
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.response import Response
@@ -22,14 +24,14 @@ class MeView(APIView):
     """GET /api/me/ — профиль текущего пользователя; DELETE — удалить аккаунт."""
 
     def get(self, request):
+        """Профиль вместе с действующим тарифом."""
         return Response(UserProfileSerializer(request.user).data)
 
     def delete(self, request):
-        """Удалить профиль и все связанные данные пользователя.
+        """Удалить профиль и все связанные данные.
 
-        Каскад (on_delete=CASCADE) стирает настройки, диалоги, сообщения,
-        память и счётчики использования. Сам аккаунт Clerk удаляет клиент
-        (user.delete()) — секретного ключа Clerk на бэкенде нет.
+        Каскад стирает настройки, диалоги, сообщения, память и счётчики. Сам
+        аккаунт Clerk удаляет клиент: секретного ключа Clerk на бэке нет.
         """
         request.user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -39,14 +41,16 @@ class MeSettingsView(APIView):
     """GET/PATCH /api/me/settings/ — чтение и частичное обновление настроек."""
 
     def _settings(self, request) -> UserSettings:
-        # OneToOne гарантирован аутентификацией; подстрахуемся get_or_create.
+        """Настройки пользователя; аутентификация их создаёт, но подстрахуемся."""
         settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)
         return settings_obj
 
     def get(self, request):
+        """Текущие настройки целиком."""
         return Response(UserSettingsSerializer(self._settings(request)).data)
 
     def patch(self, request):
+        """Частичное обновление: фронт шлёт только изменённые поля."""
         serializer = UserSettingsSerializer(
             self._settings(request), data=request.data, partial=True
         )
@@ -58,22 +62,20 @@ class MeSettingsView(APIView):
 class MeSettingsDefaultsView(APIView):
     """GET /api/me/settings/defaults/ — канонические дефолты настроек.
 
-    Значения выведены из модели UserSettings (единый источник), чтобы фронт не
-    держал их копию. Фронт кэширует ответ и использует как базу для первого
-    рендера/офлайна; при обычной загрузке значения перекрывает /api/me/settings/.
+    Значения выводятся из модели, чтобы фронт не держал их копию: он кэширует
+    ответ для первого рендера, а затем перекрывает его /api/me/settings/.
     """
 
     def get(self, request):
+        """Словарь «поле → значение по умолчанию»."""
         return Response(settings_defaults())
 
 
 def _window_view(used: int, limit, resets_at, human: str) -> dict:
-    """Одно скользящее окно для ЛК: проценты + точный момент восстановления.
+    """Одно скользящее окно для ЛК: доля расхода и момент восстановления.
 
-    Абсолютные токены наружу не отдаём — только доля, подпись окна («5 часов»)
-    и ISO-время, когда лимит начнёт восстанавливаться (фронт печатает его в
-    локальной зоне пользователя). Время отдаём при ЛЮБОМ расходе, даже если
-    доля округлилась до 0% — иначе на малом расходе оно бы пропадало.
+    Абсолютные токены наружу не отдаём. Время возвращаем при любом расходе,
+    даже если доля округлилась до 0% — иначе на малом расходе оно бы пропадало.
     """
     if limit is None:  # безлимит
         return {"used_pct": 0, "resets_at": None, "window_label": human}
@@ -86,7 +88,7 @@ def _window_view(used: int, limit, resets_at, human: str) -> dict:
 
 
 def _mode_usage(user, plan: str, mode: str, now) -> dict:
-    """Расход режима по скользящим окнам + агрегат по самому забитому окну."""
+    """Расход режима по окнам плюс агрегат по самому забитому из них."""
     quota = quota_for(plan, mode)
     used = _window_usage(user, mode, now)
 
@@ -114,12 +116,12 @@ def _mode_usage(user, plan: str, mode: str, now) -> dict:
 class UsageView(APIView):
     """GET /api/me/usage/ — расход по режимам в скользящих окнах.
 
-    По каждому режиму (chat/code/research) — доля исчерпанной квоты по самому
-    забитому окну (упрётся первым) и разбивка по окнам. Абсолютные токены
-    пользователю не показываем — только проценты и время восстановления.
+    По каждому режиму отдаём долю самого забитого окна (оно упрётся первым) и
+    разбивку по окнам — в процентах, без абсолютных чисел.
     """
 
     def get(self, request):
+        """Сводка расхода по всем режимам на текущем тарифе."""
         user = request.user
         plan = effective_plan(user)
         now = timezone.now()
@@ -136,9 +138,10 @@ class UsageView(APIView):
 
 
 class SubscriptionView(APIView):
-    """GET /api/me/subscription/ — текущий тариф, статус подписки и квоты."""
+    """GET /api/me/subscription/ — тариф, статус подписки и что он даёт."""
 
     def get(self, request):
+        """Действующий план с его возможностями и квотами по режимам."""
         user = request.user
         plan = effective_plan(user)
         limits = limits_for(plan)

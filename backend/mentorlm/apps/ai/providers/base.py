@@ -1,3 +1,5 @@
+"""Контракт провайдера: параметры генерации и интерфейс потокового ответа."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,23 +8,22 @@ from typing import Iterator, Protocol
 
 @dataclass(frozen=True)
 class GenParams:
-    """Параметры генерации, общие для провайдеров."""
+    """Параметры генерации, общие для всех провайдеров."""
 
     model: str
     temperature: float
     tools: tuple[str, ...] = ()  # включённые инструменты, напр. ("web_search",)
-    # Усилие рассуждения ("low" | "medium" | "high") — согласованное со сценарием
-    # значение (apps.ai.preferences). Провайдеры, чьи модели это поддерживают
-    # нативно (OpenAI), передают его в API; остальные полагаются на текстовую
-    # директиву в системном промпте (apps.ai.prompts). См. providers/_openai.py.
+    # "low" | "medium" | "high". Модели OpenAI получают это нативно, остальные —
+    # текстовой директивой в системном промпте (ai.prompts).
     reasoning_effort: str = "medium"
-    # Жёсткий потолок длины ответа — финансовый предохранитель тарифа (см.
-    # billing.limits.max_output_tokens). Желаемую длину по-прежнему задаём мягко
-    # промптом; это ограничение сверху, чтобы дорогой тариф не жёг лишнее.
+    # Потолок длины ответа: предохранитель от runaway-генерации, а не цель —
+    # желаемую длину задаём промптом.
     max_output_tokens: int = 16384
 
 
 class LLMProvider(Protocol):
+    """Интерфейс провайдера: один метод — стрим ответа."""
+
     def stream(
         self,
         *,
@@ -31,5 +32,5 @@ class LLMProvider(Protocol):
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
-        """Стримит ответ по кусочкам текста."""
+        """Отдаёт ответ кусочками текста и заполняет `usage` по ходу стрима."""
         ...

@@ -1,8 +1,7 @@
-"""Фасад ИИ-слоя: единая точка входа для вьюх.
+"""Фасад ИИ-слоя: единственная точка входа для вьюх.
 
-Скрывает выбор провайдера, сборку системного промпта и контекста за одним
-вызовом. Системный промпт строится на бэке по mode + scenario_id — клиент не
-может его подменить.
+Прячет за одним вызовом выбор провайдера, сборку системного промпта, контекста
+и параметров генерации; клиент влияет на них только через mode + scenario_id.
 """
 
 from __future__ import annotations
@@ -38,42 +37,42 @@ class AIStream:
 def run_conversation_stream(
     conversation, scenario_id, user, *, degrade: bool = False
 ) -> AIStream:
-    """Готовит и запускает потоковую генерацию ответа для диалога.
+    """Подготовить и запустить потоковую генерацию ответа для диалога.
 
-    `degrade=True` — квота режима исчерпана (см. billing.guard): отвечаем на
-    дешёвой модели режима (registry.degrade_model) без веб-поиска, чтобы дать
-    несколько запросов вместо жёсткого блока.
-
-    usage заполняется провайдером по ходу стрима — читать его нужно ПОСЛЕ того,
-    как поток deltas полностью исчерпан.
+    `degrade=True` — квота режима исчерпана (billing.guard): отвечаем на дешёвой
+    модели и без веб-поиска, чтобы дать несколько запросов вместо жёсткого блока.
+    `usage` провайдер заполняет по ходу стрима — читать ПОСЛЕ того, как поток
+    deltas полностью исчерпан.
     """
     mode = get_mode(conversation.mode)
     user_settings = user.settings
     plan_limits = limits_for(effective_plan(user))
 
-    # Сценарий — база параметров генерации (температура, длина, размер контекста,
-    # инструменты) и их границы. Пользовательские настройки согласуются с ним
-    # мягким сдвигом в этих границах (resolve_preferences). Клиент присылает
-    # только scenario_id и не может подменить ни промпт, ни параметры.
+    # Сценарий задаёт базу и границы параметров генерации, настройки юзера —
+    # мягкий сдвиг внутри них. Ни промпт, ни параметры клиент подменить не может.
     scenario = get_scenario(conversation.mode, scenario_id)
     prefs = resolve_preferences(mode, scenario, user_settings)
 
-    # При деградации подменяем модель на дешёвую и снимаем веб-поиск.
+    # Деградация: дешёвая модель режима вместо выбранной.
     model = mode.degrade_model if degrade else prefs.model
 
-    # Глобальная память — платная фича: только если тариф её даёт И включена
-    # настройкой memory_use. Пусто — блок просто не добавится.
+    # Глобальная память — платная фича: нужен и тариф, и включённая настройка.
     memory_block = (
         build_memory_block(user_settings) if plan_limits["allow_memory"] else ""
     )
     system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
-    # Длину истории задаёт тариф (число сообщений), с глобальным потолком.
-    # Free → 0: каждый запрос с чистого листа.
-    max_messages = min(plan_limits["context_messages"], MAX_CONTEXT_MESSAGES)
+
+    # Длина предыстории — те же слои, что у остальных настроек: тариф ставит
+    # потолок, сценарий — базу, «Глубина контекста» сдвигает внутри неё, сверху
+    # глобальный предохранитель. Free → 0: только текущий вопрос, без истории.
+    max_messages = min(
+        prefs.context_messages,
+        plan_limits["context_messages"],
+        MAX_CONTEXT_MESSAGES,
+    )
     history = build_context(conversation, max_messages=max_messages)
 
-    # Живой веб-поиск — платная фича. На тарифах без него (и при деградации) режим
-    # «Исследовать» работает по знаниям модели (инструмент просто снимаем).
+    # Веб-поиск — платная фича; без него «Исследовать» отвечает по знаниям модели.
     tools = scenario.tools
     if degrade or not plan_limits["allow_web_search"]:
         tools = tuple(t for t in tools if t != "web_search")
@@ -82,10 +81,9 @@ def run_conversation_stream(
         model=model,
         temperature=prefs.temperature,
         tools=tools,
-        # Усилие рассуждения после согласования сценария с настройкой юзера —
-        # провайдеры OpenAI передают его в API нативно, а не только через промпт.
+        # Усилие рассуждения OpenAI-провайдеры передают в API нативно.
         reasoning_effort=prefs.reasoning_effort,
-        # Потолок длины ответа — единый глобальный runaway-предохранитель.
+        # Потолок длины ответа — глобальный runaway-предохранитель.
         max_output_tokens=MAX_OUTPUT_TOKENS,
     )
     usage: dict = {}

@@ -1,3 +1,5 @@
+"""Маршруты глобальной памяти: список фактов и удаление одного из них."""
+
 from django.urls import path
 
 from .views import MemoryFactDetailView, MemoryFactListView

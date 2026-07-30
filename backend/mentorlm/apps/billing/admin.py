@@ -1,3 +1,5 @@
+"""Админка подписок: выдача тарифа вручную и проверка, какая из них действует."""
+
 from django.contrib import admin
 
 from .models import Subscription
@@ -6,6 +8,8 @@ from .plans import active_subscription
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
+    """Список подписок с признаком реально действующей."""
+
     list_display = (
         "user",
         "plan",
@@ -20,6 +24,6 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
     @admin.display(boolean=True, description="Действует сейчас")
     def is_alive(self, obj) -> bool:
-        """Даёт ли эта подписка тариф прямо сейчас (учёт статуса и срока)."""
+        """Даёт ли именно эта подписка тариф прямо сейчас (статус + срок)."""
         alive = active_subscription(obj.user)
         return alive is not None and alive.pk == obj.pk

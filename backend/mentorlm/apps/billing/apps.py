@@ -1,3 +1,5 @@
+"""Конфиг приложения `billing` — тарифы, лимиты и подписки."""
+
 from django.apps import AppConfig
 
 

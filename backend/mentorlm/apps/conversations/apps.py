@@ -1,3 +1,5 @@
+"""Конфиг приложения `conversations` — диалоги, сообщения и вложения."""
+
 from django.apps import AppConfig
 
 

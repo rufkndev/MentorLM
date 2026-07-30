@@ -1,3 +1,9 @@
+"""HTTP-слой диалогов: список, деталь и главный эндпоинт — потоковый ответ ИИ.
+
+Отправка сообщения проходит лок генерации и preflight-лимиты, затем отдаёт
+ответ модели по SSE, а в конце сохраняет его, списывает расход и пополняет память.
+"""
+
 import json
 import logging
 import time
@@ -23,10 +29,10 @@ from apps.billing.guard import (
     stop_requested,
 )
 from apps.billing.limits import limits_for, request_timeout
+from apps.billing.models import Plan
 from apps.billing.plans import effective_plan
 from apps.memory.services import extract_facts_in_background
 from apps.usage.services import record_usage
-from apps.users.models import UserProfile
 
 from .attachments import attachment_error, extract_text
 from .models import Attachment, Conversation, Message
@@ -36,10 +42,10 @@ logger = logging.getLogger(__name__)
 
 
 def _purge_expired(user) -> None:
-    """Ленивая чистка: удалить диалоги старше настройки хранения пользователя.
+    """Удалить диалоги старше срока хранения из настроек пользователя.
 
-    Автоудаление по последней активности (updated_at). retention=0 — не удалять.
-    Дешёвых фоновых задач в MVP нет, поэтому чистим при обращении к списку чатов.
+    Считаем по последней активности; 0 — не удалять. Фоновых задач в MVP нет,
+    поэтому чистим лениво, при обращении к списку чатов.
     """
     days = getattr(user.settings, "chat_retention_days", 0)
     if not days:
@@ -54,6 +60,7 @@ class ConversationListCreateView(generics.ListCreateAPIView):
     serializer_class = ConversationSerializer
 
     def get_queryset(self):
+        """Диалоги текущего пользователя, при желании — одного режима."""
         qs = Conversation.objects.filter(user=self.request.user)
         mode = self.request.query_params.get("mode")
         if mode:
@@ -61,10 +68,12 @@ class ConversationListCreateView(generics.ListCreateAPIView):
         return qs
 
     def list(self, request, *args, **kwargs):
+        """Список чатов; заодно ленивая чистка просроченных."""
         _purge_expired(request.user)
         return super().list(request, *args, **kwargs)
 
     def perform_create(self, serializer):
+        """Создать диалог: режим проверяем сами, владельца ставим из токена."""
         mode = self.request.data.get("mode", Conversation.Mode.CHAT)
         if mode not in Conversation.Mode.values:
             raise ValidationError({"mode": "Недопустимый режим."})
@@ -82,15 +91,14 @@ class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ConversationDetailSerializer
 
     def get_queryset(self):
+        """Только свои диалоги — чужой id даст 404."""
         return Conversation.objects.filter(user=self.request.user)
 
     def retrieve(self, request, *args, **kwargs):
-        """История диалога + признак того, что ответ сейчас пишется.
+        """История диалога плюс признак того, что ответ сейчас пишется.
 
-        `generating` нужен фронту после перезагрузки страницы: живого стрима в
-        браузере уже нет, а ответ на сервере ещё дописывается — по этому флагу
-        экран дожидается его и перечитывает историю, вместо того чтобы навсегда
-        показывать диалог без ответа.
+        Нужен фронту после перезагрузки страницы: живого стрима в браузере уже
+        нет, и по флагу экран дожидается ответа, а не показывает диалог без него.
         """
         response = super().retrieve(request, *args, **kwargs)
         response.data["generating"] = generation_in_progress(request.user)
@@ -104,7 +112,7 @@ PERSISTED_LIMIT_CODES = {"mode_quota_exceeded", "feature_locked"}
 
 
 def _save_user_message(conversation, content: str, extracted) -> Message:
-    """Сохранить сообщение пользователя с вложениями; первое — задаёт заголовок.
+    """Сохранить вопрос пользователя с вложениями; первый задаёт заголовок чата.
 
     Заголовок берём из текста, а если его нет — из имени первого файла.
     """
@@ -128,9 +136,10 @@ def _save_user_message(conversation, content: str, extracted) -> Message:
 
 
 class MessageCreateView(APIView):
-    """POST /api/conversations/{id}/messages/ — сообщение + потоковый ответ (SSE)."""
+    """POST /api/conversations/{id}/messages/ — сообщение и потоковый ответ (SSE)."""
 
     def post(self, request, pk):
+        """Принять вопрос, проверить лимиты и отдать ответ модели потоком."""
         conversation = (
             Conversation.objects.filter(user=request.user, pk=pk).first()
         )
@@ -138,11 +147,10 @@ class MessageCreateView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         content = (request.data.get("content") or "").strip()
-        # Системный промпт выбирает бэк по mode + scenario_id; клиент его не задаёт.
+        # Клиент шлёт только id сценария: промпт и параметры собирает бэк.
         scenario_id = request.data.get("scenario_id") or None
-        # «Повторить» после сбоя: отвечаем на ПОСЛЕДНИЙ вопрос пользователя, не
-        # создавая его копию. Неудачный хвост (частичный ответ, уведомление)
-        # убираем — иначе в диалоге копился бы мусор от каждой попытки.
+        # «Повторить» после сбоя: отвечаем на последний вопрос, не копируя его, и
+        # убираем неудачный хвост — иначе в диалоге копился бы мусор от попыток.
         retry = bool(request.data.get("retry"))
 
         if retry:
@@ -158,9 +166,8 @@ class MessageCreateView(APIView):
                 for a in last_user.attachments.all()
             ]
         else:
-            # Вложения (multipart): валидируем политику тарифа/потолков ДО
-            # извлечения и сохранения. Сами файлы не храним — только извлечённый
-            # текст и метаданные (см. attachments).
+            # Вложения проверяем по политике тарифа ДО извлечения и сохранения.
+            # Файлы не храним — только извлечённый текст и метаданные.
             files = request.FILES.getlist("files")
             max_attachments = limits_for(effective_plan(request.user))[
                 "max_attachments"
@@ -187,15 +194,13 @@ class MessageCreateView(APIView):
 
         user = request.user
 
-        # В подсчёт длины ввода включаем и текст вложений — он тоже уйдёт модели.
+        # Текст вложений тоже уйдёт модели — учитываем его в длине ввода.
         attach_text = "\n\n".join(text for *_, text in extracted)
         preflight_text = f"{content}\n\n{attach_text}" if attach_text else content
 
-        # 0. Лок «идёт генерация»: один пользователь — один активный ответ. Берём
-        #    ДО preflight, поэтому проверка лимитов и последующее списание расхода
-        #    идут под локом — параллельные запросы одного юзера не могут вместе
-        #    проскочить лимит (overshoot). Снимаем лок в finally стрима, а на
-        #    ранних выходах — явно. _GEN_LOCK_TTL страхует от смерти воркера.
+        # Лок берём ДО preflight: проверка лимитов и списание расхода идут под
+        # ним, поэтому параллельные запросы одного юзера не проскочат квоту.
+        # Снимаем в finally стрима, а на ранних выходах — явно.
         if not acquire_generation_lock(user):
             return Response(
                 {
@@ -204,13 +209,13 @@ class MessageCreateView(APIView):
                 },
                 status=status.HTTP_429_TOO_MANY_REQUESTS,
             )
-        # Флаг «стоп» от предыдущего ответа не должен обрывать новый.
+        # Флаг «стоп» от прошлого ответа не должен оборвать новый.
         clear_stop(user)
 
         try:
-            # 1. Preflight-лимиты ДО сохранения сообщения — чтобы не плодить
-            #    осиротевшие сообщения без ответа. Отдаём JSON с кодом/статусом до
-            #    старта SSE: фронтовый api.stream увидит non-200 и покажет апселл.
+            # Лимиты проверяем ДО сохранения вопроса, чтобы не плодить сообщения
+            # без ответа, и отвечаем обычным JSON до старта SSE — фронт увидит
+            # non-200 и покажет апселл.
             try:
                 decision = preflight(
                     user,
@@ -220,11 +225,9 @@ class MessageCreateView(APIView):
                 )
             except LimitExceeded as exc:
                 release_generation_lock(user)
-                # Упор в тариф — это состояние диалога, а не разовая осечка:
-                # сохраняем вопрос пользователя и уведомление, чтобы плашка с
-                # апселлом осталась в чате после ухода на /billing и возврата.
-                # Разовые отказы (частим, слишком длинный ввод) не сохраняем —
-                # их достаточно показать один раз.
+                # Упор в тариф — состояние диалога, а не разовая осечка: вопрос и
+                # уведомление сохраняем, чтобы плашка осталась после ухода на
+                # /billing и возврата. Разовые отказы показываем один раз.
                 if exc.code in PERSISTED_LIMIT_CODES:
                     if not retry:  # при повторе вопрос уже в диалоге
                         _save_user_message(conversation, content, extracted)
@@ -235,9 +238,7 @@ class MessageCreateView(APIView):
                         content=exc.message,
                         meta={
                             "code": exc.code,
-                            "can_upgrade": (
-                                effective_plan(user) != UserProfile.Plan.PRO
-                            ),
+                            "can_upgrade": effective_plan(user) != Plan.PRO,
                             **exc.extra,
                         },
                     )
@@ -254,26 +255,23 @@ class MessageCreateView(APIView):
                     {"code": exc.code, "message": exc.message, **exc.extra},
                     status=exc.status,
                 )
-            # Квота исчерпана, но есть grace-запросы → отвечаем на дешёвой модели
-            # и подсвечиваем это плашкой на фронте (can_upgrade — не на топ-тарифе).
+            # Квота исчерпана, но grace-запросы остались: отвечаем на дешёвой
+            # модели и подсвечиваем это плашкой на фронте.
             degraded = decision == "degrade"
-            can_upgrade = effective_plan(user) != UserProfile.Plan.PRO
+            can_upgrade = effective_plan(user) != Plan.PRO
 
-            # 2. Сохраняем сообщение пользователя и его вложения; первое сообщение
-            #    задаёт заголовок чата (текст, а если его нет — имя первого файла).
-            #    При «повторить» вопрос уже в диалоге — второй раз не создаём.
+            # Вопрос сохраняем только после успешного preflight. При «повторить»
+            # он уже в диалоге — второй раз не создаём.
             if not retry:
                 _save_user_message(conversation, content, extracted)
 
-            # Сценарий запоминаем на самом диалоге: он его свойство, а не режима.
-            # Вернувшись в чат (в т.ч. с другого устройства), пользователь
-            # застаёт тот же пресет, с которым его вёл.
+            # Сценарий — свойство диалога, а не режима: вернувшись в чат (в т.ч.
+            # с другого устройства), пользователь застаёт тот же пресет.
             if scenario_id and conversation.scenario_id != scenario_id:
                 conversation.scenario_id = scenario_id
                 conversation.save(update_fields=["scenario_id"])
 
-            # 3. Готовим запрос к модели до старта стрима (выбор провайдера/промпта
-            #    и сборка контекста — в едином ИИ-слое apps.ai).
+            # Выбор провайдера, промпта и контекста — целиком в ai.service.
             ai = ai_service.run_conversation_stream(
                 conversation, scenario_id, user, degrade=degraded
             )
@@ -286,38 +284,34 @@ class MessageCreateView(APIView):
         timeout_seconds = request_timeout(conversation.mode)
 
         def event_stream():
+            """Генератор SSE: дельты ответа, затем сохранение и учёт расхода."""
             usage = ai.usage
             assistant_content = ""
             started = time.monotonic()
-            # Клиент оборвал соединение — после этого отдавать события уже некуда.
-            client_gone = False
-            # Пользователь нажал «Стоп»: не ошибка — сохраняем то, что успели.
-            stopped = False
+            client_gone = False  # соединение закрыто — отдавать события некуда
+            stopped = False  # нажали «Стоп»: не ошибка, сохраняем написанное
             try:
-                # Плашка деградации — до текста ответа, чтобы фронт показал её сразу.
+                # Плашку деградации шлём до текста, чтобы фронт показал её сразу.
                 if degraded:
                     yield _sse({"degraded": True, "can_upgrade": can_upgrade})
                 for delta in ai.deltas:
-                    # Кнопка «Стоп» на фронте (POST .../stop/): прекращаем читать
-                    # ответ модели и штатно закрываем стрим — уже сгенерированная
-                    # часть сохранится ниже, лок снимется сразу.
+                    # «Стоп» с фронта: прекращаем читать модель и штатно
+                    # закрываем стрим — написанное сохранится ниже.
                     if stop_requested(user):
                         stopped = True
                         break
-                    # Wall-clock таймаут генерации: обрываем между дельтами, если
-                    # ответ идёт дольше потолка режима (зависший стрим).
+                    # Зависший стрим: обрываем между дельтами по потолку режима.
                     if time.monotonic() - started > timeout_seconds:
                         yield _sse({"error": "Превышено время ответа. Попробуйте снова."})
                         break
                     assistant_content += delta
                     yield _sse({"delta": delta})
             except GeneratorExit:
-                # Соединение закрылось (вкладка/сеть/abort на фронте). Дальше
-                # yield запрещён, но сохранить ответ и снять лок обязаны.
+                # Вкладка закрыта / сеть отвалилась: yield больше нельзя, но
+                # сохранить ответ и снять лок обязаны.
                 client_gone = True
             except Exception:  # noqa: BLE001 — стрим не должен падать молча
-                # В лог — полный traceback (иначе такие сбои не расследовать),
-                # пользователю — нейтральный текст без внутренностей провайдера.
+                # В лог — traceback, пользователю — нейтральный текст.
                 logger.exception(
                     "Сбой генерации: conversation=%s mode=%s model=%s",
                     conversation.pk,
@@ -336,9 +330,8 @@ class MessageCreateView(APIView):
                             role=Message.Role.ASSISTANT,
                             content=assistant_content,
                             model=model,
-                            # Плашки ответа храним вместе с ним, иначе при
-                            # возврате в чат они пропадают: ответ на упрощённой
-                            # модели и оборванная генерация — часть его истории.
+                            # Плашки храним вместе с ответом, иначе при возврате
+                            # в чат они пропадают.
                             meta={
                                 **(
                                     {"degraded": True, "can_upgrade": can_upgrade}
@@ -351,9 +344,9 @@ class MessageCreateView(APIView):
                         message_id = msg.id
                         conversation.updated_at = timezone.now()
                         conversation.save(update_fields=["updated_at"])
-                        # На прерванном стриме провайдер не успевает отдать usage —
-                        # оцениваем выход по уже полученному тексту, иначе расход
-                        # (реальные деньги) потерялся бы мимо квоты.
+                        # На прерванном стриме провайдер не успевает отдать
+                        # usage — оцениваем выход сами, иначе реальные деньги
+                        # прошли бы мимо квоты.
                         tokens_out = usage.get("completion_tokens", 0) or count_tokens(
                             assistant_content, model
                         )
@@ -368,16 +361,15 @@ class MessageCreateView(APIView):
                             web_search_calls=usage.get("web_search_calls", 0),
                             degraded=degraded,
                         )
-                        # Глобальная память: в фоне извлекаем устойчивые факты о
-                        # пользователе (если включена автопамять). Не блокирует ответ.
+                        # Пополнение глобальной памяти — в фоне, ответ не ждёт.
                         extract_facts_in_background(user, conversation)
                     if not client_gone:
                         yield _sse(
                             {"done": True, "message_id": message_id, "stopped": stopped}
                         )
                 finally:
-                    # Снимаем лок генерации в самом конце — после списания расхода,
-                    # чтобы следующий запрос увидел уже обновлённые лимиты.
+                    # Лок снимаем последним — после списания расхода, чтобы
+                    # следующий запрос увидел уже обновлённые лимиты.
                     clear_stop(user)
                     release_generation_lock(user)
 
@@ -390,19 +382,18 @@ class MessageCreateView(APIView):
 
 
 class GenerationStopView(APIView):
-    """POST /api/conversations/stop/ — остановить текущую генерацию (кнопка «Стоп»).
+    """POST /api/conversations/stop/ — остановить генерацию (кнопка «Стоп»).
 
-    Ставит флаг остановки; активный SSE-стрим увидит его между дельтами,
-    сохранит уже написанную часть ответа, спишет расход и снимет лок генерации.
-    Отдельный запрос, а не просто обрыв соединения: так пользователь может
-    отправить следующее сообщение сразу, не дожидаясь, пока сервер заметит обрыв.
-    Идемпотентен: флаг живёт до конца текущего ответа.
+    Ставит флаг; активный стрим увидит его между дельтами, сохранит написанное,
+    спишет расход и снимет лок. Идемпотентен: флаг живёт до конца ответа.
     """
 
     def post(self, request):
+        """Попросить остановить текущий ответ пользователя."""
         request_stop(request.user)
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
 def _sse(payload: dict) -> str:
+    """Один кадр SSE: `data: {json}` с пустой строкой-разделителем."""
     return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"

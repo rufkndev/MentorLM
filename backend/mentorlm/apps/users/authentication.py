@@ -1,3 +1,9 @@
+"""Аутентификация по Clerk-JWT — единственный способ входа в API.
+
+Токен проверяется по публичным ключам Clerk (JWKS); наша БД никого не
+аутентифицирует, а лишь заводит профиль-зеркало при первом обращении.
+"""
+
 from __future__ import annotations
 
 import ssl
@@ -10,18 +16,17 @@ from rest_framework import authentication, exceptions
 
 from .models import UserProfile, UserSettings
 
-# Модульный синглтон PyJWKClient (сам кэширует JWK-набор внутри). Не кладём его
-# в Django cache: LocMemCache пиклит значения, а SSLContext не пиклится.
+# Модульный синглтон: PyJWKClient кэширует набор ключей внутри себя. В Django
+# cache не кладём — LocMemCache пиклит значения, а SSLContext не пиклится.
 _jwks_client: PyJWKClient | None = None
 
 
 def _get_jwks_client() -> PyJWKClient:
-    """Вернуть PyJWKClient для JWKS-эндпоинта Clerk.
+    """Клиент к JWKS-эндпоинту Clerk, создаётся один раз на процесс.
 
-    PyJWKClient тянет JWKS через urllib, который на ряде окружений (python.org
-    Python на macOS, slim-образы) не имеет доступа к корневым сертификатам и
-    падает с CERTIFICATE_VERIFY_FAILED. Поэтому явно передаём ssl-контекст с
-    бандлом certifi — работает одинаково локально и в Docker.
+    SSL-контекст задаём явно с бандлом certifi: urllib внутри PyJWKClient на
+    ряде окружений (python.org на macOS, slim-образы) не видит корневых
+    сертификатов и падает с CERTIFICATE_VERIFY_FAILED.
     """
     global _jwks_client
     if _jwks_client is None:
@@ -37,18 +42,16 @@ def _get_jwks_client() -> PyJWKClient:
 
 
 class ClerkJWTAuthentication(authentication.BaseAuthentication):
-    """DRF-аутентификация по Clerk session JWT.
+    """DRF-аутентификация по session JWT из Clerk.
 
-    - Нет заголовка `Authorization: Bearer` → возвращаем None (анонимный запрос,
-      доступ решит permission-класс).
-    - Токен есть, но невалиден → AuthenticationFailed (401).
-    - Токен валиден → (UserProfile, token). UserProfile создаётся при первом
-      обращении (get_or_create), вместе с пустыми UserSettings.
+    Нет заголовка — None (решает permission-класс), невалидный токен — 401,
+    валидный — (UserProfile, token).
     """
 
     keyword = "Bearer"
 
     def authenticate(self, request):
+        """Разобрать заголовок Authorization и вернуть профиль пользователя."""
         header = authentication.get_authorization_header(request).decode("utf-8")
         if not header or not header.startswith(self.keyword + " "):
             return None
@@ -62,17 +65,18 @@ class ClerkJWTAuthentication(authentication.BaseAuthentication):
         return (profile, token)
 
     def authenticate_header(self, request):
-        # Заставляет DRF отдавать 401 (а не 403) при отсутствии аутентификации.
+        """Заставляет DRF отдавать 401 вместо 403 при отсутствии токена."""
         return self.keyword
 
     def _decode_token(self, token: str) -> dict:
+        """Проверить подпись и claims токена, вернуть его содержимое."""
         try:
             signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
             decode_kwargs = {
                 "algorithms": ["RS256"],
                 "options": {"require": ["exp", "sub"]},
             }
-            # Если задан issuer — дополнительно проверяем claim `iss`.
+            # issuer проверяем, только если он задан в настройках.
             if settings.CLERK_ISSUER:
                 decode_kwargs["issuer"] = settings.CLERK_ISSUER
             claims = jwt.decode(token, signing_key.key, **decode_kwargs)
@@ -84,11 +88,12 @@ class ClerkJWTAuthentication(authentication.BaseAuthentication):
 
     @staticmethod
     def _get_or_create_profile(claims: dict) -> UserProfile:
+        """Найти или завести профиль по Clerk-id из токена, вместе с настройками."""
         clerk_id = claims.get("sub")
         if not clerk_id:
             raise exceptions.AuthenticationFailed("В токене отсутствует sub.")
 
-        # email может присутствовать, если в Clerk JWT template добавлен claim.
+        # email есть, если в шаблоне JWT Clerk добавлен соответствующий claim.
         email = claims.get("email") or ""
 
         profile, _ = UserProfile.objects.get_or_create(
@@ -96,12 +101,12 @@ class ClerkJWTAuthentication(authentication.BaseAuthentication):
             defaults={"email": email},
         )
 
-        # Бэкфилл email, если он появился в токене позже регистрации.
+        # Бэкфилл: email мог появиться в токене уже после регистрации.
         if email and profile.email != email:
             profile.email = email
             profile.save(update_fields=["email"])
 
-        # Гарантируем наличие связанных настроек (1:1).
+        # Настройки — 1:1, гарантируем их наличие сразу.
         UserSettings.objects.get_or_create(user=profile)
 
         return profile

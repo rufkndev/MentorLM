@@ -1,3 +1,9 @@
+"""Пользователь: профиль-зеркало Clerk и его продуктовые настройки (1:1).
+
+Варианты и дефолты настроек берём из ai.preferences, чтобы они не разъезжались
+с логикой, которая их применяет.
+"""
+
 from django.db import models
 
 from apps.ai.preferences import (
@@ -17,18 +23,12 @@ from apps.ai.preferences import (
 class UserProfile(models.Model):
     """Локальное отражение пользователя Clerk.
 
-    Источник правды об авторизации — Clerk; в своей БД мы храним запись,
-    привязанную к Clerk по `clerk_id`, и доменные поля приложения.
+    Источник правды об авторизации — Clerk; у себя храним запись, привязанную к
+    нему по `clerk_id`, и доменные поля приложения.
     """
 
-    # Перечень тарифов. Само поле plan в профиле НЕ храним: тариф — это статус
-    # подписки (billing.Subscription), считается на лету через effective_plan.
-    # Enum остаётся ключами тарифных словарей (billing.limits.PLAN_LIMITS).
-    class Plan(models.TextChoices):
-        FREE = "free", "Бесплатный"
-        PLUS = "plus", "Plus"
-        PRO = "pro", "Pro"
-
+    # Поля plan здесь нет: тариф — статус подписки (billing.Subscription),
+    # считается на лету через effective_plan. Перечень тарифов — billing.Plan.
     clerk_id = models.CharField(max_length=255, unique=True, db_index=True)
     email = models.EmailField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -38,15 +38,17 @@ class UserProfile(models.Model):
         verbose_name = "Профиль пользователя"
         verbose_name_plural = "Профили пользователей"
 
-    # UserProfile — не django.contrib.auth.User, но именно он становится
-    # request.user после ClerkJWTAuthentication. Чтобы DRF-пермишен
-    # IsAuthenticated пропускал такие запросы, отдаём True.
+    # После ClerkJWTAuthentication именно UserProfile становится request.user,
+    # хотя это не django.contrib.auth.User — два свойства ниже нужны, чтобы
+    # DRF-пермишен IsAuthenticated пропускал такие запросы.
     @property
     def is_authenticated(self) -> bool:
+        """Всегда True: анонимные запросы до профиля не доходят."""
         return True
 
     @property
     def is_anonymous(self) -> bool:
+        """Всегда False — зеркальная пара к is_authenticated."""
         return False
 
     def __str__(self) -> str:
@@ -54,10 +56,10 @@ class UserProfile(models.Model):
 
 
 class UserSettings(models.Model):
-    """Продуктовые и ИИ-настройки пользователя (1:1 с профилем).
+    """Настройки пользователя; поля сгруппированы по вкладкам раздела «Настройки».
 
-    Поля сгруппированы по вкладкам раздела «Настройки» на фронте:
-    внешний вид/поведение, параметры модели и память/инструкции.
+    Параметры модели — мягкий слой: они не диктуют значения, а сдвигают базу
+    сценария в его границах (см. ai.preferences).
     """
 
     class Theme(models.TextChoices):
@@ -85,17 +87,15 @@ class UserSettings(models.Model):
     )
 
     # — Данные —
-    # Автоудаление диалогов старше N дней (по последней активности). 0 — не удалять.
-    # Значения из RETENTION_CHOICES; чистка ленивая (при запросе списка чатов).
+    # Автоудаление диалогов по последней активности; 0 — не удалять. Чистка
+    # ленивая, при запросе списка чатов (conversations.views).
     chat_retention_days = models.PositiveIntegerField(
         choices=RETENTION_CHOICES, default=DEFAULTS["chat_retention_days"]
     )
 
     # — Параметры модели ИИ —
-    # Выбор модели по режимам — продуктовые тиры (default/fast/quality), бэк
-    # маппит в реальные id (apps.ai.preferences). Креативность/длина/глубина —
-    # мягкие сдвиги поверх сценария, а не жёсткие значения (не перекрывают
-    # сценарий и им не перекрываются — согласуются в preferences.resolve_*).
+    # Модель выбирается продуктовым тиром (default/fast/quality), реальный id
+    # подставляет ai.preferences. Креативность, длина и глубина — мягкие сдвиги.
     chat_model = models.CharField(
         max_length=20, choices=MODEL_TIER_CHOICES, default=DEFAULTS["chat_model"]
     )
@@ -120,6 +120,8 @@ class UserSettings(models.Model):
     )
 
     # — Память и персональные инструкции —
+    # Свободные поля идут в промпт строками персонализации, переключатели
+    # памяти — в apps.memory.
     nickname = models.CharField(max_length=100, blank=True)
     occupation = models.CharField(max_length=150, blank=True)
     education_level = models.CharField(

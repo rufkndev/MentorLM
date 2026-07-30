@@ -1,7 +1,7 @@
 """Провайдер OpenAI Chat Completions — режим «Общий».
 
-Перенос из старого conversations/services.stream_chat_completion. Стримит токены
-и заполняет usage из финального чанка include_usage (с фолбэком на tiktoken).
+Стримит текст ответа и заполняет usage из финального чанка (include_usage),
+с запасным подсчётом через tiktoken.
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ from .base import GenParams
 
 
 class OpenAIChatProvider:
+    """Обычный чат-комплишн: system первым сообщением, история следом."""
+
     def stream(
         self,
         *,
@@ -23,6 +25,7 @@ class OpenAIChatProvider:
         params: GenParams,
         usage: dict,
     ) -> Iterator[str]:
+        """Отдаёт дельты текста; usage готов после исчерпания потока."""
         from openai import BadRequestError
 
         client = openai_client()
@@ -32,15 +35,12 @@ class OpenAIChatProvider:
         base_kwargs = dict(
             model=params.model,
             messages=messages,
-            # Потолок вывода — финансовый предохранитель тарифа (сверху). Длину
-            # по-прежнему регулируем промптом, а не обрезкой.
             max_completion_tokens=params.max_output_tokens,
             stream=True,
             stream_options={"include_usage": True},
         )
-        # temperature и reasoning_effort — необязательные: reasoning-модели
-        # (o-series/gpt-5) отвергают temperature≠1, но понимают reasoning_effort;
-        # обычные модели — наоборот. Пробуем со всеми и снимаем непринятые по 400.
+        # temperature и reasoning_effort взаимоисключающи в зависимости от
+        # модели — отдаём оба и снимаем непринятое по ответу 400.
         stream = create_with_optional(
             client.chat.completions.create,
             base_kwargs,
@@ -62,7 +62,7 @@ class OpenAIChatProvider:
                 completion += delta
                 yield delta
 
-        # Фолбэк, если провайдер не вернул точный расход токенов.
+        # Фолбэк, если провайдер не прислал точный расход токенов.
         if "prompt_tokens" not in usage:
             prompt_text = "\n".join(m["content"] for m in messages)
             usage["prompt_tokens"] = count_tokens(prompt_text, params.model)

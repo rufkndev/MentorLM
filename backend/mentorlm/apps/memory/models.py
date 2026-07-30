@@ -1,13 +1,13 @@
+"""Модель глобальной памяти — устойчивые факты о пользователе между диалогами."""
+
 from django.db import models
 
 
 class UserMemoryFact(models.Model):
-    """Устойчивый факт о пользователе для глобальной («межчатовой») памяти.
+    """Факт о пользователе, живущий на уровне аккаунта, а не одного диалога.
 
-    Извлекается отдельным LLM-запросом после ответа ассистента (если включена
-    автопамять) и подмешивается в системный промпт будущих диалогов. В отличие
-    от истории `Message`, факт не привязан к одному диалогу и живёт на уровне
-    аккаунта. Связано с users.UserProfile (см. db-user-identity).
+    Извлекается фоновым LLM-запросом после ответа (при включённой автопамяти) и
+    подмешивается в системный промпт будущих диалогов.
     """
 
     user = models.ForeignKey(
@@ -16,7 +16,7 @@ class UserMemoryFact(models.Model):
         related_name="memory_facts",
     )
     content = models.CharField(max_length=300)
-    # Диалог, из которого факт извлечён (для отладки/удаления вместе с чатом).
+    # Откуда факт взялся — для отладки и удаления вместе с чатом.
     source_conversation = models.ForeignKey(
         "conversations.Conversation",
         on_delete=models.SET_NULL,
@@ -25,7 +25,7 @@ class UserMemoryFact(models.Model):
         related_name="+",
     )
     created_at = models.DateTimeField(auto_now_add=True)
-    # Обновляется, когда факт был подмешан в ответ — свежие важнее при отборе.
+    # Обновляется при подмешивании факта в промпт: свежие важнее при отборе.
     last_used_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:

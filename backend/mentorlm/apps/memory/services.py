@@ -1,14 +1,6 @@
-"""Глобальная память пользователя (MVP): извлечение и подмешивание фактов.
+"""Глобальная память: чтение фактов в промпт и их фоновое извлечение из диалога.
 
-Два потока:
-- ЧТЕНИЕ (`build_memory_block`) — при сборке системного промпта берём несколько
-  актуальных фактов и отдаём их модели. Управляется настройкой `memory_use`.
-- ЗАПИСЬ (`extract_facts_in_background`) — после ответа ассистента отдельный
-  дешёвый LLM-запрос извлекает до 3 устойчивых фактов о пользователе и сохраняет
-  их в `UserMemoryFact`. Управляется `auto_memory` и `memory_scope`.
-
-Извлечение идёт в фоне (отдельный поток), чтобы не задерживать ответ. Ошибки
-памяти НИКОГДА не должны ломать основной запрос — всё в try/except.
+Всё под try/except — сбой памяти никогда не должен ломать основной ответ.
 """
 
 from __future__ import annotations
@@ -25,16 +17,16 @@ from .models import UserMemoryFact
 
 logger = logging.getLogger(__name__)
 
-# Сколько фактов подмешивать в промпт — мягкая настройка `memory_use`.
+# Сколько фактов подмешивать в промпт при разных значениях `memory_use`.
 _INJECT_CAP = {"auto": 8, "always": 12}
 # Сколько последних сообщений диалога отдаём экстрактору как контекст.
 _EXTRACT_CONTEXT_MESSAGES = 6
 # За один ответ извлекаем не больше стольких фактов.
 _MAX_NEW_FACTS = 3
-# Потолок общего числа фактов на пользователя — старые вытесняются.
+# Потолок числа фактов на пользователя — старые вытесняются.
 _MAX_TOTAL_FACTS = 60
 
-# Как настройка «объём автопамяти» влияет на инструкцию экстрактору.
+# Как настройка «объём автопамяти» меняет инструкцию экстрактору.
 _SCOPE_GUIDANCE = {
     "minimal": (
         "Сохраняй ТОЛЬКО явно выраженные устойчивые предпочтения (как обращаться, "
@@ -52,13 +44,12 @@ _SCOPE_GUIDANCE = {
 }
 
 
-# ── ЧТЕНИЕ ───────────────────────────────────────────────────────────────────
+# ── Чтение: факты в системный промпт ──────────────────────────────────────────
 
 def build_memory_block(user_settings) -> str:
-    """Блок «что известно о пользователе» для системного промпта (или пусто).
+    """Блок «что известно о пользователе» для промпта; при memory_use=off — пусто.
 
-    Управляется настройкой `memory_use`: off — не подмешиваем; auto/always —
-    отдаём до N самых свежих фактов. Относится к [[ai-settings-overlay]].
+    Заодно отмечает факты использованными — для будущего отбора по свежести.
     """
     memory_use = getattr(user_settings, "memory_use", "auto")
     cap = _INJECT_CAP.get(memory_use)
@@ -74,7 +65,6 @@ def build_memory_block(user_settings) -> str:
     if not facts:
         return ""
 
-    # Отмечаем, что факты были использованы (для будущего отбора по свежести).
     UserMemoryFact.objects.filter(id__in=[i for i, _ in facts]).update(
         last_used_at=timezone.now()
     )
@@ -87,12 +77,13 @@ def build_memory_block(user_settings) -> str:
     )
 
 
-# ── ЗАПИСЬ ───────────────────────────────────────────────────────────────────
+# ── Запись: извлечение фактов после ответа ────────────────────────────────────
 
 def extract_facts_in_background(user, conversation) -> None:
-    """Запустить извлечение фактов в фоне (не блокирует ответ).
+    """Запустить извлечение фактов в отдельном потоке — ответ его не ждёт.
 
-    Глобальная память — платная фича: на тарифах без `allow_memory` не пишем.
+    Память платная: без `allow_memory` в тарифе и без включённой автопамяти не
+    пишем ничего.
     """
     from apps.billing.limits import limits_for
     from apps.billing.plans import effective_plan
@@ -110,7 +101,7 @@ def extract_facts_in_background(user, conversation) -> None:
 
 
 def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
-    """Фоново: спросить LLM про новые факты и сохранить их. Ошибки не пробрасываем."""
+    """Тело фонового потока: спросить LLM про новые факты, сохранить, учесть расход."""
     from apps.conversations.models import Message
     from apps.users.models import UserProfile
 
@@ -137,10 +128,8 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
         )
         _store_new_facts(user, conversation_id, raw_facts, existing)
 
-        # Учёт расхода фоновой памяти: отдельный платный LLM-вызов. Списываем в
-        # квоту ПОРОДИВШЕГО режима (модель дешёвая, вклад мизерный, но
-        # предохранитель не дырявый). count_as_request=False — служебный вызов не
-        # считается отдельным запросом пользователя.
+        # Отдельный платный вызов: списываем в квоту породившего режима, но
+        # запросом пользователя не считаем.
         if tokens_in or tokens_out:
             from apps.usage.services import record_usage
 
@@ -157,18 +146,14 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
     except Exception:  # noqa: BLE001 — фон не должен падать наружу
         logger.exception("Извлечение фактов памяти не удалось")
     finally:
-        # Поток завёл собственные соединения с БД — закрываем, чтобы не течь.
+        # Поток завёл свои соединения с БД — закрываем, чтобы не текли.
         connections.close_all()
 
 
 def _call_extractor(
     recent_messages, existing_facts, user_settings
 ) -> tuple[list[str], int, int]:
-    """LLM-запрос: до 3 новых устойчивых фактов о пользователе (JSON).
-
-    Возвращает `(facts, tokens_in, tokens_out)` — токены нужны, чтобы учесть
-    себестоимость этого фонового вызова на пользователя (см. record_usage).
-    """
+    """Запросить у дешёвой модели новые факты; вернуть (факты, токены_в, токены_из)."""
     from openai import OpenAI
 
     scope = getattr(user_settings, "memory_scope", "balanced")
@@ -218,7 +203,7 @@ def _call_extractor(
 
 
 def _store_new_facts(user, conversation_id, raw_facts, existing_facts) -> None:
-    """Сохранить неповторяющиеся факты и вытеснить старые сверх лимита."""
+    """Сохранить неповторяющиеся факты и вытеснить старые сверх потолка."""
     known_lower = {f.lower() for f in existing_facts}
     to_create = []
     for fact in raw_facts[:_MAX_NEW_FACTS]:
@@ -226,7 +211,7 @@ def _store_new_facts(user, conversation_id, raw_facts, existing_facts) -> None:
         if not text:
             continue
         low = text.lower()
-        # Пропускаем точные дубли и очевидные вложенности.
+        # Отсекаем точные дубли и очевидные вложенности формулировок.
         if low in known_lower or any(low in e or e in low for e in known_lower):
             continue
         known_lower.add(low)
@@ -240,7 +225,6 @@ def _store_new_facts(user, conversation_id, raw_facts, existing_facts) -> None:
         return
     UserMemoryFact.objects.bulk_create(to_create)
 
-    # Вытеснение старых фактов сверх потолка (оставляем самые свежие).
     overflow = (
         UserMemoryFact.objects.filter(user=user)
         .order_by("-created_at")

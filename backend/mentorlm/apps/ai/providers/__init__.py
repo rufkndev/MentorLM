@@ -1,4 +1,4 @@
-"""Провайдеры LLM. Выбор по ключу из реестра режимов."""
+"""Провайдеры LLM за общим интерфейсом; выбираются по ключу из реестра режимов."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from .anthropic import AnthropicProvider
 from .openai_chat import OpenAIChatProvider
 from .openai_research import OpenAIResearchProvider
 
+# Провайдеры без состояния — держим по одному экземпляру на процесс.
 _PROVIDERS: dict[str, LLMProvider] = {
     "openai_chat": OpenAIChatProvider(),
     "anthropic": AnthropicProvider(),
@@ -15,6 +16,7 @@ _PROVIDERS: dict[str, LLMProvider] = {
 
 
 def get_provider(key: str) -> LLMProvider:
+    """Провайдер по ключу режима (registry.ModeConfig.provider)."""
     provider = _PROVIDERS.get(key)
     if provider is None:
         raise ValueError(f"Неизвестный провайдер: {key}")
