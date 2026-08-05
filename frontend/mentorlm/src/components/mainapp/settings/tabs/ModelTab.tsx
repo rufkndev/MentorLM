@@ -17,7 +17,7 @@ export function ModelTab() {
     <div className="flex flex-col gap-7">
       <Section
         title="Модель ИИ"
-        description="Мягкие предпочтения поверх сценариев. Каждый сценарий задаёт свою основу — эти настройки лишь смещают её в допустимых пределах, не ломая задачу сценария."
+        description="Выбор грейда модели ИИ для каждого режима."
       >
         {MODEL_MODE_FIELDS.map((f) => (
           <Row key={f.key} label={f.label} hint={f.hint}>
@@ -46,7 +46,7 @@ export function ModelTab() {
         </Row>
         <Row
           label="Длина ответов"
-          hint="Мягко короче или подробнее — но не короче, чем требует формат сценария"
+          hint="Короче или подробнее"
         >
           <SegmentedControl
             value={settings.response_length_preference}

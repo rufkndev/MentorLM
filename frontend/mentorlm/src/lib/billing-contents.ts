@@ -25,7 +25,7 @@ export type BillingPlan = {
 
 // Промо-герой страницы /billing (заголовок с выделенным словом + подзаголовок).
 export const billingHero = {
-  eyebrow: "Mentor LM Pro",
+  eyebrow: "",
   titleLead: "Учитесь", // текст до выделенного слова
   titleAccent: "глубже", // выделенное градиентом слово
   titleRest: "Больше моделей, контекста и лимитов.", // вторая строка заголовка

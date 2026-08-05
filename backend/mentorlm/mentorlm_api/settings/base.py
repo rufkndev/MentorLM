@@ -1,16 +1,18 @@
-"""Настройки Django-проекта MentorLM.
+"""Общая часть настроек MentorLM — всё, что одинаково в разработке и в проде.
 
-Всё окружение-зависимое (БД, кэш, ключи и модели провайдеров) читается из env,
-поэтому модели и лимиты меняются без правок кода.
+Здесь нет ни одного решения, зависящего от окружения: секреты, DEBUG, кэш,
+разрешённые хосты и origin'ы задают `dev.py` и `prod.py`. Всё окружение-зависимое
+(БД, ключи и модели провайдеров) читается из env, поэтому модели и лимиты
+меняются без правок кода.
 """
 
 import os
 from pathlib import Path
-from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+# .../backend/mentorlm — три уровня вверх от settings/base.py.
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # В Docker переменные уже в окружении и загрузка ничего не меняет; локально
 # берём их из .env проекта и общего infra/env/.env.
@@ -26,19 +28,9 @@ def env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in ('1', 'true', 'yes', 'on')
 
 
-# ⚠️ В проде обязательно задать DJANGO_SECRET_KEY и DEBUG=False.
-SECRET_KEY = os.environ.get(
-    'DJANGO_SECRET_KEY',
-    'django-insecure-wjout$wum05ks$lmj8nawffg8zl-$=uh089$)^u6dv8^02)%ib',
-)
-
-DEBUG = env_bool('DEBUG', True)
-
-ALLOWED_HOSTS = [
-    h.strip()
-    for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-    if h.strip()
-]
+def env_list(name: str, default: str = '') -> list[str]:
+    """Прочитать список из переменной окружения через запятую."""
+    return [item.strip() for item in os.environ.get(name, default).split(',') if item.strip()]
 
 
 # ── Приложения и middleware ───────────────────────────────────────────────────
@@ -111,25 +103,6 @@ DATABASES = {
 }
 
 
-# ── Кэш ───────────────────────────────────────────────────────────────────────
-# На нём держатся лок генерации, rate limit и флаг «Стоп» (apps/billing/guard.py),
-# поэтому в проде он ОБЯЗАН быть общим для всех воркеров: на памяти процесса
-# каждый воркер считает лимиты сам, и параллельные запросы проскакивают квоту.
-# REDIS_URL задан → Redis; пусто → память процесса (только dev в один воркер).
-REDIS_URL = os.environ.get('REDIS_URL', '')
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_URL,
-    }
-    if REDIS_URL
-    else {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-    }
-}
-
-
 # Пароли Django нужны только для входа в админку: пользователи живут в Clerk.
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -173,17 +146,6 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.IsAuthenticated',
     ],
 }
-
-
-# Фронт ходит с другого origin, поэтому список разрешённых задаётся явно.
-CORS_ALLOWED_ORIGINS = [
-    o.strip()
-    for o in os.environ.get(
-        'CORS_ALLOWED_ORIGINS',
-        'http://localhost:3000,http://127.0.0.1:3000',
-    ).split(',')
-    if o.strip()
-]
 
 
 # ── Clerk ─────────────────────────────────────────────────────────────────────

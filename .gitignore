@@ -13,6 +13,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# собирается collectstatic при старте прод-контейнера
+staticfiles/
+
 # Env files
 .env
 .env.dev

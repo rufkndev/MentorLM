@@ -33,11 +33,11 @@ export default function BlogPage() {
           <div className="min-w-0">
             <p className="text-eyebrow">Блог</p>
             <h1 className="mt-4 text-[clamp(2rem,4.6vw,3.4rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ink">
-              Материалы Mentor LM
+              Блог Mentor LM
             </h1>
             <p className="mt-5 max-w-2xl text-[17px] leading-relaxed text-ink-soft">
-              Гайды о том, как использовать AI для учёбы по делу, разборы режимов
-              платформы, практические сценарии и обновления продукта.
+              Материалы о том, как использовать AI для учёбы, разборы режимов
+              платформы, практические сценарии, обновления продукта и многое другое.
             </p>
           </div>
           {/* Маскот читает материалы */}

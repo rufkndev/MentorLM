@@ -45,7 +45,7 @@ export const CREATIVITY_OPTIONS: Option<Creativity>[] = [
 // Предпочтительная длина ответа.
 export const LENGTH_PREF_OPTIONS: Option<LengthPref>[] = [
   { value: "shorter", label: "Короче" },
-  { value: "default", label: "Как в сценарии" },
+  { value: "default", label: "Стандартно" },
   { value: "longer", label: "Подробнее" },
 ];
 
@@ -81,11 +81,10 @@ export const MODEL_MODE_FIELDS = [
 export const EDUCATION_LEVEL_OPTIONS: Option<EducationLevel>[] = [
   { value: "", label: "Не указано" },
   { value: "school", label: "Школа" },
-  { value: "college", label: "Колледж / СПО" },
+  { value: "college", label: "Колледж" },
   { value: "bachelor", label: "Бакалавриат" },
   { value: "master", label: "Магистратура" },
   { value: "postgraduate", label: "Аспирантура" },
-  { value: "other", label: "Другое" },
 ];
 
 // Сколько истории диалога учитывать.

@@ -190,7 +190,7 @@ export default function AboutPage() {
       <p>
         Хотите повлиять на продукт, предложить идею или обсудить внедрение в
         вашу группу? Напишите на{" "}
-        <a href="mailto:hello@mentorlm.ru">hello@mentorlm.ru</a> — мы читаем
+        <a href="mailto:arttaranovbusiness@gmail.com">arttaranovbusiness@gmail.com</a> — мы читаем
         каждое письмо. Контакты и реквизиты — на странице{" "}
         <a href="/contacts">«Контакты»</a>.
       </p>

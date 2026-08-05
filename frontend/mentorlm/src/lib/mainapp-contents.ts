@@ -68,19 +68,19 @@ export const chatScenarios: readonly Scenario[] = [
   {
     id: "practice",
     label: "Практическая работа",
-    description: "Готовая практическая работа под сдачу",
+    description: "Готовое решение в виде отчета по выполнению практической работы",
     icon: "assignment",
   },
   {
     id: "text",
     label: "Текст",
-    description: "Работа с текстом: написание, редактирование, конспект",
+    description: "Работа с текстом: написание, редактирование, конспектирование и т.д.",
     icon: "writing",
   },
   {
     id: "chat",
     label: "Обычный чат",
-    description: "Спокойный понятный ответ без лишнего",
+    description: "Обычный диалог с ИИ",
     icon: "talk",
   },
 ] as const;
@@ -123,7 +123,7 @@ export const codeScenarios: readonly Scenario[] = [
   {
     id: "tests",
     label: "Написать тесты",
-    description: "Покрыть код тестами с граничными случаями",
+    description: "Покрыть код тестами",
     icon: "tests",
   },
 ] as const;
@@ -142,7 +142,7 @@ export const researchScenarios: readonly Scenario[] = [
   {
     id: "deep",
     label: "Детальное исследование",
-    description: "Глубокий разбор темы с разных сторон",
+    description: "Глубокий разбор темы",
     icon: "deep",
   },
   {

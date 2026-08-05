@@ -16,12 +16,12 @@ from apps.ai.context import count_tokens
 from apps.usage.models import UsageEvent
 
 from .limits import (
-    DEGRADE_REQUESTS,
     MAX_INPUT_TOKENS,
     MAX_REQUEST_TIMEOUT_SECONDS,
     MODE_LABEL,
     QUOTA_WINDOWS,
     RATE_PER_MIN,
+    degrade_requests,
     limits_for,
     quota_for,
 )
@@ -183,8 +183,9 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
         )
 
     # Квоты режима — главный предохранитель. Исчерпанное окно не блокирует
-    # сразу: сначала DEGRADE_REQUESTS ответов на дешёвой модели, и только когда
-    # кончились и они — жёсткий блок до восстановления окна.
+    # сразу: сначала несколько ответов на дешёвой модели (число зависит от
+    # режима — limits.degrade_requests), и только когда кончились и они —
+    # жёсткий блок до восстановления окна.
     quota = quota_for(plan, mode)
     used = _window_usage(user, mode, now)
     decision = "allow"
@@ -195,7 +196,7 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
         grace_used = UsageEvent.objects.filter(
             user=user, mode=mode, degraded=True, created_at__gte=now - delta
         ).count()
-        if grace_used >= DEGRADE_REQUESTS:
+        if grace_used >= degrade_requests(mode):
             resets_at = _window_reset(user, mode, window, now)
             raise LimitExceeded(
                 "mode_quota_exceeded",

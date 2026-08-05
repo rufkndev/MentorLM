@@ -1,9 +1,4 @@
 services:
-  redis:
-    image: redis:7-alpine
-    container_name: mentorlm-redis-dev
-    restart: unless-stopped
-
   backend:
     build:
       context: ../backend
@@ -13,12 +8,12 @@ services:
       - ./env/.env
     environment:
       DEBUG: "True"
-      # Общий кэш воркеров: лок генерации, rate limit, «Стоп» (billing.guard).
-      REDIS_URL: redis://redis:6379/0
+      # REDIS_URL не задаём: без него settings.dev берёт кэш в памяти процесса
+      # (лок генерации, rate limit, «Стоп» — billing.guard). Для разработки в
+      # один воркер этого достаточно; в проде Redis обязателен и поднимается
+      # в docker-compose.prod.yml.
     ports:
       - "8000:8000"
     volumes:
       - ../backend/mentorlm:/app
-    depends_on:
-      - redis
     restart: unless-stopped

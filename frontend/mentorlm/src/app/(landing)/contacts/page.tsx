@@ -22,25 +22,25 @@ export default function ContactsPage() {
       mascotExpression="calm"
       eyebrow="Контакты"
       title="Связаться с Mentor LM"
-      description="Каналы связи для пользователей и партнёров, а также юридические реквизиты. Реквизиты в квадратных скобках — шаблон: окончательные данные будут опубликованы после регистрации."
+      description="Каналы связи, юридическая информация и реквизиты Mentor LM для пользователей и партнёров."
     >
       <h2>Написать нам</h2>
       <ul>
         <li>
           Общие вопросы и поддержка:{" "}
-          <a href="mailto:hello@mentorlm.ru">hello@mentorlm.ru</a>
+          <a href="mailto:arttaranovbusiness@gmail.com">arttaranovbusiness@gmail.com</a>
         </li>
         <li>
           Сотрудничество и партнёрство:{" "}
-          <a href="mailto:partners@mentorlm.ru">partners@mentorlm.ru</a>
+          <a href="mailto:arttaranovbusiness@gmail.com">arttaranovbusiness@gmail.com</a>
         </li>
         <li>
           Вопросы по обработке персональных данных:{" "}
-          <a href="mailto:privacy@mentorlm.ru">privacy@mentorlm.ru</a>
+          <a href="mailto:arttaranovbusiness@gmail.com">arttaranovbusiness@gmail.com</a>
         </li>
         <li>
           Оплата, счета и возвраты:{" "}
-          <a href="mailto:billing@mentorlm.ru">billing@mentorlm.ru</a>
+          <a href="mailto:arttaranovbusiness@gmail.com">arttaranovbusiness@gmail.com</a>
         </li>
       </ul>
 
@@ -52,36 +52,18 @@ export default function ContactsPage() {
 
       <h2>Юридические сведения</h2>
       <p>
-        Услуги Сервиса оказывает [организационно-правовая форма и наименование —
-        ООО «___» / ИП Фамилия Имя Отчество / самозанятый].
+        Услуги Сервиса оказывает ИП Таранов Артём Игоревич⁠.
       </p>
       <p>
-        <strong>Полное наименование:</strong> [Полное наименование]
+        <strong>Полное наименование:</strong> Индивидуальный предприниматель Таранов Артём Игоревич
         <br />
-        <strong>Сокращённое наименование:</strong> [Сокращённое наименование]
+        <strong>Сокращённое наименование:</strong> ИП Таранов А.И.
         <br />
-        <strong>ОГРН / ОГРНИП:</strong> [Номер]
+        <strong>ОГРН / ОГРНИП:</strong> 325650000017843
         <br />
-        <strong>ИНН:</strong> [Номер]
+        <strong>ИНН:</strong> 650302923331
         <br />
-        <strong>КПП:</strong> [Номер — для организаций]
-        <br />
-        <strong>Юридический адрес:</strong> [Адрес]
-        <br />
-        <strong>Почтовый / фактический адрес:</strong> [Адрес]
-      </p>
-
-      <h2>Банковские реквизиты</h2>
-      <p>
-        <strong>Наименование получателя:</strong> [Наименование]
-        <br />
-        <strong>Расчётный счёт:</strong> [Номер]
-        <br />
-        <strong>Банк:</strong> [Наименование банка]
-        <br />
-        <strong>БИК:</strong> [Номер]
-        <br />
-        <strong>Корр. счёт:</strong> [Номер]
+        <strong>Юридический адрес:</strong> 693020, Южно-Сахалинск гор., Карла Маркса ул. 14,
       </p>
 
       <h2>Регуляторные сведения</h2>

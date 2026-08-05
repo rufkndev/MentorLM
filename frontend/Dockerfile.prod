@@ -1,0 +1,56 @@
+# Контекст сборки — папка frontend/, приложение лежит в frontend/mentorlm/.
+# Сборка трёхстадийная: в финальный образ не попадают ни исходники, ни dev-зависимости.
+
+# ── Зависимости ───────────────────────────────────────────────────────────────
+FROM node:24-alpine AS deps
+WORKDIR /app
+RUN npm install -g pnpm@10.33.2
+# Отдельным слоем: переустанавливаются только при правке манифестов.
+COPY mentorlm/package.json mentorlm/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# ── Сборка ────────────────────────────────────────────────────────────────────
+FROM node:24-alpine AS builder
+WORKDIR /app
+RUN npm install -g pnpm@10.33.2
+COPY --from=deps /app/node_modules ./node_modules
+COPY mentorlm/ ./
+
+# ⚠️ NEXT_PUBLIC_* вшиваются в бандл на этапе сборки, а не читаются в рантайме:
+# сменить их можно только пересборкой образа. Значения приходят из build args
+# (docker-compose.prod.yml), секретные ключи сюда не передаются.
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_APP_URL
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
+    NEXT_TELEMETRY_DISABLED=1
+
+# Требует output: "standalone" в next.config.ts.
+RUN pnpm build
+
+# ── Рантайм ───────────────────────────────────────────────────────────────────
+FROM node:24-alpine AS runner
+WORKDIR /app
+
+# HOSTNAME обязателен: без него standalone-сервер слушает только петлю внутри
+# контейнера и nginx до него не достучится.
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+
+# standalone уже содержит минимальный набор node_modules — ставить нечего.
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# Пользователь node есть в образе; свой заводить незачем.
+USER node
+
+EXPOSE 3000
+
+# CLERK_SECRET_KEY нужен серверному clerkMiddleware в рантайме — приходит из
+# env_file, а не из build args.
+CMD ["node", "server.js"]

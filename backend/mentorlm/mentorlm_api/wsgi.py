@@ -4,6 +4,7 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorlm_api.settings')
+# Прод передаёт mentorlm_api.settings.prod через окружение (compose).
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorlm_api.settings.dev')
 
 application = get_wsgi_application()

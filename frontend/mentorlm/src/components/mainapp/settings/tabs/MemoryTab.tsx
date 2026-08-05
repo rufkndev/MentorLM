@@ -33,7 +33,7 @@ export function MemoryTab() {
           <TextInput
             value={settings.nickname}
             onChange={(nickname) => update({ nickname })}
-            placeholder="Например: Артём"
+            placeholder="Например: Босс"
           />
         </Row>
         <Row label="Чем вы занимаетесь" hint="Помогает подбирать примеры">
@@ -59,7 +59,7 @@ export function MemoryTab() {
           <TextInput
             value={settings.field_of_study}
             onChange={(field_of_study) => update({ field_of_study })}
-            placeholder="Например: программная инженерия"
+            placeholder="Например: Инженер ПО"
           />
         </Row>
         <Field
@@ -86,7 +86,7 @@ export function MemoryTab() {
         </Field>
         <Field
           label="Как вы хотите получать ответы"
-          hint="Мягкая инструкция поверх сценария. Например: короче, с примерами кода, без воды"
+          hint="Например: короче, с примерами кода, без воды"
         >
           <Textarea
             value={settings.custom_style}
@@ -99,7 +99,7 @@ export function MemoryTab() {
 
       <Section
         title="Память диалога"
-        description="Сколько прошлого контекста учитывать. Итог ограничивают сценарий и ваш тариф."
+        description="Сколько прошлого контекста учитывать."
       >
         <Row
           label="Глубина памяти"

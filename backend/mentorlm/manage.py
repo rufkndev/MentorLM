@@ -6,7 +6,8 @@ import sys
 
 def main():
     """Выполнить команду из argv с настройками проекта."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorlm_api.settings')
+    # По умолчанию — настройки разработки; прод задаёт переменную явно (compose).
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'mentorlm_api.settings.dev')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
