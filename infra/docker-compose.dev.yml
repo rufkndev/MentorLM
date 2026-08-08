@@ -1,4 +1,31 @@
+# Стек разработки. Штатный сценарий — поднять из докера только Redis:
+#     docker compose -f docker-compose.dev.yml up -d redis
+# а бэкенд и фронт запускать на хосте (`runserver` и `pnpm dev`) — так работают
+# автоперезагрузка и отладчик. Сервис backend нужен, когда хочется проверить
+# сборку в контейнере целиком.
+
+# Иначе имя проекта берётся от папки (infra) и пересекается с прод-стеком.
+name: mentorlm-dev
+
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: mentorlm-redis-dev
+    # Те же правила, что в проде: кэш без персистентности, выселяются только
+    # ключи с TTL (а они есть у всех наших). Объём меньше — данных тут единицы.
+    command: >
+      redis-server --save "" --appendonly no
+      --maxmemory 64mb --maxmemory-policy volatile-lru
+    ports:
+      # Только петля: Redis без пароля не должен быть виден локальной сети.
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ../backend
@@ -8,12 +35,15 @@ services:
       - ./env/.env
     environment:
       DEBUG: "True"
-      # REDIS_URL не задаём: без него settings.dev берёт кэш в памяти процесса
-      # (лок генерации, rate limit, «Стоп» — billing.guard). Для разработки в
-      # один воркер этого достаточно; в проде Redis обязателен и поднимается
-      # в docker-compose.prod.yml.
+      # Внутри сети compose — по имени сервиса, а не через петлю хоста. База 1:
+      # у прода 0, поэтому ключи окружений не пересекаются. Значение перекрывает
+      # REDIS_URL из env-файла, который рассчитан на запуск с хоста.
+      REDIS_URL: redis://redis:6379/1
     ports:
       - "8000:8000"
     volumes:
       - ../backend/mentorlm:/app
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped

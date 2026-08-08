@@ -1,8 +1,6 @@
 # Прод-стек MentorLM. Запускать только через infra/deploy.sh — ему нужен
 # --env-file, иначе не подставятся build args фронта (см. комментарий у frontend).
-#
 #   docker compose --env-file env/.env -f docker-compose.prod.yml up -d --build
-#
 # Наружу смотрит только nginx: backend и frontend доступны лишь внутри сети.
 
 # Иначе имя проекта берётся от папки (infra), и тома называются infra_*.

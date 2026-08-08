@@ -10,7 +10,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .base import BASE_DIR, DATABASES, MIDDLEWARE, env_list
+from .base import BASE_DIR, DATABASES, MIDDLEWARE, REDIS_CACHE_OPTIONS, env_list
 
 
 def _require(name: str) -> str:
@@ -48,12 +48,15 @@ CORS_ALLOWED_ORIGINS = env_list('CORS_ALLOWED_ORIGINS')
 # На кэше держатся лок генерации, rate limit и флаг «Стоп» (apps/billing/guard.py).
 # На памяти процесса каждый воркер считал бы лимиты сам, и параллельные запросы
 # одного пользователя проскакивали бы квоту — поэтому здесь только общий Redis.
+# Значение приходит из docker-compose.prod.yml (redis://redis:6379/0) и
+# перекрывает env-файл: адрес сервиса — часть топологии стека, не настройка.
 REDIS_URL = _require('REDIS_URL')
 
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.redis.RedisCache',
         'LOCATION': REDIS_URL,
+        'OPTIONS': REDIS_CACHE_OPTIONS,
     }
 }
 

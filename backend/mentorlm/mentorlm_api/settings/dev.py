@@ -6,8 +6,10 @@
 
 import os
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403
-from .base import env_bool, env_list
+from .base import REDIS_CACHE_OPTIONS, env_bool, env_list
 
 # Ключ разработки: в проде такой не пройдёт — prod.py требует настоящий из env.
 SECRET_KEY = os.environ.get(
@@ -29,23 +31,47 @@ CORS_ALLOWED_ORIGINS = env_list(
 
 # ── Кэш ───────────────────────────────────────────────────────────────────────
 # На нём держатся лок генерации, rate limit и флаг «Стоп» (apps/billing/guard.py).
-# Локально хватает памяти процесса — runserver работает в один воркер. Если
-# поднят REDIS_URL (infra/docker-compose.dev.yml), используем его: ближе к проду.
+# Штатный режим разработки — тот же Redis, что в проде, но на своей базе (`/1`
+# против `/0`), чтобы ключи окружений не смешивались, даже если однажды окажутся
+# на одном сервере:
+#
+#     docker compose -f infra/docker-compose.dev.yml up -d redis
+#     REDIS_URL=redis://127.0.0.1:6379/1        # в infra/env/.env
+#
+# Работать без docker можно, но откат на память процесса — только осознанный, по
+# ALLOW_LOCMEM_CACHE=1. Молча подменять общий кэш нельзя: у runserver один
+# процесс, поэтому на LocMem лок, лимиты и «Стоп» «работают» всегда, и проверка
+# этих механизмов локально ничего не доказывает. Расхождение с продом всплыло бы
+# только в бою, а цена ошибки здесь — двойные списания платных токенов.
 REDIS_URL = os.environ.get('REDIS_URL', '')
+ALLOW_LOCMEM_CACHE = env_bool('ALLOW_LOCMEM_CACHE', False)
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': REDIS_URL,
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': REDIS_CACHE_OPTIONS,
+        }
     }
-    if REDIS_URL
-    else {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+elif ALLOW_LOCMEM_CACHE:
+    CACHES = {
+        'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
     }
-}
+else:
+    raise ImproperlyConfigured(
+        'REDIS_URL не задан. Поднимите dev-Redis:\n'
+        '    docker compose -f infra/docker-compose.dev.yml up -d redis\n'
+        'и пропишите в infra/env/.env строку\n'
+        '    REDIS_URL=redis://127.0.0.1:6379/1\n'
+        'Либо, если docker сейчас не нужен, разрешите кэш в памяти процесса явно:\n'
+        '    ALLOW_LOCMEM_CACHE=1\n'
+        'В этом режиме лок генерации, rate limit и «Стоп» живут внутри одного\n'
+        'процесса и ведут себя не так, как в проде, — проверять их бесполезно.'
+    )
 
 
-# ── Логи ──────────────────────────────────────────────────────────────────────
+# Логи 
 # Коротко и в консоль: подробности отладки и так видны через DEBUG.
 LOGGING = {
     'version': 1,
