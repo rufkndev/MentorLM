@@ -20,7 +20,7 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "created_at",
     )
     list_filter = ("plan", "status", "provider")
-    search_fields = ("user__email", "user__clerk_id", "external_id")
+    search_fields = ("user__email", "external_id")
 
     @admin.display(boolean=True, description="Действует сейчас")
     def is_alive(self, obj) -> bool:

@@ -9,7 +9,7 @@
 import Link from "next/link";
 import { motion, useMotionValueEvent, useScroll } from "motion/react";
 import { useState } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";

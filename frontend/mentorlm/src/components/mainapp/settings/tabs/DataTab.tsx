@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useSettings } from "@/components/mainapp/SettingsProvider";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
 import { useApi } from "@/lib/api";
@@ -13,7 +13,7 @@ export function DataTab() {
   const { settings, update } = useSettings();
   const api = useApi();
   const { refresh } = useConversations();
-  const { user } = useUser();
+  const { user, logout } = useAuth();
   const router = useRouter();
   const [deleting, setDeleting] = useState(false);
 
@@ -25,8 +25,9 @@ export function DataTab() {
       .catch(() => {});
   };
 
-  // Полное удаление аккаунта: сначала стираем наши данные (пока токен валиден),
-  // затем удаляем сам аккаунт Clerk — это разлогинивает и уводит на лендинг.
+  // Полное удаление аккаунта: бэкенд стирает профиль и всё связанное каскадом
+  // (включая refresh-токены), затем закрываем локальную сессию и уходим на
+  // лендинг. Это же реализация права на удаление ПДн — удаление настоящее.
   const deleteAccount = async () => {
     if (!user || deleting) return;
     const ok = window.confirm(
@@ -37,8 +38,8 @@ export function DataTab() {
 
     setDeleting(true);
     try {
-      await api.delete("/api/me/"); // 1) наши данные (каскадом)
-      await user.delete(); // 2) аккаунт Clerk (и выход из сессии)
+      await api.delete("/api/me/"); // 1) аккаунт и все данные (каскадом)
+      await logout(); // 2) гасим cookie и локальное состояние
       router.push("/");
     } catch {
       setDeleting(false);

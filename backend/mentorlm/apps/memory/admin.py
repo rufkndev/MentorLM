@@ -11,5 +11,5 @@ class UserMemoryFactAdmin(admin.ModelAdmin):
 
     list_display = ("user", "content", "created_at", "last_used_at")
     list_filter = ("created_at",)
-    search_fields = ("content", "user__email", "user__clerk_id")
+    search_fields = ("content", "user__email")
     autocomplete_fields = ()

@@ -8,8 +8,8 @@ MentorLM — коммерческий веб-сервис с ИИ-помощни
 
 ## Стек
 
-- Frontend: Next.js, React, TypeScript, Tailwind CSS, Clerk.
-- Backend: Django, Django REST Framework, PostgreSQL/Supabase.
+- Frontend: Next.js, React, TypeScript, Tailwind CSS.
+- Backend: Django, Django REST Framework, PostgreSQL (свой, в Docker).
 - AI: OpenAI, Anthropic, потоковые ответы через SSE.
 - Infra: Docker Compose, nginx.
 
@@ -18,7 +18,6 @@ MentorLM — коммерческий веб-сервис с ИИ-помощни
 - `frontend/mentorlm` — веб-приложение.
 - `backend/mentorlm` — API и серверная логика.
 - `infra` — окружение, Docker Compose и nginx.
-- `dev_docs` — внутренние технические и продуктовые документы.
 
 ## Функциональность
 
@@ -49,7 +48,7 @@ MentorLM построен вокруг режимов — отдельных р�
 следующих диалогах, если это разрешено настройками.
 
 Продуктовая часть включает лендинг, юридические страницы, страницу тарифов,
-авторизацию через Clerk и защищенные рабочие режимы приложения.
+собственную авторизацию по почте и паролю и защищенные рабочие режимы приложения.
 
 ## Правовой статус
 

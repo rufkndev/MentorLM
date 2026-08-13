@@ -8,7 +8,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   createContext,
   useCallback,
@@ -79,8 +79,8 @@ const ConversationsContext = createContext<ConversationsContextValue | null>(nul
 // Провайдер: загружает список диалогов и раздаёт операции над ними.
 export function ConversationsProvider({ children }: { children: ReactNode }) {
   const api = useApi();
-  const { userId: clerkUserId } = useAuth();
-  const userId = clerkUserId ?? null; // Clerk даёт string | null | undefined
+  // null, пока сессия ещё восстанавливается (см. AuthProvider).
+  const { userId } = useAuth();
   const pathname = usePathname();
   const mode = modeFromPath(pathname);
 

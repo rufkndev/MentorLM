@@ -24,14 +24,14 @@ def settings_defaults() -> dict:
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
-    """Профиль для ЛК; имя и аватар фронт берёт из Clerk, а не отсюда."""
+    """Профиль для ЛК. Пароль и данные о согласии наружу не отдаём."""
 
     # Тариф считается из подписок на лету, поэтому протухнуть ему негде.
     plan = serializers.SerializerMethodField()
 
     class Meta:
         model = UserProfile
-        fields = ["clerk_id", "email", "plan", "created_at"]
+        fields = ["id", "email", "plan", "email_verified", "created_at"]
         read_only_fields = fields
 
     def get_plan(self, obj) -> str:

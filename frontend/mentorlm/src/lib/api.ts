@@ -1,7 +1,7 @@
 /**
  * HTTP-клиент фронтенда к Django-бэкенду.
  * Хук useApi() отдаёт get/post/patch/delete и stream() для SSE-ответов ИИ,
- * автоматически подставляя Clerk-токен в заголовок Authorization.
+ * автоматически подставляя access-токен в заголовок Authorization.
  * Используется везде, где нужны данные с бэка (чат, настройки, память, тарифы).
  *
  * Здесь же — политика устойчивости: повтор безопасных запросов при сетевом
@@ -10,12 +10,14 @@
 
 "use client";
 
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useCallback, useMemo } from "react";
 
 // Базовый адрес API (из env, без хвостового слэша); дефолт — локальный бэк.
+// Именно localhost: с 127.0.0.1 браузер не отправит cookie сессии (см.
+// AuthProvider и settings/dev.py).
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
 
 // Повторяем только идемпотентные запросы (GET): повтор POST создал бы второй
 // диалог или второе сообщение. Пауза растёт линейно — сбой обычно короткий.
@@ -57,19 +59,19 @@ const offlineError = () =>
 const expiredError = () =>
   new ApiError(401, "Сессия истекла — обновите страницу и войдите заново.", "unauthorized");
 
-// Главный хук доступа к API: собирает запросы с токеном Clerk.
+// Главный хук доступа к API: собирает запросы с токеном сессии.
 export function useApi() {
   const { getToken } = useAuth();
 
-  // Один сетевой вызов с токеном. fresh=true — просим Clerk обновить токен
-  // (нужно ровно один раз, когда бэк ответил 401 на протухший).
+  // Один сетевой вызов с токеном. fresh=true — просим провайдер сессии
+  // обновить токен (нужно ровно один раз, когда бэк ответил 401 на протухший).
   const send = useCallback(
     async (
       path: string,
       init: { method: string; body?: unknown; signal?: AbortSignal },
       fresh = false,
     ): Promise<Response> => {
-      const token = await getToken(fresh ? { skipCache: true } : undefined);
+      const token = await getToken(fresh);
       const isForm = init.body instanceof FormData;
       return fetch(`${API_URL}${path}`, {
         method: init.method,

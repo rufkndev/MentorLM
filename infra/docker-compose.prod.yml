@@ -14,6 +14,35 @@ x-logging: &default-logging
     max-file: "3"
 
 services:
+  # Боевая база. Живёт на этом же сервере: 152-ФЗ (ч.5 ст.18) требует, чтобы
+  # персональные данные граждан РФ записывались и хранились в базах на
+  # территории России, — поэтому не управляемый зарубежный Postgres, а свой.
+  # Наружу не смотрит вовсе: ни ports, ни expose. Доступ только из сети compose.
+  #
+  # Переменные подставляются из env-файла через ${...}, а не через env_file:
+  # так в контейнер базы не попадают ключи OpenAI/Anthropic. Подстановка
+  # работает потому, что deploy.sh всегда передаёт --env-file.
+  db:
+    image: postgres:17-alpine
+    container_name: mentorlm-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Контрольные суммы страниц: тихое повреждение диска обнаружится, а не
+      # уедет в бэкапы. Включается только при инициализации кластера.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    logging: *default-logging
+
   # Общий кэш воркеров: лок генерации, rate limit, «Стоп» (apps/billing/guard.py).
   # Без него параллельные запросы одного пользователя проскакивают квоту.
   redis:
@@ -43,9 +72,15 @@ services:
       # Прод-настройки включаются только здесь: локально по умолчанию dev.
       DJANGO_SETTINGS_MODULE: mentorlm_api.settings.prod
       REDIS_URL: redis://redis:6379/0
+      # Адрес базы — часть топологии стека, а не настройка: перекрываем env-файл,
+      # рассчитанный на запуск с хоста.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
     expose:
       - "8000"
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     # Даём активным SSE-ответам договорить при деплое: по умолчанию docker ждёт
@@ -63,13 +98,9 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL}
-        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
     container_name: mentorlm-frontend
-    # Только то, что нужно самому Next в рантайме: ключи провайдеров моделей и
-    # доступ к БД фронту ни к чему.
-    environment:
-      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    # Секретов у фронта нет вовсе: аутентификация целиком на бэкенде, ключи
+    # провайдеров и доступ к БД ему ни к чему. Всё, что нужно, вшито при сборке.
     expose:
       - "3000"
     restart: always
@@ -87,6 +118,11 @@ services:
       - ./nginx/mentorlm.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/proxy_params.conf:/etc/nginx/proxy_params.conf:ro
       - ./nginx/50x.html:/usr/share/nginx/html/50x.html:ro
+      # CA для клиентских сертификатов админки (mTLS). Каталог создаётся на
+      # сервере и в репозиторий не попадает — там ключ, которым выпускаются
+      # пропуска в /admin/. Без него nginx не стартует: см. раздел «Админка»
+      # в dev_docs/notes/deployNote.md.
+      - ./nginx/certs:/etc/nginx/certs:ro
       - certbot-www:/var/www/certbot
       - letsencrypt:/etc/letsencrypt:ro
     # Перечитываем конфиг раз в 6 часов — так подхватывается продлённый
@@ -116,5 +152,8 @@ services:
     logging: *default-logging
 
 volumes:
+  # Боевые данные. Том именованный и переживает пересоздание контейнеров;
+  # `docker compose down -v` его СНЕСЁТ — этой команды на проде быть не должно.
+  pgdata:
   certbot-www:
   letsencrypt:

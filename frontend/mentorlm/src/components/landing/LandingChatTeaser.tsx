@@ -7,7 +7,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 import { saveDraft } from "@/lib/draft";

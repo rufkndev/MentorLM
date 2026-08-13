@@ -20,6 +20,10 @@ staticfiles/
 .env
 .env.dev
 .env.local
+# Исключение: infra/.env — не файл, а симлинк на env/.env. Секрета в нём нет
+# (только путь), а без него compose не подставит ${...} в dev-стеке и база
+# поднимется без пароля... точнее, откажется подниматься вовсе.
+!infra/.env
 
 # venv 
 venv/
@@ -27,9 +31,6 @@ venv/
 
 # vscode
 .vscode/
-
-# clerk
-.clerk/
 
 # pnpm
 .pnpm-store/
@@ -39,3 +40,7 @@ venv/
 .claude/
 claude.md
 
+
+# Клиентский CA админки (mTLS): приватный ключ и выпущенные сертификаты
+# живут только на сервере.
+infra/nginx/certs/

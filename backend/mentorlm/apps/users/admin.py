@@ -1,8 +1,8 @@
-"""Админка пользователей: профиль-зеркало Clerk с настройками и тарифом."""
+"""Админка пользователей: учётные записи, их настройки, тариф и сессии."""
 
 from django.contrib import admin
 
-from .models import UserProfile, UserSettings
+from .models import RefreshToken, UserProfile, UserSettings
 
 
 class UserSettingsInline(admin.StackedInline):
@@ -14,11 +14,25 @@ class UserSettingsInline(admin.StackedInline):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    """Профили с поиском по Clerk-id и почте."""
+    """Учётные записи с поиском по почте."""
 
-    list_display = ("clerk_id", "email", "effective_plan", "created_at")
-    search_fields = ("clerk_id", "email")
+    list_display = ("email", "effective_plan", "is_active", "last_login_at", "created_at")
+    list_filter = ("is_active", "email_verified")
+    search_fields = ("email",)
     inlines = (UserSettingsInline,)
+
+    # Хэш пароля и данные о согласии показываем, но редактировать не даём:
+    # правка хэша руками ломает вход, а согласие — юридический факт, а не
+    # настройка (152-ФЗ). Пароль меняется только самим пользователем.
+    readonly_fields = (
+        "password",
+        "consent_accepted_at",
+        "consent_policy_version",
+        "consent_ip",
+        "last_login_at",
+        "created_at",
+        "updated_at",
+    )
 
     @admin.display(description="Тариф")
     def effective_plan(self, obj) -> str:
@@ -33,3 +47,17 @@ class UserSettingsAdmin(admin.ModelAdmin):
     """Плоский список настроек — удобно сверять массовые значения."""
 
     list_display = ("user", "creativity", "context_depth", "theme")
+
+
+@admin.register(RefreshToken)
+class RefreshTokenAdmin(admin.ModelAdmin):
+    """Активные сессии — только чтение: выпускает и гасит их users.tokens."""
+
+    list_display = ("user", "created_at", "expires_at", "revoked_at", "ip")
+    list_filter = ("revoked_at",)
+    search_fields = ("user__email", "ip")
+    # Самого токена тут нет и быть не может — в базе лежит только его хэш.
+    readonly_fields = tuple(f.name for f in RefreshToken._meta.fields)
+
+    def has_add_permission(self, request) -> bool:
+        return False

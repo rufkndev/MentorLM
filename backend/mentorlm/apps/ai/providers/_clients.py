@@ -1,13 +1,19 @@
-"""Сетевая политика обращения к LLM: таймауты и ретраи в одном месте.
+"""Сетевая политика обращения к LLM: прокси, таймауты и ретраи в одном месте.
 
 Клиенты создаём только здесь — иначе зависшее соединение ничем не ограничено:
 воркер стоит на чтении, а wall-clock-проверка во вьюхе идёт между дельтами,
-которых нет.
+которых нет. И только здесь настраивается прокси: провайдеры недоступны с
+российских IP, поэтому на проде без него не работает ни один режим.
 """
 
 from __future__ import annotations
 
+import logging
+from functools import lru_cache
+
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 # Дозвон до провайдера: быстро, иначе пользователь ждёт впустую.
 CONNECT_TIMEOUT = 15.0
@@ -30,12 +36,53 @@ def _timeout():
     )
 
 
+def _make_http_client(label: str):
+    """Транспорт httpx с прокси и общей политикой таймаутов.
+
+    Таймаут задаём здесь, а не только в SDK: со своим http_client клиент SDK
+    берёт таймаут транспорта, и без этой строки политика выше потерялась бы
+    молча.
+    """
+    import httpx
+
+    proxy = (settings.LLM_PROXY_URL or "").strip() or None
+    if proxy:
+        # Хост без логина и пароля: адрес прокси в логах полезен, учётные
+        # данные — нет.
+        logger.info("LLM-клиент %s: трафик через прокси %s", label, httpx.URL(proxy).host)
+    else:
+        logger.info("LLM-клиент %s: прямое соединение, прокси не задан", label)
+
+    return httpx.Client(
+        proxy=proxy,
+        timeout=_timeout(),
+        # Пул переиспользуется между запросами (см. кэш ниже): без ограничения
+        # всплеск параллельных ответов открыл бы соединений сколько угодно.
+        limits=httpx.Limits(max_connections=64, max_keepalive_connections=16),
+    )
+
+
+# Транспорт кэшируем на процесс, а сами клиенты SDK создаются на каждый ответ.
+# Иначе пул соединений (и рукопожатие с прокси) заводился бы заново на каждое
+# сообщение пользователя, а старый никто бы не закрывал. httpx.Client
+# потокобезопасен, поэтому его же берёт фоновый поток извлечения памяти.
+@lru_cache(maxsize=1)
+def _openai_http():
+    return _make_http_client("openai")
+
+
+@lru_cache(maxsize=1)
+def _anthropic_http():
+    return _make_http_client("anthropic")
+
+
 def openai_client():
     """Клиент OpenAI с общей сетевой политикой."""
     from openai import OpenAI
 
     return OpenAI(
         api_key=settings.OPENAI_API_KEY,
+        http_client=_openai_http(),
         timeout=_timeout(),
         max_retries=MAX_RETRIES,
     )
@@ -47,6 +94,7 @@ def anthropic_client():
 
     return Anthropic(
         api_key=settings.ANTHROPIC_API_KEY,
+        http_client=_anthropic_http(),
         timeout=_timeout(),
         max_retries=MAX_RETRIES,
     )

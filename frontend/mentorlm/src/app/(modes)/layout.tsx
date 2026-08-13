@@ -6,10 +6,12 @@
 
 "use client";
 
-import { Suspense, useState } from "react";
-import { UserButton } from "@clerk/nextjs";
+import { Suspense, useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { PanelLeft } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { AccountMenu } from "@/components/mainapp/AccountMenu";
 import { AppSidebar } from "@/components/mainapp/sidebar";
 import { ConversationsProvider } from "@/components/mainapp/ConversationsProvider";
 import { SettingsDialog } from "@/components/mainapp/settings";
@@ -25,6 +27,24 @@ export default function ModesLayout({
   // Свёрнут/раскрыт сайдбар и открыт/закрыт диалог настроек.
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Защита маршрутов живёт здесь, а не в middleware: cookie сессии — httpOnly и
+  // ограничена путём /api/auth/, middleware её всё равно не увидит, а само по
+  // себе наличие cookie ещё не означает, что сессия жива.
+  const { status } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (status === "anon") {
+      // Запоминаем, куда пользователь шёл: после входа вернём его туда же.
+      router.replace(`/sign-in?next=${encodeURIComponent(pathname)}`);
+    }
+  }, [status, router, pathname]);
+
+  // Пока сессия восстанавливается — не рисуем ничего: показать приложение
+  // нельзя (данных нет), увести на вход тоже (может оказаться, что вход есть).
+  if (status !== "authed") return null;
 
   return (
     <SettingsProvider>
@@ -71,14 +91,7 @@ export default function ModesLayout({
 
       {/* аккаунт справа сверху */}
       <div className="fixed right-3 top-3 z-40">
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox:
-                "h-10 w-10 ring-1 ring-white/60 shadow-[0_8px_22px_-10px_rgba(7,27,77,0.25)]",
-            },
-          }}
-        />
+        <AccountMenu onOpenSettings={() => setSettingsOpen(true)} />
       </div>
 
         <SettingsDialog

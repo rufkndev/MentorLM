@@ -25,8 +25,16 @@ ALLOWED_HOSTS = env_list('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 # не задействован).
 CORS_ALLOWED_ORIGINS = env_list(
     'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://127.0.0.1:3000',
+    'http://localhost:3000',
 )
+
+# Без этого браузер не отправит cookie с refresh-токеном на кросс-origin запрос
+# и не сохранит новую из ответа: вход слетал бы на каждой перезагрузке.
+#
+# ⚠️ И фронт, и API должны быть на localhost (NEXT_PUBLIC_API_URL=http://localhost:8000).
+# 127.0.0.1 браузер считает ДРУГИМ сайтом, а cookie у нас SameSite=Lax — на
+# 127.0.0.1:8000 она просто не поедет, и виноватых будет не найти.
+CORS_ALLOW_CREDENTIALS = True
 
 
 # ── Кэш ───────────────────────────────────────────────────────────────────────

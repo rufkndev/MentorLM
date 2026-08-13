@@ -154,7 +154,10 @@ def _call_extractor(
     recent_messages, existing_facts, user_settings
 ) -> tuple[list[str], int, int]:
     """Запросить у дешёвой модели новые факты; вернуть (факты, токены_в, токены_из)."""
-    from openai import OpenAI
+    # Тот же клиент, что у режимов: через него приходят прокси, таймауты и
+    # ретраи. Свой OpenAI(...) здесь означал бы поход мимо прокси — то есть
+    # тихий отказ памяти на проде, ведь ошибки этого потока только логируются.
+    from apps.ai.providers._clients import openai_client
 
     scope = getattr(user_settings, "memory_scope", "balanced")
     guidance = _SCOPE_GUIDANCE.get(scope, _SCOPE_GUIDANCE["balanced"])
@@ -182,7 +185,7 @@ def _call_extractor(
         "Какие НОВЫЕ устойчивые факты о пользователе тут появились?"
     )
 
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = openai_client()
     resp = client.chat.completions.create(
         model=settings.OPENAI_MEMORY_MODEL,
         messages=[

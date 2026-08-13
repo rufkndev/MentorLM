@@ -18,7 +18,7 @@ class ConversationAdmin(admin.ModelAdmin):
 
     list_display = ("id", "user", "mode", "title", "updated_at")
     list_filter = ("mode",)
-    search_fields = ("title", "user__email", "user__clerk_id")
+    search_fields = ("title", "user__email")
     inlines = (MessageInline,)
 
 

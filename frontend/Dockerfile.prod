@@ -21,10 +21,8 @@ COPY mentorlm/ ./
 # (docker-compose.prod.yml), секретные ключи сюда не передаются.
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_APP_URL
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL \
-    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY \
     NEXT_TELEMETRY_DISABLED=1
 
 # Требует output: "standalone" в next.config.ts.
@@ -51,6 +49,5 @@ USER node
 
 EXPOSE 3000
 
-# CLERK_SECRET_KEY нужен серверному clerkMiddleware в рантайме — приходит из
-# env_file, а не из build args.
+# Секретов в рантайме фронту не нужно: аутентификация целиком на бэкенде.
 CMD ["node", "server.js"]

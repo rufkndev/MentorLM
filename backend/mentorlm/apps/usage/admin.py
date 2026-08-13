@@ -20,7 +20,7 @@ class UsageAdmin(admin.ModelAdmin):
         "billable_tokens",
     )
     list_filter = ("day", "mode")
-    search_fields = ("user__email", "user__clerk_id")
+    search_fields = ("user__email",)
 
 
 @admin.register(UsageEvent)
@@ -40,5 +40,5 @@ class UsageEventAdmin(admin.ModelAdmin):
         "conversation",
     )
     list_filter = ("mode", "model", "created_at")
-    search_fields = ("user__email", "user__clerk_id")
+    search_fields = ("user__email",)
     readonly_fields = ("created_at",)

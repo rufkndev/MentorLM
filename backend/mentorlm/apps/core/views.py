@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 class HealthCheckView(APIView):
     """GET /api/health/ — публичный пробник для мониторинга и compose."""
 
-    # Единственный открытый эндпоинт: остальным нужен Clerk-JWT.
+    # Открыт всем: проба контейнера ходит сюда без токена.
     authentication_classes = []
     permission_classes = [AllowAny]
 

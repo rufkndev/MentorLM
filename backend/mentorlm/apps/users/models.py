@@ -1,9 +1,10 @@
-"""Пользователь: профиль-зеркало Clerk и его продуктовые настройки (1:1).
+"""Пользователь: учётная запись, её продуктовые настройки (1:1) и refresh-токены.
 
 Варианты и дефолты настроек берём из ai.preferences, чтобы они не разъезжались
 с логикой, которая их применяет.
 """
 
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
 from apps.ai.preferences import (
@@ -21,16 +22,36 @@ from apps.ai.preferences import (
 
 
 class UserProfile(models.Model):
-    """Локальное отражение пользователя Clerk.
+    """Учётная запись пользователя приложения.
 
-    Источник правды об авторизации — Clerk; у себя храним запись, привязанную к
-    нему по `clerk_id`, и доменные поля приложения.
+    Своя, а не внешнего провайдера: по 152-ФЗ (ч.5 ст.18) персональные данные
+    граждан РФ должны записываться и храниться в базах на территории России.
+    Логин — email, пароль хранится только хэшем.
+
+    Это не django.contrib.auth.User: тот отвечает исключительно за вход в
+    админку. Два контура намеренно разделены — учётка админа не должна быть
+    учёткой пользователя продукта.
     """
 
     # Поля plan здесь нет: тариф — статус подписки (billing.Subscription),
     # считается на лету через effective_plan. Перечень тарифов — billing.Plan.
-    clerk_id = models.CharField(max_length=255, unique=True, db_index=True)
-    email = models.EmailField(blank=True)
+    email = models.EmailField(unique=True, db_index=True)
+    # Хэш Django (по умолчанию PBKDF2), а не пароль. 128 символов — стандартная
+    # ширина поля auth.User, её хватает любому алгоритму из HASHERS.
+    password = models.CharField(max_length=128)
+    # Блокировка без удаления: данные остаются, войти нельзя.
+    is_active = models.BooleanField(default=True)
+    # Пока писем не шлём (нет почтового провайдера) — задел под подтверждение.
+    email_verified = models.BooleanField(default=False)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+
+    # — Согласие на обработку ПДн (152-ФЗ) —
+    # Согласие нужно уметь доказать, поэтому фиксируем момент, версию политики,
+    # действовавшую на тот момент, и адрес, с которого оно дано.
+    consent_accepted_at = models.DateTimeField(null=True, blank=True)
+    consent_policy_version = models.CharField(max_length=20, blank=True)
+    consent_ip = models.GenericIPAddressField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -38,9 +59,9 @@ class UserProfile(models.Model):
         verbose_name = "Профиль пользователя"
         verbose_name_plural = "Профили пользователей"
 
-    # После ClerkJWTAuthentication именно UserProfile становится request.user,
-    # хотя это не django.contrib.auth.User — два свойства ниже нужны, чтобы
-    # DRF-пермишен IsAuthenticated пропускал такие запросы.
+    # После аутентификации именно UserProfile становится request.user, хотя это
+    # не django.contrib.auth.User — два свойства ниже нужны, чтобы DRF-пермишен
+    # IsAuthenticated пропускал такие запросы.
     @property
     def is_authenticated(self) -> bool:
         """Всегда True: анонимные запросы до профиля не доходят."""
@@ -51,8 +72,57 @@ class UserProfile(models.Model):
         """Всегда False — зеркальная пара к is_authenticated."""
         return False
 
+    @staticmethod
+    def normalize_email(raw: str) -> str:
+        """Привести email к каноничному виду: без пробелов, в нижнем регистре.
+
+        Без этого Petrov@vuz.ru и petrov@vuz.ru стали бы разными аккаунтами и
+        unique их не поймал бы.
+        """
+        return (raw or "").strip().lower()
+
+    def set_password(self, raw_password: str) -> None:
+        """Захэшировать пароль. Объект после этого нужно сохранить."""
+        self.password = make_password(raw_password)
+
+    def check_password(self, raw_password: str) -> bool:
+        """Совпадает ли пароль с хранимым хэшем."""
+        return check_password(raw_password, self.password)
+
     def __str__(self) -> str:
-        return self.email or self.clerk_id
+        return self.email
+
+
+class RefreshToken(models.Model):
+    """Долгоживущий токен обновления сессии — одна строка на устройство.
+
+    Сам токен в базе НЕ хранится, только его sha256: утечка дампа не должна
+    давать доступ к чужим сессиям. Токены одноразовые — `rotate` гасит
+    предъявленный и выдаёт новый (см. users.tokens).
+    """
+
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="refresh_tokens",
+    )
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    # Заполняется при выходе, ротации или принудительном отзыве всех сессий.
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    # Чтобы пользователь мог опознать свои сессии, а мы — расследовать угон.
+    user_agent = models.CharField(max_length=300, blank=True)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Refresh-токен"
+        verbose_name_plural = "Refresh-токены"
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.user} от {self.created_at:%d.%m.%Y %H:%M}"
 
 
 class UserSettings(models.Model):

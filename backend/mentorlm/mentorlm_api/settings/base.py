@@ -7,6 +7,7 @@
 """
 
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -90,15 +91,25 @@ TEMPLATES = [
 WSGI_APPLICATION = 'mentorlm_api.wsgi.application'
 
 
-# ── База данных: Postgres в Supabase ──────────────────────────────────────────
+# ── База данных: свой Postgres в docker ───────────────────────────────────────
+# База с персональными данными должна физически находиться в РФ (152-ФЗ, ч.5
+# ст.18), поэтому Postgres поднимаем сами рядом с приложением, а не берём
+# управляемый зарубежный. Дев и прод — две разные базы: дев не должен работать
+# с боевыми данными.
+#
+# Имена переменных совпадают с теми, что ждёт официальный образ postgres, —
+# одни и те же значения кормят и контейнер, и Django.
+# Дефолты рассчитаны на запуск с хоста: dev-контейнер слушает 5433, чтобы не
+# конфликтовать с системным Postgres. Внутри compose хост/порт перекрываются
+# на db:5432.
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("SUPABASE_NAME"),
-        "USER": os.environ.get("SUPABASE_USER"),
-        "PASSWORD": os.environ.get("SUPABASE_PASSWORD"),
-        "HOST": os.environ.get("SUPABASE_HOST"),
-        "PORT": os.environ.get("SUPABASE_PORT"),
+        "NAME": os.environ.get("POSTGRES_DB", "mentorlm_dev"),
+        "USER": os.environ.get("POSTGRES_USER", "mentorlm"),
+        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "mentorlm"),
+        "HOST": os.environ.get("POSTGRES_HOST", "127.0.0.1"),
+        "PORT": os.environ.get("POSTGRES_PORT", "5433"),
     }
 }
 
@@ -121,13 +132,16 @@ REDIS_CACHE_OPTIONS = {
 }
 
 
-# Пароли Django нужны только для входа в админку: пользователи живут в Clerk.
+# Применяются и к паролям пользователей (users.auth_views), и к админским.
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
     },
     {
+        # 8 вместо стандартных 8 по умолчанию — задано явно, чтобы порог был
+        # виден здесь, а не подразумевался.
         'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        'OPTIONS': {'min_length': 8},
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -154,11 +168,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # ── DRF ───────────────────────────────────────────────────────────────────────
-# Единственный способ аутентификации — Clerk-JWT, и по умолчанию любая вьюха
-# требует входа: публичные эндпоинты (health) отключают это у себя явно.
+# Единственный способ аутентификации — свой access-токен, и по умолчанию любая
+# вьюха требует входа: публичные эндпоинты (health, вход, регистрация)
+# отключают это у себя явно.
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'apps.users.authentication.ClerkJWTAuthentication',
+        'apps.users.authentication.SessionJWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -166,11 +181,38 @@ REST_FRAMEWORK = {
 }
 
 
-# ── Clerk ─────────────────────────────────────────────────────────────────────
-# CLERK_JWKS_URL: https://<frontend-api>/.well-known/jwks.json
-# CLERK_ISSUER:   https://<frontend-api> — значение claim `iss` в токене.
-CLERK_JWKS_URL = os.environ.get('CLERK_JWKS_URL', '')
-CLERK_ISSUER = os.environ.get('CLERK_ISSUER', '')
+# ── Сессии пользователей ──────────────────────────────────────────────────────
+# Схема двухтокенная (подробности — в apps/users/tokens.py): короткий access в
+# памяти вкладки и длинный refresh в httpOnly-cookie.
+#
+# 15 минут — компромисс: отозвать выданный access нельзя (он проверяется
+# подписью, без похода в базу), поэтому чем короче, тем меньше окно у украденного.
+ACCESS_TOKEN_TTL = timedelta(minutes=15)
+# Столько живёт «запомнить меня»: месяц без повторного ввода пароля.
+REFRESH_TOKEN_TTL = timedelta(days=30)
+
+AUTH_COOKIE_NAME = 'mlm_refresh'
+# Cookie нужна только эндпоинтам сессии — на остальные запросы её не шлём.
+AUTH_COOKIE_PATH = '/api/auth/'
+# Lax, а не Strict: со Strict cookie не придёт при переходе по внешней ссылке,
+# и пользователь увидит себя разлогиненным. None потребовал бы Secure и сломал
+# бы разработку по http.
+AUTH_COOKIE_SAMESITE = 'Lax'
+# В деве по http; prod.py включает обязательно.
+AUTH_COOKIE_SECURE = False
+
+# Версия политики конфиденциальности, под которой пользователь дал согласие.
+# Поднимать при каждом существенном изменении текста /legal/privacy: согласие
+# даётся под конкретную редакцию, и это нужно уметь показать.
+PRIVACY_POLICY_VERSION = '2026-08-13'
+
+
+# ── Прокси к провайдерам ──────────────────────────────────────────────────────
+# Через прокси идут ТОЛЬКО запросы к OpenAI/Anthropic (apps.ai.providers._clients),
+# всё остальное — напрямую. Пусто — без прокси. На российском сервере обязателен:
+# провайдеры не отвечают на запросы с российских IP.
+# Формат: http://ЛОГИН:ПАРОЛЬ@ХОСТ:ПОРТ, также https:// и socks5://.
+LLM_PROXY_URL = os.environ.get('LLM_PROXY_URL', '').strip()
 
 
 # ── Модели провайдеров ────────────────────────────────────────────────────────

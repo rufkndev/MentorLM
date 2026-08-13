@@ -1,5 +1,5 @@
-# Стек разработки. Штатный сценарий — поднять из докера только Redis:
-#     docker compose -f docker-compose.dev.yml up -d redis
+# Стек разработки. Штатный сценарий — поднять из докера базу и Redis:
+#     docker compose -f docker-compose.dev.yml up -d db redis
 # а бэкенд и фронт запускать на хосте (`runserver` и `pnpm dev`) — так работают
 # автоперезагрузка и отладчик. Сервис backend нужен, когда хочется проверить
 # сборку в контейнере целиком.
@@ -8,6 +8,36 @@
 name: mentorlm-dev
 
 services:
+  # Дев-база. Отдельная от прода намеренно: разработка не должна касаться боевых
+  # данных.
+  #
+  # Значения — из общего infra/env/.env, как и в проде: второго места, где
+  # прописан пароль, нет. Подстановка ${...} работает без флага --env-file
+  # благодаря симлинку infra/.env → env/.env: compose сам читает файл с именем
+  # .env, лежащий рядом с compose-файлом.
+  #
+  # Через ${...}, а не env_file: иначе в контейнер базы уехали бы ещё и ключи
+  # OpenAI/Anthropic и адрес прокси с паролем — базе они ни к чему.
+  db:
+    image: postgres:17-alpine
+    container_name: mentorlm-db-dev
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      # $$ — экранирование для compose: подставить должен шелл ВНУТРИ контейнера,
+      # а не compose при разборе файла.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: mentorlm-redis-dev
@@ -39,11 +69,19 @@ services:
       # у прода 0, поэтому ключи окружений не пересекаются. Значение перекрывает
       # REDIS_URL из env-файла, который рассчитан на запуск с хоста.
       REDIS_URL: redis://redis:6379/1
+      # То же самое для базы: из контейнера ходим на db:5432, а не на 127.0.0.1:5433.
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
     ports:
       - "8000:8000"
     volumes:
       - ../backend/mentorlm:/app
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata-dev:

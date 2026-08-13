@@ -1,12 +1,11 @@
 /**
  * Корневой layout приложения (App Router) — обёртка всех страниц.
- * Подключает шрифты, глобальные стили, SEO-метаданные и провайдер Clerk,
+ * Подключает шрифты, глобальные стили, SEO-метаданные и провайдер сессии,
  * а также анти-FOUC скрипт, выставляющий тему и размер шрифта до отрисовки.
  */
 
 import type { Metadata, Viewport } from "next";
-import { ClerkProvider } from "@clerk/nextjs";
-import { clerkLocalization } from "@/lib/clerk-localization";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import { CookieNotice } from "@/components/ui/CookieNotice";
 import { GlassFilters } from "@/components/ui/GlassFilters";
 import { JetBrains_Mono, Manrope } from "next/font/google";
@@ -71,7 +70,9 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <ClerkProvider localization={clerkLocalization}>
+    // Провайдер сессии оборачивает и лендинг: навбар и тизер меняют кнопку в
+    // зависимости от того, вошёл ли пользователь.
+    <AuthProvider>
       <html
         lang="ru"
         className={`${sans.variable} ${jetbrains.variable}`}
@@ -99,6 +100,6 @@ export default function RootLayout({
           <CookieNotice />
         </body>
       </html>
-    </ClerkProvider>
+    </AuthProvider>
   );
 }

@@ -19,7 +19,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { ComposerSubmit } from "@/components/mainapp/ChatComposer";
 import type {
   Message,
@@ -98,8 +98,7 @@ export function useChatSession(
   scenarios: readonly Scenario[],
 ) {
   const api = useApi();
-  const { userId: clerkUserId } = useAuth();
-  const userId = clerkUserId ?? null;
+  const { userId } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mode, create, refresh } = useConversations();
@@ -249,7 +248,8 @@ export function useChatSession(
     fetchHistory(urlConvId).catch(() => {});
   }, [urlConvId, userId, fetchHistory]);
 
-  // На жёстком обновлении страницы userId от Clerk появляется не сразу. Как
+  // На жёстком обновлении страницы userId появляется не сразу: сессия
+  // восстанавливается запросом к /api/auth/refresh/ (см. AuthProvider). Как
   // только он готов — подставляем кэш, если история ещё не показана (не трогаем
   // активный стрим: там messages уже непустой).
   useEffect(() => {

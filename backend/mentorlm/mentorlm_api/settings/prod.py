@@ -106,6 +106,10 @@ SILENCED_SYSTEM_CHECKS = ['security.W021']
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+# Cookie с refresh-токеном — только по https. По сути это ключ от сессии на
+# месяц, и по открытому каналу его отдавать нельзя.
+AUTH_COOKIE_SECURE = True
+
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'same-origin'
 
