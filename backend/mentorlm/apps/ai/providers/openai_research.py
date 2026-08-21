@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Iterator
 
@@ -14,6 +15,8 @@ from apps.billing.limits import WEB_SEARCH_CALLS_PER_ANSWER
 from ..context import count_tokens
 from ._clients import openai_client
 from .base import GenParams
+
+logger = logging.getLogger(__name__)
 
 # Модель иногда «проговаривает» поисковые запросы прямо в текст псевдо-тегами
 # <web_search_query .../> — служебный шум, который выглядит как сломанный ответ.
@@ -89,6 +92,12 @@ class OpenAIResearchProvider:
                 for key in dropped:
                     optional.pop(key)
 
+        # Потолок поисков сторожим сами, ТОЛЬКО если API не принял max_tool_calls:
+        # иначе обрывать нечего — модель сама остановится и напишет ответ. Именно
+        # свой обрыв ровно на потолке и оставлял пользователя без ответа: сложный
+        # запрос доходил до восьмого поиска раньше первой буквы текста.
+        enforce_cap = searching and "max_tool_calls" not in optional
+
         completion = ""
         pending = ""  # хвост, который ещё может оказаться служебным тегом
         capped = False  # упёрлись в потолок поисков и оборвали чтение сами
@@ -106,9 +115,11 @@ class OpenAIResearchProvider:
                     getattr(event.item, "type", "") == "web_search_call"
                 ):
                     usage["web_search_calls"] += 1
-                    # Страховка, если max_tool_calls не поддержан: прекращаем
-                    # читать, чтобы поиски не жгли квоту дальше.
-                    if usage["web_search_calls"] >= WEB_SEARCH_CALLS_PER_ANSWER:
+                    # Страховка на случай, когда потолок не передан в API:
+                    # прекращаем читать, чтобы поиски не жгли квоту дальше.
+                    if enforce_cap and (
+                        usage["web_search_calls"] > WEB_SEARCH_CALLS_PER_ANSWER
+                    ):
                         capped = True
                         break
             # Остаток буфера тегом так и не стал — отдаём как обычный текст.
@@ -126,7 +137,24 @@ class OpenAIResearchProvider:
             # Оборвали сами на потолке поисков — расход считаем своими числами.
             usage["prompt_tokens"] = count_tokens(system, params.model)
             usage["completion_tokens"] = count_tokens(completion, params.model)
+            if not completion:
+                logger.warning(
+                    "«Исследовать»: ответ оборван на потолке поисков (%s) без текста",
+                    usage["web_search_calls"],
+                )
             return
+
+        # Ответ без текста разбирать потом не по чему: причина видна только в
+        # финальном объекте (обрыв по потолку токенов, отказ, пустой вывод).
+        if not completion:
+            logger.warning(
+                "«Исследовать»: пустой ответ модели %s — status=%s, details=%s, "
+                "поисков=%s",
+                params.model,
+                getattr(final, "status", None),
+                getattr(final, "incomplete_details", None),
+                usage["web_search_calls"],
+            )
 
         # TODO: доставать url_citation annotations из final.output и отдавать
         # источники на фронт отдельным полем SSE — пока только текст.

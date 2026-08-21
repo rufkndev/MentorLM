@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'apps.usage',
     'apps.billing',
     'apps.memory',
+    'apps.mailer',
 ]
 
 MIDDLEWARE = [
@@ -205,6 +206,40 @@ AUTH_COOKIE_SECURE = False
 # Поднимать при каждом существенном изменении текста /legal/privacy: согласие
 # даётся под конкретную редакцию, и это нужно уметь показать.
 PRIVACY_POLICY_VERSION = '2026-08-13'
+
+# Сколько живут ссылки из писем (apps.users.tokens). Разные сроки не случайны:
+# подтверждение почты человек может отложить до вечера, а ссылка на смену
+# пароля — это временный ключ от аккаунта, и лежать в ящике сутками ей незачем.
+EMAIL_VERIFY_TOKEN_TTL = timedelta(hours=48)
+PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
+
+
+# ── Почта ─────────────────────────────────────────────────────────────────────
+# Отправляем через Yandex Cloud Postbox по SMTP — российский сервис, что важно
+# по 152-ФЗ: адреса пользователей не уезжают к зарубежному провайдеру рассылок.
+# Как завести домен, DKIM и ключи — dev_docs/notes/emailNote.md.
+#
+# Для Django это обычный SMTP-сервер, никакого кода про облако в проекте нет:
+# логин — идентификатор API-ключа с областью действия `yc.postbox.send`,
+# пароль — секретная часть того же ключа.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'postbox.cloud.yandex.net')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+# 587 — STARTTLS, 465 — TLS с первого байта. Взаимоисключающие: включить оба
+# нельзя, и Django на старте об этом скажет.
+EMAIL_USE_TLS = EMAIL_PORT != 465
+EMAIL_USE_SSL = EMAIL_PORT == 465
+EMAIL_HOST_USER = os.environ.get('POSTBOX_KEY_ID', '')
+EMAIL_HOST_PASSWORD = os.environ.get('POSTBOX_SECRET', '')
+# Без таймаута зависшее SMTP-соединение держало бы поток воркера до упора.
+EMAIL_TIMEOUT = 10
+
+# Адрес отправителя должен быть подтверждён в Postbox, иначе письмо не уйдёт.
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'MentorLM <no-reply@localhost>')
+# Reply-To писем: на no-reply отвечать некуда, а отвечают всё равно.
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@mentorlm.ru')
+# Адрес фронтенда — из него собираются ссылки в письмах. Именно фронта, а не
+# API: по ссылке открывается страница /verify-email, а не эндпоинт Django.
+PUBLIC_SITE_URL = os.environ.get('PUBLIC_SITE_URL', 'http://localhost:3000').rstrip('/')
 
 
 # ── Прокси к провайдерам ──────────────────────────────────────────────────────

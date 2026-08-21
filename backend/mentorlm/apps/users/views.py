@@ -5,8 +5,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.billing.guard import _window_reset, _window_usage
-from apps.billing.limits import MODE_LABEL, QUOTA_WINDOWS, limits_for, quota_for
+from apps.billing.guard import mode_usage_report
+from apps.billing.limits import limits_for
 from apps.billing.plans import active_subscription, effective_plan
 
 from .models import UserSettings
@@ -73,53 +73,11 @@ class MeSettingsDefaultsView(APIView):
         return Response(settings_defaults())
 
 
-def _window_view(used: int, limit, resets_at, human: str) -> dict:
-    """Одно скользящее окно для ЛК: доля расхода и момент восстановления.
-
-    Абсолютные токены наружу не отдаём. Время возвращаем при любом расходе,
-    даже если доля округлилась до 0% — иначе на малом расходе оно бы пропадало.
-    """
-    if limit is None:  # безлимит
-        return {"used_pct": 0, "resets_at": None, "window_label": human}
-    used_pct = min(100, round(used / limit * 100)) if limit else 0
-    return {
-        "used_pct": used_pct,
-        "resets_at": resets_at.isoformat() if used > 0 else None,
-        "window_label": human,
-    }
-
-
-def _mode_usage(user, plan: str, mode: str, now) -> dict:
-    """Расход режима по окнам плюс агрегат по самому забитому из них."""
-    quota = quota_for(plan, mode)
-    used = _window_usage(user, mode, now)
-
-    windows = {}
-    tightest, top_pct = None, -1
-    for window, (_, human) in QUOTA_WINDOWS.items():
-        limit = quota.limit(window)
-        resets_at = _window_reset(user, mode, window, now) if used[window] else now
-        view = _window_view(used[window], limit, resets_at, human)
-        windows[window] = view
-        if view["used_pct"] > top_pct:
-            tightest, top_pct = window, view["used_pct"]
-
-    return {
-        "label": MODE_LABEL.get(mode, mode).strip("«»"),
-        "used_pct": max(0, top_pct),
-        "remaining_pct": max(0, 100 - max(0, top_pct)),
-        "tightest_window": tightest,
-        "resets_at": windows[tightest]["resets_at"],
-        "window_label": windows[tightest]["window_label"],
-        "windows": windows,
-    }
-
-
 class UsageView(APIView):
     """GET /api/me/usage/ — расход по режимам в скользящих окнах.
 
-    По каждому режиму отдаём долю самого забитого окна (оно упрётся первым) и
-    разбивку по окнам — в процентах, без абсолютных чисел.
+    Сами проценты считает billing.guard.mode_usage_report — тот же вызов идёт в
+    конце ответа модели, поэтому ЛК и сайдбар не могут разойтись.
     """
 
     def get(self, request):
@@ -132,7 +90,7 @@ class UsageView(APIView):
                 "plan": plan,
                 "plan_label": limits_for(plan)["label"],
                 "modes": {
-                    mode: _mode_usage(user, plan, mode, now)
+                    mode: mode_usage_report(user, mode, plan=plan, now=now)
                     for mode in _USAGE_MODES
                 },
             }

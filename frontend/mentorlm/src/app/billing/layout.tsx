@@ -7,6 +7,7 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
 
 // Каркас страниц биллинга: кнопка «Назад» + контент.
 export default function BillingLayout({
@@ -25,8 +26,12 @@ export default function BillingLayout({
     }
   };
 
+  // Провайдер тарифа нужен и здесь, а не только в /chat: страница тарифов
+  // обязана знать действующий план, иначе платному пользователю она показывает
+  // «Free — ваш текущий план». Гость просто не получит данных (401), и карточки
+  // останутся такими же, как на лендинге.
   return (
-    <>
+    <SubscriptionProvider>
       {/* Плавающая кнопка «Назад» в левом верхнем углу */}
       <button
         type="button"
@@ -38,6 +43,6 @@ export default function BillingLayout({
         Назад
       </button>
       <main className="min-h-screen">{children}</main>
-    </>
+    </SubscriptionProvider>
   );
 }

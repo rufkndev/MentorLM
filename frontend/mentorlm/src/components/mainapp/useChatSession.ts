@@ -77,6 +77,11 @@ const PERSISTED_LIMIT_CODES = new Set(["mode_quota_exceeded", "feature_locked"])
 const GENERATION_POLL_MS = 4000;
 const MAX_GENERATION_POLLS = 150; // ~10 минут, с запасом на долгий research
 
+// Сколько ждём, пока бэк подтвердит остановку, прежде чем разорвать соединение
+// сами. Обычно он отвечает за секунду-две; запас — на случай, если сам запрос
+// «Стоп» завис в сети.
+const STOP_FALLBACK_MS = 20_000;
+
 // Сообщение с бэка → сообщение треда. Плашки (лимит тарифа, упрощённая модель,
 // остановленный ответ) хранятся в meta, поэтому переживают возврат в чат.
 function toMessage(m: ApiMessage): Message {
@@ -102,7 +107,7 @@ export function useChatSession(
   const router = useRouter();
   const searchParams = useSearchParams();
   const { mode, create, refresh } = useConversations();
-  const { refreshUsage } = useSubscription();
+  const { refreshUsage, applyModeUsage } = useSubscription();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
@@ -312,14 +317,32 @@ export function useChatSession(
       // экрана — тред просто снова подпишется на него при возврате.
       const controller = new AbortController();
       const placeholderId = crypto.randomUUID();
+      let stopping = false;
       beginReply(
         id,
         { id: placeholderId, role: "assistant", content: "", thinking: true },
         () => {
-          // Просим бэк остановиться: он сохранит написанную часть, спишет расход
-          // и сразу снимет лок — следующее сообщение можно слать тут же.
-          api.post("/api/conversations/stop/", {}).catch(() => {});
-          controller.abort();
+          // Повторное нажатие — рвём соединение немедленно.
+          if (stopping) {
+            controller.abort();
+            return;
+          }
+          stopping = true;
+          patchReply(id, { stopped: true }); // обратная связь сразу
+          // Соединение НЕ рвём: бэк дописывает остаток, сохраняет его и
+          // присылает done с настоящим id — иначе часть ответа пришлось бы
+          // выуживать из истории вслепую. Ответ на этот запрос приходит уже
+          // после снятия лока, поэтому следующий вопрос гарантированно не
+          // упрётся в «дождитесь окончания предыдущего ответа».
+          const fallback = setTimeout(() => controller.abort(), STOP_FALLBACK_MS);
+          api
+            .post<{ stopped?: boolean }>("/api/conversations/stop/", {})
+            .then((res) => {
+              // Не успел за отведённое время — обрываем сами.
+              if (!res?.stopped) controller.abort();
+            })
+            .catch(() => controller.abort())
+            .finally(() => clearTimeout(fallback));
         },
       );
 
@@ -337,26 +360,48 @@ export function useChatSession(
         if (result.degraded) {
           patchReply(id, { degraded: true, canUpgrade: result.canUpgrade });
         }
-        // Модель не выдала ни слова — честно говорим об этом и даём повторить,
-        // иначе в треде остался бы пустой пузырёк.
-        if (result.messageId === null && !getReply(id)?.message.content) {
+        if (result.stopped) patchReply(id, { stopped: true });
+        const empty = !getReply(id)?.message.content;
+        // Остановили до первого слова — сохранять и показывать нечего.
+        if (result.stopped && empty) {
+          dropReply(id);
+          if (result.usage) applyModeUsage(mode, result.usage);
+          return;
+        }
+        // Ответ не дописан (сбой провайдера, таймаут, пустой ответ модели):
+        // написанную часть бэк уже сохранил — показываем её вместе с
+        // пояснением и предложением повторить, а не теряем.
+        if (result.error) {
+          patchReply(id, {
+            thinking: false,
+            error: result.error,
+            canRetry: true,
+          });
+        } else if (result.messageId === null && empty) {
           patchReply(id, {
             error: "Модель не вернула ответ.",
             canRetry: true,
           });
         }
         endReply(id, result.messageId);
+        // Расход бэк присылает вместе с концом ответа — подставляем его сразу,
+        // не дожидаясь фонового опроса.
+        if (result.usage) applyModeUsage(mode, result.usage);
       } catch (err) {
-        // Остановлено пользователем — это не ошибка: оставляем уже написанную
-        // часть ответа (бэк сохранил её же) и помечаем сообщение.
+        // Соединение оборвали сами: бэк не подтвердил остановку вовремя (или
+        // «Стоп» нажали второй раз). Это не ошибка — оставляем написанную часть.
         if (controller.signal.aborted) {
           patchReply(id, { stopped: true });
           endReply(id, null);
           // Сохранённую бэком часть подтянем из истории — там она с настоящим
           // id. Повтор через паузу: бэк дописывает её уже после обрыва
-          // соединения, и первый запрос может успеть раньше сохранения.
+          // соединения, и первый запрос может успеть раньше сохранения. По той
+          // же причине и расход перечитываем второй раз.
           fetchHistory(id).catch(() => {});
-          setTimeout(() => fetchHistory(id).catch(() => {}), 1200);
+          setTimeout(() => {
+            fetchHistory(id).catch(() => {});
+            refreshUsage();
+          }, 1200);
           return;
         }
         // Упор в лимит тарифа бэк сохраняет в диалог отдельным уведомлением —
@@ -368,6 +413,10 @@ export function useChatSession(
           fetchHistory(id).catch(() => {});
           return;
         }
+        // Предыдущий ответ ещё дописывался — вопрос до бэка не дошёл и в
+        // диалоге его нет. «Повторить» здесь не предлагаем: бэк ответил бы на
+        // прошлый вопрос и стёр его ответ — вопрос нужно отправить заново.
+        const busy = failure?.code === "generation_in_progress";
         // Остальные сбои (сеть, лимит частоты, отказ провайдера) НЕ затирают
         // уже написанный текст: показываем его вместе с пояснением и
         // предложением повторить.
@@ -376,20 +425,19 @@ export function useChatSession(
           error: failure
             ? failure.message
             : "Не удалось получить ответ. Проверьте связь и попробуйте снова.",
-          canRetry: true,
+          canRetry: !busy,
         });
         endReply(id, null);
       } finally {
         setSending(false);
         // Обновляем сайдбар: заголовок чата и порядок по последней активности.
         refresh();
-        // И расход: бэк списывает его до конца стрима, поэтому к этому моменту
-        // цифры в «Подписке» уже актуальны — пользователь видит остаток сразу,
-        // без перезагрузки страницы.
+        // И расход — на случай, если ответ оборвался и события done с ним не
+        // было (обрыв связи, отказ до старта стрима).
         refreshUsage();
       }
     },
-    [api, fetchHistory, refresh, refreshUsage],
+    [api, applyModeUsage, fetchHistory, mode, refresh, refreshUsage],
   );
 
   const handleSubmit = useCallback(
@@ -475,8 +523,16 @@ export function useChatSession(
       live.abort();
       return;
     }
-    api.post("/api/conversations/stop/", {}).catch(() => {});
-  }, [live, api]);
+    const id = convIdRef.current;
+    // Бэк отвечает, когда генерация действительно завершилась, — сразу и
+    // подтягиваем сохранённую часть, не дожидаясь круга опроса.
+    api
+      .post("/api/conversations/stop/", {})
+      .then(() => {
+        if (id) fetchHistory(id).catch(() => {});
+      })
+      .catch(() => {});
+  }, [live, api, fetchHistory]);
 
   // Состояние отстаёт от URL ровно один кадр: navigation происходит при
   // рендере, а переключение диалога — в эффекте после него. Без этой проверки

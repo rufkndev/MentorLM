@@ -7,6 +7,7 @@ import { Section } from "../controls";
 import {
   useSubscription,
   type ModeUsage,
+  type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
 import { billingPlans } from "@/lib/billing-contents";
 
@@ -36,37 +37,54 @@ function formatResetAt(resetsAt: string | null): string | null {
   return `${day} в ${time}`;
 }
 
-// Полоска расхода одного режима: доля исчерпанной квоты + точное время сброса.
-// Цвет включается, только когда остаток реально мал — иначе шкала спокойная.
-function ModeUsageBar({ mode }: { mode: ModeUsage }) {
-  const remaining = mode.remaining_pct;
-  const resetAt = formatResetAt(mode.resets_at);
-  const tone =
-    remaining <= 10
-      ? "#d4334a"
-      : remaining <= 25
-        ? "#e08a1e"
-        : "var(--brand-primary)";
+// Цвет шкалы включается, только когда остаток реально мал — иначе она спокойная.
+function toneFor(remaining: number): string {
+  if (remaining <= 10) return "#d4334a";
+  if (remaining <= 25) return "#e08a1e";
+  return "var(--brand-primary)";
+}
+
+// Полоска одного окна квоты: остаток + точное время восстановления.
+function WindowBar({ window }: { window: UsageWindow }) {
+  const remaining = window.remaining_pct;
+  const resetAt = formatResetAt(window.resets_at);
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-3 text-[12.5px]">
-        <span className="text-ink-soft">{mode.label}</span>
+      <div className="flex items-baseline justify-between gap-3 text-[12px]">
+        <span className="text-muted">за {window.window_label}</span>
         <span className="font-medium text-ink">Осталось {remaining}%</span>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_9%,transparent)]">
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_9%,transparent)]">
         {/* Ширина — остаток, а не расход: пользователь следит именно за ним.
             Плавный переход делает фоновое обновление заметным, но спокойным. */}
         <div
           className="h-full rounded-full transition-[width,background-color] duration-700 ease-out"
-          style={{ width: `${Math.max(2, remaining)}%`, background: tone }}
+          style={{
+            width: `${Math.max(2, remaining)}%`,
+            background: toneFor(remaining),
+          }}
         />
       </div>
       {resetAt && (
-        <p className="mt-1.5 text-[11px] text-muted">
-          Лимит начнёт восстанавливаться {resetAt}
-          {mode.window_label ? ` · окно ${mode.window_label}` : ""}
+        <p className="mt-1 text-[11px] text-muted">
+          Начнёт восстанавливаться {resetAt}
         </p>
       )}
+    </div>
+  );
+}
+
+// Расход одного режима: оба окна квоты по отдельности. Раньше показывалось
+// только самое забитое из них, и цифра «прыгала» между 5 часами и неделей —
+// причём молча, так что остаток выглядел то упавшим, то восстановившимся.
+function ModeUsageBars({ mode }: { mode: ModeUsage }) {
+  return (
+    <div>
+      <p className="text-[12.5px] font-medium text-ink-soft">{mode.label}</p>
+      <div className="mt-2 space-y-2.5">
+        <WindowBar window={mode.windows.burst} />
+        <WindowBar window={mode.windows.week} />
+      </div>
     </div>
   );
 }
@@ -123,13 +141,13 @@ export function SubscriptionTab() {
         </div>
 
         {usage && (
-          <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <div className="mt-4 space-y-4 border-t border-line pt-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
               Использование
             </p>
-            <ModeUsageBar mode={usage.modes.chat} />
-            <ModeUsageBar mode={usage.modes.code} />
-            <ModeUsageBar mode={usage.modes.research} />
+            <ModeUsageBars mode={usage.modes.chat} />
+            <ModeUsageBars mode={usage.modes.code} />
+            <ModeUsageBars mode={usage.modes.research} />
           </div>
         )}
       </div>
@@ -176,8 +194,10 @@ export function SubscriptionTab() {
               <span className="text-[18px] font-semibold">{upsell.price} ₽</span>
               <span className="text-muted"> / месяц</span>
             </p>
+            {/* На страницу тарифов, а не сразу в оплату: сравнить планы — часть
+                решения, и с Plus должен быть виден не только Pro. */}
             <Link
-              href={upsell.cta.href ?? "/billing"}
+              href="/billing"
               className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)]"
             >
               Перейти на {upsell.name}

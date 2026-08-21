@@ -1,0 +1,20 @@
+{% comment %}
+Кнопка письма. Отдельным шаблоном, чтобы она везде выглядела одинаково.
+
+Фон задан и в bgcolor у <td>, и в style у <a>: Outlook игнорирует border-radius,
+но bgcolor понимает — там кнопка просто станет прямоугольной, а не исчезнет.
+
+Параметры: url, label.
+{% endcomment %}
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:26px 0 22px 0;">
+  <tr>
+    <td align="center" bgcolor="#1746f5" style="border-radius:999px;">
+      <a href="{{ url }}"
+         style="display:inline-block; padding:14px 30px; border-radius:999px;
+                font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                font-size:15px; font-weight:600; line-height:1; color:#ffffff; text-decoration:none;">
+        {{ label }}
+      </a>
+    </td>
+  </tr>
+</table>

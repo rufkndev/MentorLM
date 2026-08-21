@@ -41,7 +41,10 @@ class UserProfile(models.Model):
     password = models.CharField(max_length=128)
     # Блокировка без удаления: данные остаются, войти нельзя.
     is_active = models.BooleanField(default=True)
-    # Пока писем не шлём (нет почтового провайдера) — задел под подтверждение.
+    # Подтверждён ли адрес переходом по ссылке из письма (apps.users.auth_views).
+    # Вход не блокирует: неподтверждённая почта — повод показать напоминание, а
+    # не запереть человека снаружи. Успешный сброс пароля тоже поднимает флаг —
+    # человек прочитал письмо, значит ящик его.
     email_verified = models.BooleanField(default=False)
     last_login_at = models.DateTimeField(null=True, blank=True)
 
@@ -123,6 +126,52 @@ class RefreshToken(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user} от {self.created_at:%d.%m.%Y %H:%M}"
+
+
+class EmailToken(models.Model):
+    """Одноразовый токен из письма: подтверждение почты и сброс пароля.
+
+    Устроен как RefreshToken и по тем же причинам: в базе лежит только sha256,
+    токен гасится при первом использовании. Разница — в назначении и сроке
+    жизни. Ссылка из письма живёт в чужом почтовом ящике, в истории браузера и
+    в логах антивирусов, поэтому:
+
+    * `purpose` проверяется вместе с хэшем — ссылка «подтвердите почту» не
+      должна годиться для смены пароля, даже если однажды утечёт;
+    * `email` фиксирует адрес, НА КОТОРЫЙ ушло письмо: подтверждать нужно
+      именно его, а не тот, что окажется в профиле к моменту перехода.
+    """
+
+    class Purpose(models.TextChoices):
+        VERIFY_EMAIL = "verify_email", "Подтверждение почты"
+        PASSWORD_RESET = "password_reset", "Сброс пароля"
+
+    user = models.ForeignKey(
+        UserProfile,
+        on_delete=models.CASCADE,
+        related_name="email_tokens",
+    )
+    purpose = models.CharField(max_length=20, choices=Purpose.choices)
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+    email = models.EmailField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    # Заполняется при переходе по ссылке или при выпуске нового токена того же
+    # назначения — старая ссылка после этого не работает.
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    # Кто запросил письмо — для разбора жалоб на «мне приходят чужие письма».
+    ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Токен из письма"
+        verbose_name_plural = "Токены из писем"
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["user", "purpose"])]
+
+    def __str__(self) -> str:
+        return f"{self.get_purpose_display()} для {self.user}"
 
 
 class UserSettings(models.Model):

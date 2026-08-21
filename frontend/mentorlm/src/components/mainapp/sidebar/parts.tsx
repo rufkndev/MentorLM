@@ -16,7 +16,10 @@ import {
 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
-import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
+import {
+  useSubscription,
+  type UsageWindow,
+} from "@/components/mainapp/SubscriptionProvider";
 import { billingPlans } from "@/lib/billing-contents";
 import { cn } from "@/lib/cn";
 import { modes } from "@/lib/mainapp-contents";
@@ -115,16 +118,9 @@ export function SearchInput({
   );
 }
 
-// Компактный индикатор расхода текущего режима. Обновляется вместе с расходом
-// в провайдере (после каждого ответа и по фоновому таймеру), поэтому остаток
-// виден сразу — не нужно открывать настройки или перезагружать страницу.
-function UsageMeter() {
-  const { usage } = useSubscription();
-  const { mode } = useConversations();
-  const current = usage?.modes?.[mode];
-  if (!current) return null;
-
-  const remaining = current.remaining_pct;
+// Одно окно квоты строкой: подпись, тонкая шкала остатка и процент.
+function UsageWindowRow({ window }: { window: UsageWindow }) {
+  const remaining = window.remaining_pct;
   // Цвет включается, только когда остаток реально мал — иначе шкала спокойная.
   const tone =
     remaining <= 10
@@ -132,21 +128,43 @@ function UsageMeter() {
       : remaining <= 25
         ? "#e08a1e"
         : "var(--brand-primary)";
-
   return (
-    <div className="mb-1 px-3 py-2">
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
-          {current.label}
-        </span>
-        <span className="text-[11.5px] text-muted">осталось {remaining}%</span>
-      </div>
-      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_10%,transparent)]">
+    <div className="flex items-center gap-2">
+      <span className="w-11 shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-muted">
+        {window.window_label.replace("часов", "ч").replace("дней", "дн")}
+      </span>
+      <div className="h-1 flex-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_10%,transparent)]">
         <div
           className="h-full rounded-full transition-[width] duration-700 ease-out"
           style={{ width: `${Math.max(2, remaining)}%`, background: tone }}
         />
       </div>
+      <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted">
+        {remaining}%
+      </span>
+    </div>
+  );
+}
+
+// Компактный индикатор расхода текущего режима. Показываем ОБА окна квоты:
+// маленький вопрос почти не двигает недельную долю, но заметно двигает
+// пятичасовую — с одной общей шкалой остаток «прыгал» бы между окнами без
+// объяснений. Обновляется вместе с расходом в провайдере: он приходит прямо с
+// последним событием ответа, поэтому остаток виден сразу после ответа модели —
+// не нужно открывать настройки или перезагружать страницу.
+function UsageMeter() {
+  const { usage } = useSubscription();
+  const { mode } = useConversations();
+  const current = usage?.modes?.[mode];
+  if (!current) return null;
+
+  return (
+    <div className="mb-1 space-y-1.5 px-3 py-2">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
+        {current.label} · осталось
+      </span>
+      <UsageWindowRow window={current.windows.burst} />
+      <UsageWindowRow window={current.windows.week} />
     </div>
   );
 }
@@ -162,6 +180,9 @@ export function SidebarFooter({
   const { plan } = useSubscription();
   const upsellId = plan === "free" ? "plus" : plan === "plus" ? "pro" : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
+  // Ведём на страницу тарифов, а не сразу в оплату: человек должен сначала
+  // сравнить планы. Кнопка называет следующий тариф, а выбор остаётся за ним.
+  const upsellHref = "/billing";
 
   return (
     <div className="p-3">
@@ -176,7 +197,7 @@ export function SidebarFooter({
       </button>
       {upsell && (
         <Link
-          href={upsell.cta.href ?? "/billing"}
+          href={upsellHref}
           className="mt-1 flex h-10 items-center justify-between gap-2 rounded-2xl bg-[var(--brand-primary-soft)] px-3 text-[13.5px] font-medium text-[var(--brand-primary)] transition-colors hover:bg-[var(--brand-primary-soft)]/80"
         >
           <span className="flex items-center gap-2">

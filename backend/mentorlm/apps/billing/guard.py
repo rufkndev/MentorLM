@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import time
+
 from django.core.cache import cache
 from django.db.models import Min, Q, Sum
 from django.db.models.functions import Coalesce
@@ -55,15 +57,50 @@ class LimitExceeded(Exception):
 # воркер умрёт. С запасом над самым долгим ответом, иначе отпустит на живом.
 _GEN_LOCK_TTL = MAX_REQUEST_TIMEOUT_SECONDS + 60
 
+# Шаг опроса лока при ожидании — им же меряются паузы ниже.
+_LOCK_POLL_SECONDS = 0.1
 
-def acquire_generation_lock(user) -> bool:
+# Сколько ждать освобождения лока, прежде чем ответить «идёт генерация».
+# Предыдущий ответ после «Стопа» сворачивается за секунду-две (сохранить текст,
+# списать расход), и без этой паузы следующий вопрос упирался бы в 429 у
+# пользователя, который уже видит на экране остановленный ответ.
+LOCK_WAIT_SECONDS = 5.0
+
+# Сколько эндпоинт «Стоп» ждёт фактического завершения ответа, прежде чем
+# ответить «не успели». Потолок с запасом: стрим замечает флаг между пульсами
+# (≈1 с), дальше только сохранение и списание.
+STOP_WAIT_SECONDS = 10.0
+
+
+def acquire_generation_lock(user, *, wait_seconds: float = 0.0) -> bool:
     """Взять лок генерации; True — взяли, можно продолжать.
 
     cache.add — атомарный SET-if-absent (в Redis `SET NX`). Снимать обязательно
     через release_generation_lock, и кэш должен быть общим для всех воркеров
-    (см. settings.CACHES).
+    (см. settings.CACHES). `wait_seconds` — короткое ожидание вместо мгновенного
+    отказа: предыдущий ответ мог быть только что остановлен и ещё сохраняется.
     """
-    return bool(cache.add(f"genlock:{user.pk}", 1, timeout=_GEN_LOCK_TTL))
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        if cache.add(f"genlock:{user.pk}", 1, timeout=_GEN_LOCK_TTL):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(_LOCK_POLL_SECONDS)
+
+
+def wait_generation_finished(user, seconds: float) -> bool:
+    """Дождаться конца текущей генерации; False — не успела за отведённое время.
+
+    Нужно кнопке «Стоп»: пока лок держится, следующий вопрос получит 429, —
+    поэтому фронт ждёт подтверждения, а не шлёт его вслепую.
+    """
+    deadline = time.monotonic() + seconds
+    while generation_in_progress(user):
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(_LOCK_POLL_SECONDS)
+    return True
 
 
 def release_generation_lock(user) -> None:
@@ -128,6 +165,65 @@ def _window_reset(user, mode: str, window: str, now):
         user=user, mode=mode, created_at__gte=now - delta
     ).aggregate(m=Min("created_at"))["m"]
     return (oldest + delta) if oldest else (now + delta)
+
+
+# ── Витрина расхода ───────────────────────────────────────────────────────────
+# Проценты живут здесь же, где считаются квоты: ЛК, сайдбар и событие конца
+# стрима обязаны показывать одно и то же число.
+
+
+def _window_view(used: int, limit: int | None, resets_at, human: str) -> dict:
+    """Одно скользящее окно для интерфейса: доля расхода и момент восстановления.
+
+    Абсолютные µ$ наружу не отдаём. Время возвращаем при любом расходе, даже
+    если доля округлилась до 0% — иначе на малом расходе оно бы пропадало.
+    """
+    if limit is None:  # безлимит
+        return {
+            "used_pct": 0,
+            "remaining_pct": 100,
+            "resets_at": None,
+            "window_label": human,
+        }
+    used_pct = min(100, round(used / limit * 100)) if limit else 100
+    return {
+        "used_pct": used_pct,
+        "remaining_pct": 100 - used_pct,
+        "resets_at": resets_at.isoformat() if used > 0 else None,
+        "window_label": human,
+    }
+
+
+def mode_usage_report(user, mode: str, *, plan: str | None = None, now=None) -> dict:
+    """Расход режима по всем окнам — для ЛК и для события конца стрима.
+
+    Окна отдаём ВСЕ и по отдельности: интерфейс показывает и 5-часовое, и
+    недельное. Одной шкалой на режим их не свести — она показывала бы то одно
+    окно, то другое, и остаток «прыгал» бы без объяснений: маленький вопрос
+    почти не двигает недельную долю, но заметно двигает пятичасовую.
+    Верхние поля — самое забитое окно (`tightest_window`): оно упрётся первым.
+    """
+    plan = plan or effective_plan(user)
+    now = now or timezone.now()
+    quota = quota_for(plan, mode)
+    used = _window_usage(user, mode, now)
+
+    windows = {}
+    tightest, top_pct = None, -1
+    for window, (_, human) in QUOTA_WINDOWS.items():
+        limit = quota.limit(window)
+        resets_at = _window_reset(user, mode, window, now) if used[window] else now
+        view = _window_view(used[window], limit, resets_at, human)
+        windows[window] = view
+        if view["used_pct"] > top_pct:
+            tightest, top_pct = window, view["used_pct"]
+
+    return {
+        "label": MODE_LABEL.get(mode, mode).strip("«»"),
+        **windows[tightest],
+        "tightest_window": tightest,
+        "windows": windows,
+    }
 
 
 def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:

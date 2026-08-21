@@ -11,6 +11,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import type { ModeUsage } from "@/components/mainapp/SubscriptionProvider";
 import { useCallback, useMemo } from "react";
 
 // Базовый адрес API (из env, без хвостового слэша); дефолт — локальный бэк.
@@ -38,6 +39,25 @@ export class ApiError extends Error {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Итог стрима ответа ИИ. Ошибку внутри стрима НЕ бросаем: к этому моменту часть
+// ответа уже написана и сохранена на бэке — её нужно показать вместе с
+// пояснением, а не потерять. Бросаются только отказы до начала стрима (лимиты,
+// сеть, 401), где показывать нечего.
+export type StreamResult = {
+  /** id сохранённого ответа в БД; null — сохранять было нечего. */
+  messageId: number | null;
+  /** Ответ выдан на упрощённой модели (квота исчерпана). */
+  degraded: boolean;
+  /** Показывать ли апселл в плашке деградации. */
+  canUpgrade: boolean;
+  /** Ответ прерван пользователем — это не ошибка. */
+  stopped: boolean;
+  /** Текст ошибки от бэка, если ответ не дописан. */
+  error: string | null;
+  /** Свежий расход режима сразу после списания (см. mode_usage_report). */
+  usage: ModeUsage | null;
+};
 
 // Собирает ApiError из тела ответа: у лимитов бэк отдаёт JSON {code, message}.
 async function apiErrorFrom(res: Response): Promise<ApiError> {
@@ -163,11 +183,7 @@ export function useApi() {
         onDelta?: (delta: string) => void;
         signal?: AbortSignal;
       } = {},
-    ): Promise<{
-      messageId: number | null;
-      degraded: boolean;
-      canUpgrade: boolean;
-    }> => {
+    ): Promise<StreamResult> => {
       const res = await fetchResilient(path, {
         method: "POST",
         body,
@@ -184,6 +200,9 @@ export function useApi() {
       let messageId: number | null = null;
       let degraded = false; // квота исчерпана — ответ на упрощённой модели
       let canUpgrade = false; // показывать ли апселл в плашке деградации
+      let stopped = false; // ответ остановлен пользователем
+      let error: string | null = null;
+      let usage: ModeUsage | null = null;
 
       // SSE: события разделены пустой строкой, данные — в строках `data: {...}`.
       for (;;) {
@@ -206,27 +225,33 @@ export function useApi() {
               delta?: string;
               done?: boolean;
               message_id?: number | null;
-              error?: string;
+              stopped?: boolean;
+              error?: string | null;
               degraded?: boolean;
               can_upgrade?: boolean;
+              usage?: ModeUsage | null;
             };
             try {
               payload = JSON.parse(json);
             } catch {
               continue;
             }
-            if (payload.error) throw new ApiError(500, payload.error);
+            if (payload.error) error = payload.error;
             if (payload.degraded) {
               degraded = true;
               canUpgrade = !!payload.can_upgrade;
             }
             if (payload.delta) options.onDelta?.(payload.delta);
-            if (payload.done) messageId = payload.message_id ?? null;
+            if (payload.done) {
+              messageId = payload.message_id ?? null;
+              stopped = !!payload.stopped;
+              usage = payload.usage ?? null;
+            }
           }
         }
       }
 
-      return { messageId, degraded, canUpgrade };
+      return { messageId, degraded, canUpgrade, stopped, error, usage };
     },
     [fetchResilient],
   );

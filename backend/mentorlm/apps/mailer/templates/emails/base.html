@@ -1,0 +1,74 @@
+{% comment %}
+Каркас всех писем MentorLM.
+
+Вёрстка нарочно «древняя» — таблицы и инлайновые стили. Почтовые клиенты
+(Mail.ru, Яндекс.Почта, Outlook, Gmail) вырезают <style> из <head> и не знают
+ни flex, ни grid, ни CSS-переменных: то, что работает в приложении, здесь
+рассыпается. Поэтому фирменные цвета вписаны числами — это единственная копия
+токенов из globals.css, и при смене брендовых цветов её надо править руками.
+
+Картинок нет намеренно: почтовики режут внешние ресурсы до явного согласия
+пользователя, и письмо с логотипом-картинкой у половины получателей выглядело
+бы сломанным. Марка набрана текстом.
+
+Блоки: preheader (строка предпросмотра в списке писем), content (тело).
+{% endcomment %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MentorLM</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f2f5; -webkit-font-smoothing:antialiased;">
+
+  {# Строка предпросмотра: видна в списке писем рядом с темой, в самом письме — нет. #}
+  <div style="display:none; max-height:0; overflow:hidden; opacity:0; color:transparent;">
+    {% block preheader %}{% endblock %}
+  </div>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="background-color:#f1f2f5;">
+    <tr>
+      <td align="center" style="padding:32px 16px;">
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+               style="max-width:560px; width:100%;">
+
+          {# Шапка: словесная марка #}
+          <tr>
+            <td align="center" style="padding-bottom:20px;">
+              <span style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                           font-size:17px; font-weight:600; letter-spacing:-0.2px; color:#090f1f;">
+                Mentor<span style="color:#1746f5;">LM</span>
+              </span>
+            </td>
+          </tr>
+
+          {# Карточка письма #}
+          <tr>
+            <td style="background-color:#ffffff; border:1px solid #dce2ee; border-radius:16px;
+                       padding:32px 32px 28px 32px;
+                       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                       color:#1b2437; font-size:15px; line-height:1.6;">
+              {% block content %}{% endblock %}
+            </td>
+          </tr>
+
+          {# Подвал #}
+          <tr>
+            <td align="center" style="padding:20px 12px 0 12px;
+                       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+                       color:#6a7285; font-size:12px; line-height:1.6;">
+              Письмо отправлено автоматически — отвечать на него не нужно.<br>
+              Вопросы: <a href="mailto:{{ support_email }}" style="color:#6a7285;">{{ support_email }}</a><br>
+              <span style="color:#8b93a7;">© {{ year }} MentorLM</span>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

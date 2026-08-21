@@ -6,6 +6,8 @@
 
 import json
 import logging
+import queue
+import threading
 import time
 from datetime import timedelta
 
@@ -19,14 +21,18 @@ from rest_framework.views import APIView
 from apps.ai import service as ai_service
 from apps.ai.context import count_tokens
 from apps.billing.guard import (
+    LOCK_WAIT_SECONDS,
+    STOP_WAIT_SECONDS,
     LimitExceeded,
     acquire_generation_lock,
     clear_stop,
     generation_in_progress,
+    mode_usage_report,
     preflight,
     release_generation_lock,
     request_stop,
     stop_requested,
+    wait_generation_finished,
 )
 from apps.billing.limits import limits_for, request_timeout
 from apps.billing.models import Plan
@@ -103,6 +109,45 @@ class ConversationDetailView(generics.RetrieveUpdateDestroyAPIView):
         response = super().retrieve(request, *args, **kwargs)
         response.data["generating"] = generation_in_progress(request.user)
         return response
+
+
+# Пауза между «пульсами» SSE, пока модель молчит. Пульс решает сразу три задачи:
+# держит соединение живым через прокси, даёт вьюхе проверить «Стоп» и таймаут, и
+# — главное — обнаруживает закрытую вкладку: запись в мёртвый сокет обрывает
+# генератор. Без него молчащая модель («Исследовать» ищет минутами) удерживала
+# лок генерации до конца ответа, и следующий вопрос упирался в 429.
+HEARTBEAT_SECONDS = 1.0
+
+# Как часто спрашивать про «Стоп» и сверяться с потолком времени. Флаг лежит в
+# общем кэше, а дельт бывают сотни в секунду — проверять каждую было бы лишним
+# походом в Redis на каждый токен ответа.
+CHECK_INTERVAL_SECONDS = 0.5
+
+
+def _pump_deltas(deltas, inbox: queue.Queue, cancel: threading.Event) -> None:
+    """Читать поток провайдера в отдельном потоке, складывая куски в очередь.
+
+    Чтение блокирующее и прервать его нельзя, а вьюха обязана оставаться живой
+    даже когда модель молчит. Поэтому чтение вынесено сюда: генератор ответа
+    общается с провайдером только через очередь и в любой момент может уйти.
+    """
+    try:
+        for delta in deltas:
+            if cancel.is_set():
+                break
+            inbox.put(("delta", delta))
+    except BaseException as exc:  # noqa: BLE001 — пробрасываем в основной поток
+        inbox.put(("error", exc))
+    finally:
+        inbox.put(("end", None))
+        # Закрываем поток провайдера: соединение с моделью освобождается, и
+        # после «Стопа» генерация не продолжает жечь токены в фоне.
+        close = getattr(deltas, "close", None)
+        if close is not None:
+            try:
+                close()
+            except Exception:  # noqa: BLE001 — закрытие не должно ничего ломать
+                logger.debug("Не удалось закрыть поток провайдера", exc_info=True)
 
 
 # Отказы, которые сохраняем в диалог отдельным сообщением-уведомлением: это
@@ -200,8 +245,10 @@ class MessageCreateView(APIView):
 
         # Лок берём ДО preflight: проверка лимитов и списание расхода идут под
         # ним, поэтому параллельные запросы одного юзера не проскочат квоту.
-        # Снимаем в finally стрима, а на ранних выходах — явно.
-        if not acquire_generation_lock(user):
+        # Снимаем в finally стрима, а на ранних выходах — явно. Короткое
+        # ожидание вместо мгновенного отказа: предыдущий ответ мог быть только
+        # что остановлен и ещё досохраняется — на экране он уже завершён.
+        if not acquire_generation_lock(user, wait_seconds=LOCK_WAIT_SECONDS):
             return Response(
                 {
                     "code": "generation_in_progress",
@@ -290,22 +337,50 @@ class MessageCreateView(APIView):
             started = time.monotonic()
             client_gone = False  # соединение закрыто — отдавать события некуда
             stopped = False  # нажали «Стоп»: не ошибка, сохраняем написанное
+            error_text = None  # текст ошибки для пользователя (уйдёт вместе с done)
+
+            # Провайдера читает отдельный поток: пока он ждёт модель, этот цикл
+            # успевает заметить «Стоп», таймаут и обрыв связи.
+            inbox: queue.Queue = queue.Queue()
+            cancel = threading.Event()
+            reader = threading.Thread(
+                target=_pump_deltas,
+                args=(ai.deltas, inbox, cancel),
+                daemon=True,
+                name=f"llm-stream-{conversation.pk}",
+            )
+            reader.start()
+            checked = 0.0  # когда последний раз смотрели «Стоп» и часы
             try:
                 # Плашку деградации шлём до текста, чтобы фронт показал её сразу.
                 if degraded:
                     yield _sse({"degraded": True, "can_upgrade": can_upgrade})
-                for delta in ai.deltas:
-                    # «Стоп» с фронта: прекращаем читать модель и штатно
-                    # закрываем стрим — написанное сохранится ниже.
-                    if stop_requested(user):
-                        stopped = True
+                while True:
+                    # «Стоп» и потолок времени проверяем по часам, а не на каждой
+                    # дельте: флаг живёт в Redis, а дельт бывают сотни в секунду.
+                    # Проверка идёт по кругу цикла, а не только между дельтами, —
+                    # иначе молчащий ответ не прерывался бы вовсе.
+                    now_mono = time.monotonic()
+                    if now_mono - checked >= CHECK_INTERVAL_SECONDS:
+                        checked = now_mono
+                        if stop_requested(user):
+                            stopped = True
+                            break
+                        if now_mono - started > timeout_seconds:
+                            error_text = "Превышено время ответа. Попробуйте снова."
+                            break
+                    try:
+                        kind, payload = inbox.get(timeout=HEARTBEAT_SECONDS)
+                    except queue.Empty:
+                        yield ": ping\n\n"  # пульс: комментарий SSE, клиент его игнорирует
+                        continue
+                    if kind == "delta":
+                        assistant_content += payload
+                        yield _sse({"delta": payload})
+                    elif kind == "error":
+                        raise payload
+                    else:  # провайдер дочитан
                         break
-                    # Зависший стрим: обрываем между дельтами по потолку режима.
-                    if time.monotonic() - started > timeout_seconds:
-                        yield _sse({"error": "Превышено время ответа. Попробуйте снова."})
-                        break
-                    assistant_content += delta
-                    yield _sse({"delta": delta})
             except GeneratorExit:
                 # Вкладка закрыта / сеть отвалилась: yield больше нельзя, но
                 # сохранить ответ и снять лок обязаны.
@@ -318,10 +393,10 @@ class MessageCreateView(APIView):
                     conversation.mode,
                     model,
                 )
-                yield _sse(
-                    {"error": "Не удалось дописать ответ. Попробуйте ещё раз."}
-                )
+                error_text = "Не удалось дописать ответ. Попробуйте ещё раз."
             finally:
+                # Поток чтения больше не нужен: он закроет поток провайдера сам.
+                cancel.set()
                 try:
                     message_id = None
                     if assistant_content:
@@ -344,28 +419,49 @@ class MessageCreateView(APIView):
                         message_id = msg.id
                         conversation.updated_at = timezone.now()
                         conversation.save(update_fields=["updated_at"])
-                        # На прерванном стриме провайдер не успевает отдать
-                        # usage — оцениваем выход сами, иначе реальные деньги
-                        # прошли бы мимо квоты.
-                        tokens_out = usage.get("completion_tokens", 0) or count_tokens(
-                            assistant_content, model
-                        )
-                        record_usage(
-                            user,
-                            mode=conversation.mode,
-                            scenario=scenario_id or "",
-                            conversation=conversation,
-                            model=model,
-                            tokens_in=usage.get("prompt_tokens", 0),
-                            tokens_out=tokens_out,
-                            web_search_calls=usage.get("web_search_calls", 0),
-                            degraded=degraded,
-                        )
                         # Пополнение глобальной памяти — в фоне, ответ не ждёт.
                         extract_facts_in_background(user, conversation)
+                    elif not stopped and not error_text:
+                        # Модель не отдала ни слова: честная ошибка вместо
+                        # пустого пузырька — фронт предложит повторить.
+                        logger.warning(
+                            "Пустой ответ модели: conversation=%s mode=%s model=%s "
+                            "usage=%s",
+                            conversation.pk,
+                            conversation.mode,
+                            model,
+                            usage,
+                        )
+                        error_text = "Модель не вернула ответ. Попробуйте ещё раз."
+                    # Расход списываем всегда, а не только при сохранённом
+                    # ответе: на прерванном и на пустом стриме провайдер уже
+                    # потратил токены, и без записи они прошли бы мимо квоты.
+                    # На обрыве usage прийти не успевает — выход оцениваем сами.
+                    tokens_out = usage.get("completion_tokens", 0) or count_tokens(
+                        assistant_content, model
+                    )
+                    record_usage(
+                        user,
+                        mode=conversation.mode,
+                        scenario=scenario_id or "",
+                        conversation=conversation,
+                        model=model,
+                        tokens_in=usage.get("prompt_tokens", 0),
+                        tokens_out=tokens_out,
+                        web_search_calls=usage.get("web_search_calls", 0),
+                        degraded=degraded,
+                    )
                     if not client_gone:
+                        # Расход отдаём прямо здесь: он уже списан, и сайдбар
+                        # обновляется в тот же момент, без гонки с опросом ЛК.
                         yield _sse(
-                            {"done": True, "message_id": message_id, "stopped": stopped}
+                            {
+                                "done": True,
+                                "message_id": message_id,
+                                "stopped": stopped,
+                                "error": error_text,
+                                "usage": mode_usage_report(user, conversation.mode),
+                            }
                         )
                 finally:
                     # Лок снимаем последним — после списания расхода, чтобы
@@ -384,14 +480,21 @@ class MessageCreateView(APIView):
 class GenerationStopView(APIView):
     """POST /api/conversations/stop/ — остановить генерацию (кнопка «Стоп»).
 
-    Ставит флаг; активный стрим увидит его между дельтами, сохранит написанное,
-    спишет расход и снимет лок. Идемпотентен: флаг живёт до конца ответа.
+    Ставит флаг; активный стрим увидит его на ближайшем круге (не дольше паузы
+    между пульсами), сохранит написанное, спишет расход и снимет лок.
+    Идемпотентен: флаг живёт до конца ответа.
+
+    Отвечаем не сразу, а дождавшись конца ответа: пока лок держится, следующий
+    вопрос получил бы 429 «дождитесь окончания» — притом что на экране ответ уже
+    остановлен. `stopped: false` — не успели за отведённое время, фронт тогда
+    рвёт соединение сам.
     """
 
     def post(self, request):
-        """Попросить остановить текущий ответ пользователя."""
+        """Попросить остановить текущий ответ и дождаться его завершения."""
         request_stop(request.user)
-        return Response(status=status.HTTP_202_ACCEPTED)
+        finished = wait_generation_finished(request.user, STOP_WAIT_SECONDS)
+        return Response({"stopped": finished}, status=status.HTTP_202_ACCEPTED)
 
 
 def _sse(payload: dict) -> str:

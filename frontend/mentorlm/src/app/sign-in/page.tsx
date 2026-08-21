@@ -7,6 +7,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthError, useAuth } from "@/components/auth/AuthProvider";
@@ -72,6 +73,16 @@ function SignInForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+
+        {/* Ссылка на восстановление — рядом с полем пароля: её ищут именно
+            здесь, после того как пароль не подошёл. */}
+        <Link
+          href={t.forgot.href}
+          className="-mt-1 self-end text-[13px] text-ink-soft underline-offset-4 hover:text-ink hover:underline"
+        >
+          {t.forgot.label}
+        </Link>
+
         <Button
           type="submit"
           disabled={busy}

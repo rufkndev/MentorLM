@@ -2,7 +2,7 @@
 
 from django.contrib import admin
 
-from .models import RefreshToken, UserProfile, UserSettings
+from .models import EmailToken, RefreshToken, UserProfile, UserSettings
 
 
 class UserSettingsInline(admin.StackedInline):
@@ -58,6 +58,25 @@ class RefreshTokenAdmin(admin.ModelAdmin):
     search_fields = ("user__email", "ip")
     # Самого токена тут нет и быть не может — в базе лежит только его хэш.
     readonly_fields = tuple(f.name for f in RefreshToken._meta.fields)
+
+    def has_add_permission(self, request) -> bool:
+        return False
+
+
+@admin.register(EmailToken)
+class EmailTokenAdmin(admin.ModelAdmin):
+    """Ссылки из писем — только чтение, для разбора «письмо не пришло».
+
+    Видно, было ли письмо вообще заказано и переходили ли по ссылке. Самой
+    ссылки здесь нет: в базе лежит только её хэш, и восстановить её нельзя —
+    в том числе поддержке. Помочь можно единственным способом: попросить
+    запросить письмо заново.
+    """
+
+    list_display = ("user", "purpose", "created_at", "expires_at", "used_at")
+    list_filter = ("purpose",)
+    search_fields = ("user__email", "email")
+    readonly_fields = tuple(f.name for f in EmailToken._meta.fields)
 
     def has_add_permission(self, request) -> bool:
         return False

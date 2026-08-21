@@ -8,10 +8,37 @@
 
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
+import {
+  useSubscription,
+  type Plan,
+} from "@/components/mainapp/SubscriptionProvider";
 import { Mascot } from "@/components/ui/Mascot";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { billingHero, billingPlans, type BillingPlan } from "@/lib/billing-contents";
+import {
+  billingHero,
+  billingPlans,
+  type BillingPlan,
+  type PlanCta,
+} from "@/lib/billing-contents";
+
+// Тарифы по возрастанию — по этому порядку решаем, что предлагать, а что у
+// пользователя уже есть.
+const PLAN_ORDER: readonly Plan[] = ["free", "plus", "pro"];
+
+// Кнопка карточки с поправкой на действующий тариф. Тариф неизвестен (гость или
+// ответ ещё не пришёл) — оставляем как в контенте: лучше показать обычную
+// кнопку, чем ошибочно назвать чужой план текущим.
+function ctaFor(plan: BillingPlan, current: Plan | null): PlanCta {
+  if (!current) return plan.cta;
+  if (plan.id === current) {
+    return { label: "Текущий план", href: null, disabled: true };
+  }
+  if (PLAN_ORDER.indexOf(plan.id) < PLAN_ORDER.indexOf(current)) {
+    return { label: "Включено в ваш тариф", href: null, disabled: true };
+  }
+  return plan.cta;
+}
 
 // Страница тарифов: герой + сетка планов.
 export default function BillingPage() {
@@ -73,6 +100,7 @@ function HeroSection() {
 
 // Сетка из трёх карточек тарифов.
 function PlansSection() {
+  const { plan: current } = useSubscription();
   return (
     <section className="relative mt-16 sm:mt-20">
       <div className="mx-auto max-w-6xl px-6">
@@ -80,7 +108,7 @@ function PlansSection() {
         <div className="grid items-stretch gap-5 md:grid-cols-3">
           {billingPlans.map((plan, i) => (
             <Reveal key={plan.id} delay={0.08 * (i + 1)} className="h-full">
-              <PlanCard plan={plan} />
+              <PlanCard plan={plan} current={current} />
             </Reveal>
           ))}
         </div>
@@ -90,8 +118,16 @@ function PlansSection() {
 }
 
 // Карточка одного тарифа (единая структура для всех трёх планов).
-function PlanCard({ plan }: { plan: BillingPlan }) {
+function PlanCard({
+  plan,
+  current,
+}: {
+  plan: BillingPlan;
+  current: Plan | null;
+}) {
   const featured = !!plan.featured;
+  const cta = ctaFor(plan, current);
+  const tagline = plan.id === current ? "Ваш текущий план" : plan.tagline;
 
   // Выделенный план отличается только фоном и цветом текста, не геометрией —
   // так названия и цены выравниваются по горизонтали между карточками.
@@ -113,7 +149,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
       }
     >
       {/* Плашка-подпись над карточкой («популярный» и т.п.) */}
-      <PlanTag tagline={plan.tagline} featured={featured} />
+      <PlanTag tagline={tagline} featured={featured} />
 
       {/* Название, цена и описание плана */}
       <div className="mt-5">
@@ -166,7 +202,7 @@ function PlanCard({ plan }: { plan: BillingPlan }) {
 
       {/* Кнопка действия плана, прижата к низу карточки */}
       <div className="mt-auto pt-8">
-        <PlanCta plan={plan} featured={featured} />
+        <PlanCtaButton cta={cta} featured={featured} />
       </div>
     </article>
   );
@@ -236,15 +272,13 @@ function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
 }
 
 // Кнопка действия плана: неактивная плашка, внешняя ссылка или внутренний Link.
-function PlanCta({
-  plan,
+function PlanCtaButton({
+  cta,
   featured,
 }: {
-  plan: BillingPlan;
+  cta: PlanCta;
   featured: boolean;
 }) {
-  const cta = plan.cta;
-
   // Текущий план / «по запросу» — просто плашка без перехода.
   if (cta.disabled || !cta.href) {
     return (

@@ -17,6 +17,7 @@ import { ConversationsProvider } from "@/components/mainapp/ConversationsProvide
 import { SettingsDialog } from "@/components/mainapp/settings";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
+import { VerifyEmailBanner } from "@/components/mainapp/VerifyEmailBanner";
 
 // Каркас приложения: сайдбар + контент + аккаунт + настройки.
 export default function ModesLayout({
@@ -62,6 +63,9 @@ export default function ModesLayout({
 
       {/* Область контента активного режима */}
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Напоминание о неподтверждённой почте — в потоке, а не поверх:
+            плавающая плашка перекрыла бы композер или меню аккаунта. */}
+        <VerifyEmailBanner />
         <main className="relative flex-1">{children}</main>
       </div>
 

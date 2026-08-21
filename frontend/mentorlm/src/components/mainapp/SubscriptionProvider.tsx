@@ -34,28 +34,32 @@ export type SubscriptionInfo = {
   max_attachments: number;
 };
 
+export type UsageWindowKey = "burst" | "week";
+
 // Одно скользящее окно квоты режима: доля исчерпанного, подпись окна и точный
 // момент, с которого лимит начнёт восстанавливаться (ISO с бэка).
 export type UsageWindow = {
   used_pct: number;
+  remaining_pct: number;
   resets_at: string | null;
   window_label: string;
 };
 
-export type ModeUsage = {
+// Расход режима: оба окна по отдельности плюс поднятое наверх самое забитое из
+// них (см. mode_usage_report на бэке).
+export type ModeUsage = UsageWindow & {
   label: string;
-  used_pct: number;
-  remaining_pct: number;
-  tightest_window: "burst" | "week";
-  resets_at: string | null;
-  window_label: string;
+  /** Самое забитое окно — оно упрётся первым. */
+  tightest_window: UsageWindowKey;
   windows: { burst: UsageWindow; week: UsageWindow };
 };
+
+export type UsageMode = "chat" | "code" | "research";
 
 export type UsageInfo = {
   plan: Plan;
   plan_label: string;
-  modes: { chat: ModeUsage; code: ModeUsage; research: ModeUsage };
+  modes: Record<UsageMode, ModeUsage>;
 };
 
 type SubscriptionContextValue = {
@@ -70,6 +74,8 @@ type SubscriptionContextValue = {
   refresh: () => void;
   /** Перечитать только расход — дёшево и часто (после каждого ответа ИИ). */
   refreshUsage: () => void;
+  /** Подставить расход режима, пришедший вместе с концом ответа (без запроса). */
+  applyModeUsage: (mode: string, data: ModeUsage) => void;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
@@ -94,6 +100,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     api.get<SubscriptionInfo>("/api/me/subscription/").then(setSub).catch(() => {});
     refreshUsage();
   }, [api, refreshUsage]);
+
+  // Расход режима приходит прямо в последнем событии ответа — бэк отдаёт его
+  // уже после списания. Подставляем без запроса: шкала обновляется в тот же
+  // момент, когда ответ дописан, и не зависит от гонки с фоновым опросом.
+  const applyModeUsage = useCallback((mode: string, data: ModeUsage) => {
+    setUsage((prev) =>
+      prev && mode in prev.modes
+        ? { ...prev, modes: { ...prev.modes, [mode]: data } }
+        : prev,
+    );
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -132,8 +149,9 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       isTop: plan === "pro",
       refresh,
       refreshUsage,
+      applyModeUsage,
     }),
-    [sub, usage, plan, refresh, refreshUsage],
+    [sub, usage, plan, refresh, refreshUsage, applyModeUsage],
   );
 
   return (
@@ -153,6 +171,7 @@ const EMPTY: SubscriptionContextValue = {
   isTop: false,
   refresh: () => {},
   refreshUsage: () => {},
+  applyModeUsage: () => {},
 };
 
 // Доступ к тарифу и расходу. Вне провайдера (напр. на лендинге) — пустое

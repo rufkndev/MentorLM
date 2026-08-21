@@ -3,9 +3,13 @@
 from django.urls import path
 
 from .auth_views import (
+    EmailVerifyConfirmView,
+    EmailVerifyRequestView,
     LoginView,
     LogoutView,
     PasswordChangeView,
+    PasswordResetConfirmView,
+    PasswordResetRequestView,
     RefreshView,
     RegisterView,
 )
@@ -24,6 +28,25 @@ urlpatterns = [
     path("auth/refresh/", RefreshView.as_view(), name="auth-refresh"),
     path("auth/logout/", LogoutView.as_view(), name="auth-logout"),
     path("auth/password/", PasswordChangeView.as_view(), name="auth-password"),
+
+    # Письма. Подтверждение почты и сброс пароля приходят ссылкой на страницу
+    # фронта, а она уже зовёт эти эндпоинты с токеном из адреса.
+    path(
+        "auth/verify-email/request/",
+        EmailVerifyRequestView.as_view(),
+        name="auth-verify-email-request",
+    ),
+    path("auth/verify-email/", EmailVerifyConfirmView.as_view(), name="auth-verify-email"),
+    path(
+        "auth/password-reset/",
+        PasswordResetRequestView.as_view(),
+        name="auth-password-reset",
+    ),
+    path(
+        "auth/password-reset/confirm/",
+        PasswordResetConfirmView.as_view(),
+        name="auth-password-reset-confirm",
+    ),
 
     # Личный кабинет.
     path("me/", MeView.as_view(), name="me"),
