@@ -119,6 +119,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # Ждём именно backend, а не только базу: миграции накатывает его CMD
+      # (backend/Dockerfile.prod), и здоровым он становится уже после них.
+      # Без этого условия первый такт после деплоя с новой миграцией уходит в
+      # схему предыдущей версии и падает на несуществующей колонке.
+      backend:
+        condition: service_healthy
     # Даём такту доработать при деплое: посреди списания прерываться нельзя.
     stop_grace_period: 60s
     restart: always
