@@ -1,15 +1,29 @@
+/*
+ * Вкладка «Подписка»: тариф, расход по режимам и управление автопродлением.
+ *
+ * Управление здесь — это исполнение п. 7.4 оферты и ст. 16.1 ЗоЗПП: отказ от
+ * автосписаний должен приниматься в личном кабинете, без объяснения причин,
+ * без звонков и без обращения к третьим лицам. Отсюда три следствия в UI:
+ * кнопка отключения не спрятана за апселлом, подтверждение не уговаривает
+ * остаться, а после отказа прямо написано, до какой даты сохраняется доступ
+ * (п. 7.7). Удаление привязанной карты — второй названный в оферте способ
+ * отказа, поэтому оно тоже здесь, а не «по запросу в поддержку».
+ */
+
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Sparkles } from "lucide-react";
+import { Check, CreditCard, Loader2, Sparkles } from "lucide-react";
 import { Section } from "../controls";
 import {
   useSubscription,
   type ModeUsage,
   type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
+import { ApiError, useApi } from "@/lib/api";
 import { billingPlans } from "@/lib/billing-contents";
+import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
 
 // Точная дата и время, когда лимит начнёт восстанавливаться — в локальной зоне
 // пользователя. Сегодня/завтра называем словом, дальше — датой.
@@ -101,6 +115,147 @@ function formatPeriodEnd(iso: string | null): string | null {
   });
 }
 
+// Управление автопродлением и привязанной картой.
+function AutoRenewControls() {
+  const api = useApi();
+  const { sub, refresh } = useSubscription();
+  const [busy, setBusy] = useState<null | "cancel" | "resume" | "card">(null);
+  const [error, setError] = useState<string | null>(null);
+  // Подтверждение только на отключение — там человек теряет доступ в будущем.
+  // На включение подтверждения нет: это не опасное действие.
+  const [confirming, setConfirming] = useState(false);
+
+  if (!sub || sub.status === "none" || sub.plan === "free") return null;
+
+  const until = formatPeriodEnd(sub.current_period_end);
+
+  async function run(action: "cancel" | "resume" | "card") {
+    setBusy(action);
+    setError(null);
+    try {
+      if (action === "cancel") await api.post("/api/billing/subscription/cancel/", {});
+      if (action === "resume") await api.post("/api/billing/subscription/resume/", {});
+      if (action === "card") await api.delete("/api/billing/payment-method/");
+      await refresh();
+      setConfirming(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Не удалось выполнить действие");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-line bg-paper-2/30 p-5">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
+        Автопродление
+      </p>
+
+      <p className="mt-2 text-[13.5px] leading-relaxed text-ink-soft">
+        {sub.auto_renew ? (
+          <>
+            Подписка продлевается автоматически
+            {until && <> — следующее списание {until}</>}. За сутки до списания
+            мы пришлём письмо с суммой и датой.
+          </>
+        ) : (
+          <>
+            Автоматических списаний нет.
+            {until && <> Доступ к тарифу сохраняется до {until}, затем аккаунт
+            перейдёт на бесплатный тариф.</>}
+          </>
+        )}
+      </p>
+
+      {/* Привязанная карта: показываем маску, чтобы было понятно, что удаляем */}
+      {sub.card_title && (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-xl border border-line bg-surface/70 px-4 py-3">
+          <span className="flex items-center gap-2 text-[13px] text-ink">
+            <CreditCard className="h-4 w-4 text-muted" strokeWidth={1.7} />
+            {sub.card_title}
+          </span>
+          <button
+            type="button"
+            onClick={() => run("card")}
+            disabled={busy !== null}
+            className="text-[12.5px] text-muted transition-colors hover:text-[#d4334a] disabled:opacity-50"
+          >
+            {busy === "card" ? "Удаляем…" : "Удалить"}
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <p
+          role="alert"
+          className="mt-3 rounded-xl border border-red-200 bg-red-50/50 px-3.5 py-2.5 text-[12.5px] text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300"
+        >
+          {error}
+        </p>
+      )}
+
+      <div className="mt-4">
+        {sub.auto_renew ? (
+          confirming ? (
+            <div className="rounded-xl border border-line bg-surface/70 p-4">
+              <p className="text-[13px] leading-relaxed text-ink-soft">
+                Отключить автопродление?
+                {until && <> Доступ к тарифу сохранится до {until} — оплаченный
+                период не пропадает.</>}
+              </p>
+              <div className="mt-3 flex gap-2">
+                {/* Подтверждение — основное действие: отказ не должен требовать
+                    усилий, это прямо запрещено ст. 16.1 ЗоЗПП. */}
+                <button
+                  type="button"
+                  onClick={() => run("cancel")}
+                  disabled={busy !== null}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#d4334a] px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[#bb2c41] disabled:opacity-60"
+                >
+                  {busy === "cancel" && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+                  )}
+                  Отключить
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  disabled={busy !== null}
+                  className="rounded-xl px-3.5 py-2 text-[13px] text-ink-soft transition-colors hover:bg-ink/[0.06]"
+                >
+                  Оставить
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="rounded-xl border border-line px-4 py-2 text-[13px] text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink"
+            >
+              Отключить автопродление
+            </button>
+          )
+        ) : (
+          sub.card_title && (
+            <button
+              type="button"
+              onClick={() => run("resume")}
+              disabled={busy !== null}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)] disabled:opacity-60"
+            >
+              {busy === "resume" && (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+              )}
+              Включить автопродление
+            </button>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SubscriptionTab() {
   const { sub, usage, plan, isTop, refreshUsage } = useSubscription();
 
@@ -117,6 +272,7 @@ export function SubscriptionTab() {
   // Plus — Pro, на Free — Plus. Пока тариф не загружен (plan === null) — молчим.
   const upsellId = plan === "plus" ? "pro" : plan === "free" ? "plus" : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
+  const prices = usePlanPrices();
 
   return (
     <Section title="Подписка">
@@ -129,9 +285,13 @@ export function SubscriptionTab() {
             <p className="mt-1 text-[20px] font-semibold text-ink">{planLabel}</p>
             {periodEnd && (
               <p className="mt-1 text-[12.5px] text-muted">
-                {sub?.status === "canceled"
-                  ? `Действует до ${periodEnd}`
-                  : `Продление ${periodEnd}`}
+                {/* «Продление» — только когда списание действительно будет.
+                    Раньше здесь стояло «Продление» у всех подряд, и после
+                    отказа от автосписаний это выглядело так, будто отказ не
+                    сработал. */}
+                {sub?.auto_renew
+                  ? `Продление ${periodEnd}`
+                  : `Действует до ${periodEnd}`}
               </p>
             )}
           </div>
@@ -151,6 +311,10 @@ export function SubscriptionTab() {
           </div>
         )}
       </div>
+
+      {/* Управление списаниями — сразу под тарифом, до апселла: отказ не
+          должен быть спрятан за предложением купить больше. */}
+      <AutoRenewControls />
 
       {/* На верхнем тарифе апселла нет — вместо него подтверждение статуса. */}
       {isTop && (
@@ -191,7 +355,9 @@ export function SubscriptionTab() {
           </ul>
           <div className="mt-4 flex items-center justify-between">
             <p className="text-[13px] text-ink">
-              <span className="text-[18px] font-semibold">{upsell.price} ₽</span>
+              <span className="text-[18px] font-semibold">
+                {priceOf(upsell.id, upsell.price, prices)} ₽
+              </span>
               <span className="text-muted"> / месяц</span>
             </p>
             {/* На страницу тарифов, а не сразу в оплату: сравнить планы — часть

@@ -36,4 +36,47 @@ LETTERS: dict[str, Letter] = {
         subject="Сброс пароля в MentorLM",
         template="emails/password_reset",
     ),
+
+    # ── Подписка и деньги ────────────────────────────────────────────────────
+    # Первое из этих писем — не вежливость, а обязанность: п. 7.3 оферты и
+    # ст. 16.1 ЗоЗПП требуют предупредить о списании не позднее чем за 24 часа
+    # и назвать сумму, дату, тариф и способ отказа. Не отправили — не имеем
+    # права списывать, а списали — обязаны вернуть всё (п. 7.6). Поэтому
+    # `renewal_notice` завязано на код: billing.payments.renewal_blocked_reason
+    # смотрит именно на отметку о его отправке.
+    "renewal_notice": Letter(
+        subject="Завтра продлим подписку MentorLM",
+        template="emails/renewal_notice",
+    ),
+    "payment_succeeded": Letter(
+        subject="Оплата прошла — подписка MentorLM активна",
+        template="emails/payment_succeeded",
+    ),
+    # Чек по ФЗ-422 («Мой налог»). Исполнитель — ИП на НПД, ККТ не применяет
+    # (п. 2.2 ст. 2 ФЗ-54), поэтому чек не приходит от оператора фискальных
+    # данных сам — его формируют вручную, а это письмо и есть та самая
+    # «передача чека покупателю», которой требует ч. 1 ст. 14 ФЗ-422.
+    "npd_receipt": Letter(
+        subject="Чек по оплате MentorLM",
+        template="emails/npd_receipt",
+    ),
+    # Единственное письмо, которое уходит НЕ пользователю, а владельцу сервиса
+    # (SUPPORT_EMAIL). Напоминание выписать чеки в «Мой налог»: срок по ФЗ-422
+    # ограничен, а следить за ним по логам докера никто не станет.
+    "npd_receipts_due": Letter(
+        subject="MentorLM: нужно выписать чеки в «Мой налог»",
+        template="emails/npd_receipts_due",
+    ),
+    "renewal_failed": Letter(
+        subject="Не удалось продлить подписку MentorLM",
+        template="emails/renewal_failed",
+    ),
+    "subscription_canceled": Letter(
+        subject="Автопродление подписки MentorLM отключено",
+        template="emails/subscription_canceled",
+    ),
+    "refund_succeeded": Letter(
+        subject="Возврат по подписке MentorLM",
+        template="emails/refund_succeeded",
+    ),
 }

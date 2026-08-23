@@ -83,5 +83,36 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  # Планировщик биллинга — то же, что в проде, но под профилем: обычный
+  # `up -d db redis` его не поднимет, и это правильно. Такт шлёт настоящие
+  # письма и делает настоящие списания, поэтому включать его на дев-машине надо
+  # осознанно:
+  #     docker compose -f docker-compose.dev.yml --profile scheduler up -d scheduler
+  # Разовый прогон удобнее так (ничего не меняет, только показывает план):
+  #     python manage.py billing_tick --dry-run
+  scheduler:
+    profiles: ["scheduler"]
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.dev
+    container_name: mentorlm-scheduler-dev
+    env_file:
+      - ./env/.env
+    environment:
+      DEBUG: "True"
+      REDIS_URL: redis://redis:6379/1
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    command: >
+      /bin/sh -c "while :; do python manage.py billing_tick || true; sleep 600; done"
+    volumes:
+      - ../backend/mentorlm:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   pgdata-dev:

@@ -21,6 +21,7 @@ import {
   type BillingPlan,
   type PlanCta,
 } from "@/lib/billing-contents";
+import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
 
 // Тарифы по возрастанию — по этому порядку решаем, что предлагать, а что у
 // пользователя уже есть.
@@ -234,8 +235,11 @@ function PlanTag({
   );
 }
 
-// Цена плана: «По запросу» либо число рублей в месяц.
+// Цена плана: «По запросу» либо число рублей в месяц. Число берётся с бэкенда
+// (usePlanPrices) — там единственный источник правды; plan.price запасной.
 function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
+  const prices = usePlanPrices();
+
   if (plan.price === null) {
     return (
       <p
@@ -257,7 +261,7 @@ function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
           featured ? "text-white" : "text-ink"
         )}
       >
-        {plan.price} ₽
+        {priceOf(plan.id, plan.price, prices)} ₽
       </span>
       <span
         className={cn(

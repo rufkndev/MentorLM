@@ -89,6 +89,41 @@ services:
     restart: always
     logging: *default-logging
 
+  # Планировщик биллинга. Тот же образ, что backend, но вместо gunicorn крутит
+  # `manage.py billing_tick` раз в 10 минут: уведомления за 24 часа до
+  # автосписания, сами списания, добивание зависших платежей.
+  #
+  # Отдельным контейнером, а не потоком внутри backend: воркеров gunicorn
+  # несколько, и внутрипроцессный таймер запустился бы в каждом — то есть
+  # списал бы деньги столько раз, сколько воркеров. Здесь процесс ровно один,
+  # и даже он подстрахован advisory-локом Postgres внутри команды.
+  #
+  # `|| true` обязателен: без него упавший такт останавливает контейнер, а
+  # restart: always загоняет его в цикл перезапусков.
+  scheduler:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile.prod
+    container_name: mentorlm-scheduler
+    env_file:
+      - ./env/.env
+    environment:
+      DJANGO_SETTINGS_MODULE: mentorlm_api.settings.prod
+      REDIS_URL: redis://redis:6379/0
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+    command: >
+      /bin/sh -c "while :; do python manage.py billing_tick || true; sleep 600; done"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Даём такту доработать при деплое: посреди списания прерываться нельзя.
+    stop_grace_period: 60s
+    restart: always
+    logging: *default-logging
+
   frontend:
     build:
       context: ../frontend

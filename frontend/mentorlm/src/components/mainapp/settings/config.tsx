@@ -4,6 +4,7 @@ import {
   Cpu,
   CreditCard,
   Database,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -11,9 +12,16 @@ import { GeneralTab } from "./tabs/GeneralTab";
 import { ModelTab } from "./tabs/ModelTab";
 import { MemoryTab } from "./tabs/MemoryTab";
 import { SubscriptionTab } from "./tabs/SubscriptionTab";
+import { PaymentsTab } from "./tabs/PaymentsTab";
 import { DataTab } from "./tabs/DataTab";
 
-export type TabId = "general" | "model" | "memory" | "subscription" | "data";
+export type TabId =
+  | "general"
+  | "model"
+  | "memory"
+  | "subscription"
+  | "payments"
+  | "data";
 
 /* Единый источник вкладок: метаданные для навигации + компонент-панель.
  * Добавить вкладку = добавить одну запись здесь и одну в TabId. */
@@ -27,5 +35,6 @@ export const TABS: {
   { id: "model", label: "Модель ИИ", icon: Cpu, Panel: ModelTab },
   { id: "memory", label: "Память", icon: Brain, Panel: MemoryTab },
   { id: "subscription", label: "Подписка", icon: CreditCard, Panel: SubscriptionTab },
+  { id: "payments", label: "Платежи", icon: Receipt, Panel: PaymentsTab },
   { id: "data", label: "Данные", icon: Database, Panel: DataTab },
 ];

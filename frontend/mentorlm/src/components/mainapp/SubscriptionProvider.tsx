@@ -28,10 +28,43 @@ export type SubscriptionInfo = {
   status: string;
   provider: string | null;
   current_period_end: string | null;
+  /** Будет ли списание в конце периода. False — доступ просто закончится. */
+  auto_renew: boolean;
+  /** «Visa •••• 4444» — только маска, реквизитов карты у нас нет. */
+  card_title: string;
+  card_last4: string;
+  card_type: string;
+  /** Когда пользователь отказался от автопродления; null — не отказывался. */
+  canceled_at: string | null;
   allow_web_search: boolean;
   allow_memory: boolean;
   context_messages: number;
   max_attachments: number;
+};
+
+// Одна операция в истории платежей (GET /api/billing/payments/).
+export type PaymentRecord = {
+  id: number;
+  plan: Plan;
+  plan_label: string;
+  kind: "initial" | "renewal" | "upgrade";
+  kind_label: string;
+  status: "pending" | "waiting_for_capture" | "succeeded" | "canceled";
+  status_label: string;
+  amount: string;
+  currency: string;
+  description: string;
+  external_id: string | null;
+  card_last4: string;
+  card_type: string;
+  period_start: string | null;
+  period_end: string | null;
+  refunded: boolean;
+  refunded_amount: string;
+  /** Ссылка на чек в сервисе ФНС; пусто — чек ещё выписывается. */
+  npd_receipt_url: string;
+  created_at: string;
+  paid_at: string | null;
 };
 
 export type UsageWindowKey = "burst" | "week";
@@ -71,7 +104,9 @@ type SubscriptionContextValue = {
   isPaid: boolean;
   /** Верхний тариф — расти некуда, апселла нет вообще. */
   isTop: boolean;
-  refresh: () => void;
+  /** Перечитать тариф и расход. Промис — чтобы страница возврата с оплаты
+   *  могла дождаться нового тарифа до перехода в приложение. */
+  refresh: () => Promise<void>;
   /** Перечитать только расход — дёшево и часто (после каждого ответа ИИ). */
   refreshUsage: () => void;
   /** Подставить расход режима, пришедший вместе с концом ответа (без запроса). */
@@ -96,8 +131,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
     api.get<UsageInfo>("/api/me/usage/").then(setUsage).catch(() => {});
   }, [api]);
 
-  const refresh = useCallback(() => {
-    api.get<SubscriptionInfo>("/api/me/subscription/").then(setSub).catch(() => {});
+  const refresh = useCallback(async () => {
+    await api
+      .get<SubscriptionInfo>("/api/me/subscription/")
+      .then(setSub)
+      .catch(() => {});
     refreshUsage();
   }, [api, refreshUsage]);
 
@@ -169,7 +207,7 @@ const EMPTY: SubscriptionContextValue = {
   plan: null,
   isPaid: false,
   isTop: false,
-  refresh: () => {},
+  refresh: async () => {},
   refreshUsage: () => {},
   applyModeUsage: () => {},
 };

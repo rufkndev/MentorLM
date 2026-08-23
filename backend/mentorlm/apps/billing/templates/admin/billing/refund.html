@@ -1,0 +1,109 @@
+{% extends "admin/base_site.html" %}
+
+{% comment %}
+Страница оформления возврата. Показывает не только сумму, но и расчёт: п. 11.2
+оферты разрешает удержать фактически понесённые расходы, и при разборе спора
+объяснять придётся именно эту часть. Поле суммы редактируемое — подсказка
+остаётся подсказкой, решение принимает человек.
+{% endcomment %}
+
+{% block content %}
+<div id="content-main">
+
+  <p style="margin-bottom:1.5em;">
+    Платёж №{{ payment.pk }} · {{ payment.user_email }} ·
+    тариф {{ plan_label }} · {{ payment.amount }} ₽ от {{ payment.created_at|date:"d.m.Y" }}
+    {% if payment.external_id %}<br><small>ID в ЮKassa: <code>{{ payment.external_id }}</code></small>{% endif %}
+  </p>
+
+  <fieldset class="module aligned" style="margin-bottom:1.5em;">
+    <h2>Расчёт по п. 11.2 оферты</h2>
+    <div class="form-row">
+      <div>
+        <table style="margin:0.5em 0;">
+          <tr>
+            <th style="text-align:left; padding-right:2em;">Оплачено</th>
+            <td>{{ payment.amount }} ₽</td>
+          </tr>
+          {% if payment.refunded_amount %}
+          <tr>
+            <th style="text-align:left;">Уже возвращено</th>
+            <td>−{{ payment.refunded_amount }} ₽</td>
+          </tr>
+          {% endif %}
+          <tr>
+            <th style="text-align:left;">Оплаченный период</th>
+            <td>
+              {% if payment.period_start %}
+                {{ payment.period_start|date:"d.m.Y" }} — {{ payment.period_end|date:"d.m.Y" }}
+              {% else %}не задан{% endif %}
+            </td>
+          </tr>
+          <tr>
+            <th style="text-align:left;">Фактические расходы</th>
+            <td>
+              {{ spent }} ₽
+              <small style="color:#666;">— обращения к моделям за период (из ledger UsageEvent)</small>
+            </td>
+          </tr>
+          <tr>
+            <th style="text-align:left;">Доступно к возврату</th>
+            <td>{{ available }} ₽</td>
+          </tr>
+          <tr style="font-weight:bold;">
+            <th style="text-align:left;">Рекомендуемая сумма</th>
+            <td>{{ suggested }} ₽</td>
+          </tr>
+        </table>
+        <p class="help" style="margin-top:1em;">
+          Пропорционально полным дням до конца периода, за вычетом фактически
+          понесённых расходов. Если платными функциями не пользовались и расходов
+          нет — возвращается вся сумма (п. 11.3). При возврате по п. 7.6
+          (списание после отказа или без уведомления) удержания недопустимы —
+          возвращайте полную сумму.
+        </p>
+      </div>
+    </div>
+  </fieldset>
+
+  <form method="post">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <h2>Возврат</h2>
+
+      <div class="form-row">
+        <label for="amount" class="required">Сумма, ₽:</label>
+        <input type="text" name="amount" id="amount" value="{{ suggested }}" style="width:12em;">
+        <p class="help">Не больше {{ available }} ₽.</p>
+      </div>
+
+      <div class="form-row">
+        <label for="reason" class="required">Основание:</label>
+        <select name="reason" id="reason">
+          {% for value, label in reasons %}
+            <option value="{{ value }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-row">
+        <label for="comment">Комментарий:</label>
+        <input type="text" name="comment" id="comment" style="width:32em;"
+               placeholder="Например: обращение от 22.08.2026, отказ от услуги">
+        <p class="help">Попадёт в реестр возвратов и в описание платежа в ЮKassa.</p>
+      </div>
+    </fieldset>
+
+    <div class="submit-row">
+      <input type="submit" value="Провести возврат" class="default">
+      <a href="{% url 'admin:billing_payment_changelist' %}" class="button cancel-link">Отмена</a>
+    </div>
+  </form>
+
+  <p class="help" style="margin-top:1.5em;">
+    Деньги вернутся тем же способом и на то же платёжное средство, с которого
+    была оплата (п. 11.6). Пользователю уйдёт письмо с суммой и основанием.
+  </p>
+
+</div>
+{% endblock %}

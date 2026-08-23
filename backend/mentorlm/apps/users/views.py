@@ -117,6 +117,17 @@ class SubscriptionView(APIView):
                     if sub and sub.current_period_end
                     else None
                 ),
+                # Состояние автопродления и привязанной карты. Нужно ЛК, чтобы
+                # показать, будет ли списание, и дать его отключить — то самое
+                # «отключение в личном кабинете» из п. 7.4 оферты. Реквизитов
+                # карты здесь нет и быть не может: только маска для узнавания.
+                "auto_renew": bool(sub and sub.auto_renew),
+                "card_title": sub.card_title if sub else "",
+                "card_last4": sub.card_last4 if sub else "",
+                "card_type": sub.card_type if sub else "",
+                "canceled_at": (
+                    sub.canceled_at.isoformat() if sub and sub.canceled_at else None
+                ),
                 "allow_web_search": limits["allow_web_search"],
                 "allow_memory": limits["allow_memory"],
                 "context_messages": limits["context_messages"],

@@ -15,10 +15,20 @@ import { TABS, type TabId } from "./config";
 type Props = {
   open: boolean;
   onClose: () => void;
+  /** С какой вкладки открыть. Нужна ссылкам из писем: закон требует указать
+   *  СПОСОБ отказа от списаний, а не просто упомянуть его наличие, — ссылка
+   *  «где-то в настройках» таким указанием не является. */
+  initialTab?: TabId;
 };
 
-export function SettingsDialog({ open, onClose }: Props) {
-  const [tab, setTab] = useState<TabId>("general");
+export function SettingsDialog({ open, onClose, initialTab }: Props) {
+  const [tab, setTab] = useState<TabId>(initialTab ?? "general");
+
+  // Диалог не размонтируется при закрытии (AnimatePresence), поэтому вкладку
+  // из ссылки применяем на каждое открытие — иначе она сработала бы один раз.
+  useEffect(() => {
+    if (open && initialTab) setTab(initialTab);
+  }, [open, initialTab]);
 
   // ESC закрывает
   useEffect(() => {

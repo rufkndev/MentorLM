@@ -207,6 +207,11 @@ AUTH_COOKIE_SECURE = False
 # даётся под конкретную редакцию, и это нужно уметь показать.
 PRIVACY_POLICY_VERSION = '2026-08-13'
 
+# Редакция публичной оферты на момент оплаты. Сохраняется в подписку, потому что
+# п. 17.4 оферты применяет к договору ту версию, что действовала при оплате, —
+# а текст на сайте к моменту спора успеет измениться.
+OFFER_VERSION = '2026-08-04'
+
 # Сколько живут ссылки из писем (apps.users.tokens). Разные сроки не случайны:
 # подтверждение почты человек может отложить до вечера, а ссылка на смену
 # пароля — это временный ключ от аккаунта, и лежать в ящике сутками ей незачем.
@@ -236,10 +241,25 @@ EMAIL_TIMEOUT = 10
 # Адрес отправителя должен быть подтверждён в Postbox, иначе письмо не уйдёт.
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'MentorLM <no-reply@localhost>')
 # Reply-To писем: на no-reply отвечать некуда, а отвечают всё равно.
-SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@mentorlm.ru')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'arttaranovbusiness@gmail.com')
 # Адрес фронтенда — из него собираются ссылки в письмах. Именно фронта, а не
 # API: по ссылке открывается страница /verify-email, а не эндпоинт Django.
 PUBLIC_SITE_URL = os.environ.get('PUBLIC_SITE_URL', 'http://localhost:3000').rstrip('/')
+
+
+# ── Платежи: ЮKassa ───────────────────────────────────────────────────────────
+# Пара «идентификатор магазина + секретный ключ» из личного кабинета ЮKassa;
+# ими подписывается basic-авторизация к api.yookassa.ru (apps.billing.yookassa).
+# Как их получить и как зарегистрировать URL уведомлений —
+# dev_docs/notes/paymentsNote.md.
+YOOKASSA_SHOP_ID = os.environ.get('YOOKASSA_SHOP_ID', '').strip()
+YOOKASSA_SECRET_KEY = os.environ.get('YOOKASSA_SECRET_KEY', '').strip()
+
+# Куда ЮKassa возвращает человека с платёжной формы. Адрес фронта, а не API:
+# по нему открывается страница /billing/return, которая опрашивает статус.
+# Отдельная переменная нужна только для нестандартных стендов; обычно пусто и
+# собирается из PUBLIC_SITE_URL.
+YOOKASSA_RETURN_URL = os.environ.get('YOOKASSA_RETURN_URL', '').strip()
 
 
 # ── Прокси к провайдерам ──────────────────────────────────────────────────────

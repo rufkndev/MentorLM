@@ -1,0 +1,59 @@
+{% extends "emails/base.html" %}
+
+{% comment %}
+Уведомление о предстоящем автосписании. Единственное письмо в проекте,
+у которого есть юридические требования к содержанию: п. 7.3 оферты и ст. 16.1
+ЗоЗПП (в ред. ФЗ от 15.10.2025 № 376-ФЗ) обязывают назвать СУММУ, ДАТУ
+списания, НАИМЕНОВАНИЕ ТАРИФА и СПОСОБ ОТКАЗА. Убирать что-либо из этих
+четырёх пунктов нельзя — без них списание считается совершённым без
+уведомления и подлежит полному возврату (п. 7.6).
+{% endcomment %}
+
+{% block preheader %}{{ charge_date }} спишем {{ amount }} ₽ за тариф {{ plan_label }}. Отказаться можно в личном кабинете.{% endblock %}
+
+{% block content %}
+  <h1 style="margin:0 0 12px 0; font-size:20px; font-weight:600; line-height:1.35;
+             letter-spacing:-0.2px; color:#090f1f;">
+    Подписка продлится {{ charge_date }}
+  </h1>
+
+  <p style="margin:0 0 18px 0;">
+    Предупреждаем заранее, как и обещали: через сутки мы автоматически спишем
+    оплату следующего месяца с привязанной карты.
+  </p>
+
+  {# Четыре обязательных пункта — таблицей, чтобы их нельзя было не заметить. #}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="background-color:#f7f8fb; border:1px solid #dce2ee; border-radius:12px;
+                margin:0 0 20px 0;">
+    <tr>
+      <td style="padding:18px 20px; font-size:15px; line-height:1.9; color:#1b2437;">
+        <span style="color:#6a7285;">Тариф:</span>
+        <strong style="color:#090f1f;">MentorLM {{ plan_label }}</strong><br>
+        <span style="color:#6a7285;">Сумма:</span>
+        <strong style="color:#090f1f;">{{ amount }} ₽</strong><br>
+        <span style="color:#6a7285;">Дата списания:</span>
+        <strong style="color:#090f1f;">{{ charge_date }}</strong>{% if card_title %}<br>
+        <span style="color:#6a7285;">Карта:</span>
+        <strong style="color:#090f1f;">{{ card_title }}</strong>{% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <p style="margin:0;">
+    Ничего делать не нужно — если всё устраивает, подписка просто продлится
+    ещё на месяц.
+  </p>
+
+  {% include "emails/_button.html" with url=manage_url label="Управлять подпиской" %}
+
+  <p style="margin:0; padding-top:18px; border-top:1px solid #dce2ee; font-size:13px; color:#6a7285;">
+    <strong style="color:#1b2437;">Не хотите продлевать?</strong>
+    Откройте настройки MentorLM → «Подписка» и отключите автопродление либо
+    удалите привязанную карту. Это можно сделать в любой момент до списания,
+    без объяснения причин и без звонков — доступ к тарифу {{ plan_label }}
+    сохранится до {{ period_end }}, после чего аккаунт перейдёт на бесплатный
+    тариф. Можно и просто ответить на это письмо, написав нам на
+    <a href="mailto:{{ support_email }}" style="color:#6a7285;">{{ support_email }}</a>.
+  </p>
+{% endblock %}

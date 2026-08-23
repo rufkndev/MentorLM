@@ -1,28 +1,53 @@
 /**
  * Страница оформления подписки (/billing/checkout).
- * Показывает сводку выбранного плана из ?plan= (данные — billing-contents) и
- * место под форму оплаты (ЮKassa появится позже).
+ * Сводка выбранного плана из ?plan= (данные — billing-contents), согласия и
+ * переход на платёжную форму ЮKassa («Умный платёж»: человек уходит на форму
+ * провайдера, реквизиты карты через нас не проходят вовсе).
+ *
+ * Два чекбокса здесь — не формальность, а то, чем мы отличаемся от нарушения:
+ *  • «Продлевать автоматически» СНЯТ по умолчанию. Предпроставленное согласие
+ *    запрещено ст. 16 ЗоЗПП, а п. 7.2 оферты требует именно «выраженного
+ *    согласия». Снят — на бэк уходит auto_renew: false, и `save_payment_method`
+ *    в ЮKassa не отправляется вовсе: карта не привязывается, списать нечем.
+ *  • «Принимаю оферту» — акцепт по п. 4.1: договор заключается нажатием кнопки
+ *    оплаты под сформированным заказом.
  *
  * Здесь же — единственное место, где неподтверждённая почта что-то запрещает.
  * Сам продукт работает и без подтверждения; упирается только оплата, потому что
  * с этого момента нам нужно уметь отправить человеку чек и предупреждение об
  * автосписании за 24 часа (ФЗ-376). На бэкенде то же правило — пермишен
- * `EmailVerified` (apps/users/permissions.py), который вешается на платёжные
- * эндпоинты; экран ниже нужен, чтобы человек увидел причину, а не голый 403.
+ * `EmailVerified` (apps/users/permissions.py), который висит на CheckoutView;
+ * экран ниже нужен, чтобы человек увидел причину, а не голый 403.
  */
 
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, CreditCard, MailCheck, Shield } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  CreditCard,
+  MailCheck,
+  Receipt,
+  Shield,
+} from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useResendVerification } from "@/components/auth/useResendVerification";
+import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Button } from "@/components/ui/Button";
+import { useApi, ApiError } from "@/lib/api";
 import { authContents } from "@/lib/auth-contents";
-import { billingPlans, type BillingPlan } from "@/lib/billing-contents";
+import {
+  billingPlans,
+  checkoutContents as t,
+  type BillingPlan,
+} from "@/lib/billing-contents";
+import { cn } from "@/lib/cn";
+import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
 
 const gate = authContents.verifyGate;
 
@@ -119,8 +144,97 @@ function VerifyGate() {
   );
 }
 
-// Сводка плана + заглушка формы оплаты.
+// Чекбокс в стиле дизайн-системы: нативный input скрыт, но остаётся в потоке —
+// с ним бесплатно работают клавиатура, focus-visible и чтение с экрана.
+function CheckBox({
+  checked,
+  onChange,
+  children,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3">
+      <span className="relative mt-0.5 flex-none">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer absolute h-0 w-0 opacity-0"
+        />
+        <span
+          aria-hidden
+          className={cn(
+            "grid h-[18px] w-[18px] place-items-center rounded-[6px] border transition-colors",
+            "peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand-primary)] peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-[var(--brand-surface)]",
+            checked
+              ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-white"
+              : "border-line bg-surface",
+          )}
+        >
+          {checked && <Check className="h-3 w-3" strokeWidth={3} />}
+        </span>
+      </span>
+      <span className="text-[13px] leading-relaxed text-ink-soft">{children}</span>
+    </label>
+  );
+}
+
+// Дата окончания оплаченного периода словами — для предупреждения о смене тарифа.
+function formatUntil(iso: string | null): string {
+  if (!iso) return "конца оплаченного периода";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "конца оплаченного периода";
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+// Сводка плана, согласия и переход на форму оплаты.
 function CheckoutShell({ plan }: { plan: BillingPlan }) {
+  const api = useApi();
+  const { sub, isPaid } = useSubscription();
+  // Цена с бэкенда: именно она будет списана. Пока ответ не пришёл — запасная
+  // из контента, чтобы карточка не мигала пустотой.
+  const price = priceOf(plan.id, plan.price, usePlanPrices());
+
+  // Снят по умолчанию — см. комментарий в шапке файла.
+  const [autoRenew, setAutoRenew] = useState(false);
+  const [acceptOffer, setAcceptOffer] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Смена тарифа: текущий период закроется, новый начнётся сегодня. Показываем
+  // это до оплаты, а не после — иначе сгоревший остаток станет сюрпризом.
+  const isUpgrade = isPaid && sub != null && sub.plan !== plan.id;
+
+  async function pay() {
+    if (!acceptOffer) {
+      setError(t.errors.needOffer);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ payment_id: number; confirmation_url: string }>(
+        "/api/billing/checkout/",
+        { plan: plan.id, auto_renew: autoRenew, accept_offer: true },
+      );
+      // Уходим на форму ЮKassa. Именно assign, а не router.push: адрес внешний,
+      // и вернётся человек уже на /billing/return.
+      window.location.assign(res.confirmation_url);
+    } catch (e) {
+      // Сообщение бэка информативнее нашего: он знает, тариф ли уже подключён,
+      // не отвечает ли провайдер или не подтверждена почта.
+      setError(e instanceof ApiError ? e.message : t.errors.generic);
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="relative flex min-h-screen items-center justify-center px-6 py-24">
       {/* мягкое свечение позади карточки — как на странице тарифов */}
@@ -143,11 +257,9 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
           </span>
           <div>
             <h1 className="text-display text-[22px] font-semibold text-ink">
-              Оформление подписки
+              {t.title}
             </h1>
-            <p className="mt-0.5 text-[13px] text-muted">
-              Подписка продлевается ежемесячно
-            </p>
+            <p className="mt-0.5 text-[13px] text-muted">{t.subtitle}</p>
           </div>
         </div>
 
@@ -158,14 +270,12 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
               <BrandMark size={18} />
               Mentor LM {plan.name}
             </span>
-            {plan.price !== null && (
-              <span className="text-display text-[22px] font-semibold text-ink">
-                {plan.price} ₽
-                <span className="ml-1 text-[12px] font-normal text-muted">
-                  / месяц
-                </span>
+            <span className="text-display text-[22px] font-semibold text-ink">
+              {price} ₽
+              <span className="ml-1 text-[12px] font-normal text-muted">
+                {t.perMonth}
               </span>
-            )}
+            </span>
           </div>
           <ul className="mt-4 space-y-2">
             {plan.features.map((f) => (
@@ -185,15 +295,88 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
           </ul>
         </div>
 
-        {/* Заглушка формы оплаты */}
-        <div className="mt-4 rounded-2xl border border-dashed border-line px-5 py-4">
-          <p className="text-[13px] leading-relaxed text-ink-soft">
-            Здесь появится форма оплаты — мы подключаем платёжный шлюз. Пока
-            оформление недоступно.
+        {/* Смена тарифа: остаток текущего периода не переносится */}
+        {isUpgrade && (
+          <div className="mt-4 flex gap-2.5 rounded-2xl border border-[#e08a1e]/35 bg-[#e08a1e]/[0.08] px-4 py-3.5">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 flex-none text-[#c2761a]"
+              strokeWidth={1.9}
+            />
+            <div>
+              <p className="text-[13px] font-medium text-ink">
+                {t.upgradeWarning.title}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">
+                {t.upgradeWarning.text(
+                  sub.plan_label,
+                  plan.name,
+                  formatUntil(sub.current_period_end),
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Согласия */}
+        <div className="mt-5 space-y-4 rounded-2xl border border-line bg-surface/70 p-5">
+          <div>
+            <CheckBox checked={autoRenew} onChange={setAutoRenew}>
+              <span className="font-medium text-ink">{t.autoRenew.label}</span>
+            </CheckBox>
+            <p className="mt-1.5 pl-[30px] text-[12.5px] leading-relaxed text-muted">
+              {autoRenew ? t.autoRenew.hint(price) : t.autoRenew.off}
+            </p>
+          </div>
+
+          <div className="border-t border-line pt-4">
+            <CheckBox checked={acceptOffer} onChange={setAcceptOffer}>
+              {t.offer.lead}{" "}
+              <Link
+                href="/legal/offer"
+                target="_blank"
+                className="text-[var(--brand-primary)] underline-offset-2 hover:underline"
+              >
+                {t.offer.offerLabel}
+              </Link>{" "}
+              {t.offer.and}{" "}
+              <Link
+                href="/legal/privacy"
+                target="_blank"
+                className="text-[var(--brand-primary)] underline-offset-2 hover:underline"
+              >
+                {t.offer.privacyLabel}
+              </Link>{" "}
+              {t.offer.tail}
+            </CheckBox>
+          </div>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-red-50/50 px-3.5 py-2.5 text-[13px] text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300"
+          >
+            {error}
           </p>
-          <div className="mt-2.5 flex items-center gap-2 text-[12px] text-muted">
-            <Shield className="h-3.5 w-3.5 flex-none" strokeWidth={1.8} />
-            Платёж пройдёт через защищённый платёжный шлюз
+        )}
+
+        <Button
+          onClick={pay}
+          disabled={busy || !acceptOffer}
+          magnetic={false}
+          className="mt-5 w-full"
+        >
+          {busy ? t.paying : t.pay(price)}
+        </Button>
+
+        <div className="mt-3.5 space-y-1.5">
+          <div className="flex items-start gap-2 text-[12px] leading-relaxed text-muted">
+            <Shield className="mt-0.5 h-3.5 w-3.5 flex-none" strokeWidth={1.8} />
+            {t.secure}
+          </div>
+          <div className="flex items-start gap-2 text-[12px] leading-relaxed text-muted">
+            <Receipt className="mt-0.5 h-3.5 w-3.5 flex-none" strokeWidth={1.8} />
+            {t.receipt}
           </div>
         </div>
 
@@ -202,7 +385,7 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
           className="mt-6 inline-flex items-center gap-2 text-[13.5px] text-ink-soft transition-colors hover:text-ink"
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={1.7} />
-          Вернуться к тарифам
+          {t.back}
         </Link>
       </div>
     </section>

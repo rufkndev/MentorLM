@@ -21,6 +21,7 @@ import {
   type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
 import { billingPlans } from "@/lib/billing-contents";
+import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
 import { cn } from "@/lib/cn";
 import { modes } from "@/lib/mainapp-contents";
 
@@ -180,6 +181,8 @@ export function SidebarFooter({
   const { plan } = useSubscription();
   const upsellId = plan === "free" ? "plus" : plan === "plus" ? "pro" : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
+  // Цена — с бэкенда: она же спишется. См. lib/use-plan-prices.
+  const prices = usePlanPrices();
   // Ведём на страницу тарифов, а не сразу в оплату: человек должен сначала
   // сравнить планы. Кнопка называет следующий тариф, а выбор остаётся за ним.
   const upsellHref = "/billing";
@@ -205,7 +208,7 @@ export function SidebarFooter({
             Перейти на {upsell.name}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]/70">
-            {upsell.price}₽
+            {priceOf(upsell.id, upsell.price, prices)}₽
           </span>
         </Link>
       )}

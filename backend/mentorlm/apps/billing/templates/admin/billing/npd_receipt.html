@@ -1,0 +1,69 @@
+{% extends "admin/base_site.html" %}
+
+{% comment %}
+Выдача чека по ФЗ-422. Инструкция прямо на странице намеренно: этот экран
+открывают раз в несколько дней, и помнить последовательность действий в
+«Мой налог» никто не обязан.
+{% endcomment %}
+
+{% block content %}
+<div id="content-main">
+
+  <p style="margin-bottom:1.5em;">
+    Платёж №{{ payment.pk }} · {{ payment.user_email }} ·
+    тариф {{ plan_label }} · <strong>{{ payment.amount }} ₽</strong>
+    от {{ payment.paid_at|date:"d.m.Y" }}
+  </p>
+
+  {% if deadline %}
+  <p class="{% if deadline|date:'U' < now|date:'U' %}errornote{% else %}help{% endif %}"
+     style="margin-bottom:1.5em;">
+    Срок выдачи чека по ч. 3 ст. 14 ФЗ-422: <strong>до {{ deadline|date:"d.m.Y" }}</strong>
+    (не позднее 9-го числа месяца, следующего за месяцем расчёта).
+  </p>
+  {% endif %}
+
+  <fieldset class="module aligned" style="margin-bottom:1.5em;">
+    <h2>Как получить ссылку</h2>
+    <div class="form-row">
+      <div>
+        <ol style="margin:0.5em 0 0 1.2em; line-height:1.9;">
+          <li>Открыть приложение <strong>«Мой налог»</strong> (или lknpd.nalog.ru).</li>
+          <li>«Новая продажа» → сумма <strong>{{ payment.amount }} ₽</strong>,
+              наименование: <em>Подписка MentorLM {{ plan_label }}</em>.</li>
+          <li>Плательщик — <strong>физическое лицо</strong>.</li>
+          <li>Дата расчёта — <strong>{{ payment.paid_at|date:"d.m.Y" }}</strong>
+              (дата фактической оплаты, а не сегодняшняя).</li>
+          <li>Сформировать чек и скопировать ссылку на него.</li>
+        </ol>
+        <p class="help" style="margin-top:1em;">
+          Если платёж был возвращён полностью — чек нужно аннулировать в
+          «Мой налог», а не выдавать.
+        </p>
+      </div>
+    </div>
+  </fieldset>
+
+  <form method="post">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      <h2>Ссылка на чек</h2>
+      <div class="form-row">
+        <label for="receipt_url" class="required">Ссылка:</label>
+        <input type="url" name="receipt_url" id="receipt_url" style="width:36em;"
+               placeholder="https://lknpd.nalog.ru/api/v1/receipt/.../print">
+        <p class="help">
+          Постоянная ссылка на чек из «Мой налог». Уйдёт покупателю письмом —
+          это и есть передача чека по ч. 1 ст. 14 ФЗ-422.
+        </p>
+      </div>
+    </fieldset>
+
+    <div class="submit-row">
+      <input type="submit" value="Отметить и отправить покупателю" class="default">
+      <a href="{% url 'admin:billing_payment_changelist' %}" class="button cancel-link">Отмена</a>
+    </div>
+  </form>
+
+</div>
+{% endblock %}
