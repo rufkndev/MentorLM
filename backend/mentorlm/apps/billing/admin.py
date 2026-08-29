@@ -21,7 +21,13 @@ from django.utils.html import format_html
 from django.utils import timezone
 
 from .limits import USE_KKT_RECEIPTS, limits_for
-from .models import BillingEvent, Payment, Refund, Subscription
+from .models import (
+    PAYMENT_METHOD_TITLES,
+    BillingEvent,
+    Payment,
+    Refund,
+    Subscription,
+)
 from .payments import (
     PaymentError,
     cancel_autorenew,
@@ -42,19 +48,26 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "plan",
         "status",
         "auto_renew",
+        # Рядом с auto_renew намеренно: расхождение этих двух колонок — и есть
+        # «человек просил автопродление, а привязать средство не удалось».
+        # Первое, на что смотрят при разборе обращения «почему не продлилось».
+        "auto_renew_requested",
         "card",
         "current_period_end",
         "renewal_notified_at",
+        "expiry_notified_at",
         "is_alive",
         "created_at",
     )
-    list_filter = ("plan", "status", "provider", "auto_renew")
+    list_filter = ("plan", "status", "provider", "auto_renew", "auto_renew_requested")
     search_fields = ("user__email", "external_id", "payment_method_id")
     readonly_fields = (
         "auto_renew_consent_at",
         "auto_renew_consent_ip",
         "payment_method_id",
+        "payment_method_type",
         "renewal_notified_at",
+        "expiry_notified_at",
         "renewal_attempts",
         "canceled_at",
         "offer_version",
@@ -132,14 +145,39 @@ class PaymentAdmin(admin.ModelAdmin):
         "kind",
         "status",
         "amount",
+        # Чем платили и привязалось ли. Вместе с `kind` это вся картина по
+        # автопродлению: видно и то, что человек платил не картой, и то, что
+        # привязка не состоялась, — без захода в объект платежа.
+        "method",
         "npd_receipt",
         "refunded_amount",
         "refund_link",
     )
-    list_filter = ("status", "kind", "plan", "provider", NpdReceiptFilter)
+    list_filter = (
+        "status",
+        "kind",
+        "plan",
+        "provider",
+        "payment_method_type",
+        NpdReceiptFilter,
+    )
     search_fields = ("user_email", "external_id", "description")
     date_hierarchy = "created_at"
     inlines = (RefundInline,)
+
+    @admin.display(description="Способ")
+    def method(self, obj) -> str:
+        """Способ оплаты и судьба привязки: «Банковская карта (привязана)»."""
+        title = PAYMENT_METHOD_TITLES.get(obj.payment_method_type, "")
+        if obj.card_last4:
+            title = f"{obj.card_type or 'Карта'} •••• {obj.card_last4}"
+        if not title:
+            return "—"
+        if obj.payment_method_id:
+            return f"{title} (привязана)"
+        # Отдельно отмечаем только осмысленный случай: просили привязку и не
+        # получили. Отсутствие привязки без запроса — норма, а не находка.
+        return f"{title} (привязка не удалась)" if obj.auto_renew_requested else title
 
     @admin.display(description="Чек НПД")
     def npd_receipt(self, obj):

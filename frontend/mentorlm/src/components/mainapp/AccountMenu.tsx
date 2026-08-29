@@ -143,7 +143,7 @@ export function AccountMenu({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
-            className="glass-strong absolute right-0 top-12 w-[280px] overflow-hidden rounded-[var(--radius-lg)] p-1.5"
+            className="glass-strong absolute right-0 top-12 z-50 w-[280px] origin-top-right overflow-hidden rounded-[var(--radius-lg)] p-1.5"
           >
             {/* ── Шапка: кто вошёл и на каком тарифе ─────────────────────── */}
             <div className="flex items-center gap-3 px-2.5 pb-3 pt-2.5">

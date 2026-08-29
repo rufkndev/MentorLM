@@ -8,13 +8,14 @@
  * платежа сам переспрашивает статус у ЮKassa (billing/views.py). Вебхук при
  * этом остаётся главным механизмом — просто мы на него не закладываемся.
  *
- * Успех — единственное состояние, где мы уводим человека дальше сами: тариф
- * уже работает, задерживать незачем.
+ * Дальше человек уходит сам — кнопкой. Автоматический редирект по таймеру мы
+ * не делаем: подтверждение оплаты человек должен успеть прочитать, а страница,
+ * которая уезжает из-под курсора, читается как сбой.
  */
 
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
@@ -31,6 +32,24 @@ const POLL_MS = 1_500;
 const TIMEOUT_MS = 30_000;
 
 type Phase = "pending" | "success" | "canceled" | "timeout" | "notFound";
+
+// Что бэкенд рассказал о привязке платёжного средства по этому платежу.
+type BindingResult = {
+  requested: boolean;
+  enabled: boolean;
+  methodLabel: string;
+};
+
+// Ответ /api/billing/payments/<id>/ в той части, которая нужна этой странице.
+type PaymentStatus = {
+  status: string;
+  plan_label: string;
+  auto_renew_requested: boolean;
+  auto_renew_enabled: boolean;
+  method_label: string;
+  /** Причина отказа словами; пусто, если код от ЮKassa нам незнаком. */
+  cancellation_hint: string;
+};
 
 export default function BillingReturnPage() {
   return (
@@ -50,6 +69,16 @@ function ReturnInner() {
 
   const [phase, setPhase] = useState<Phase>("pending");
   const [planLabel, setPlanLabel] = useState("");
+  // Почему банк отказал и просили ли при этом автопродление. Второе важно:
+  // с автопродлением мы открываем форму ввода карты, и человек, у которого
+  // именно эта карта не проходит, иначе не догадается, что без галочки ему
+  // доступны СБП и другие способы.
+  const [cancelHint, setCancelHint] = useState("");
+  const [wantedAutoRenew, setWantedAutoRenew] = useState(false);
+  // Итог попытки привязки. Заполняется только при успешной оплате и нужен
+  // ровно для одного: сказать человеку, что заказанного им автопродления не
+  // будет, — пока он ещё смотрит на экран, а не через месяц.
+  const [binding, setBinding] = useState<BindingResult | null>(null);
 
   // Держим в ref, чтобы эффект опроса не перезапускался из-за смены ссылок.
   const refreshRef = useRef(refresh);
@@ -71,6 +100,11 @@ function ReturnInner() {
     }
     // Пока сессия восстанавливается, запрос ушёл бы без токена. Ждём —
     // «платёж не найден» из-за неготовой сессии было бы худшей из ошибок.
+    // `status` обязан быть в зависимостях: человек приходит сюда редиректом с
+    // формы ЮKassa, то есть загрузкой страницы с нуля, и на первом рендере
+    // сессия всегда ещё "loading". Без него эффект не перезапускался бы после
+    // восстановления сессии — опрос не стартовал вообще, и страница крутила бы
+    // «проверяем оплату» бесконечно, не доходя даже до таймаута.
     if (status !== "authed") return;
 
     let stopped = false;
@@ -80,13 +114,18 @@ function ReturnInner() {
     const poll = async () => {
       if (stopped) return;
       try {
-        const p = await api.get<{ status: string; plan_label: string }>(
+        const p = await api.get<PaymentStatus>(
           `/api/billing/payments/${paymentId}/`,
         );
         if (stopped) return;
 
         if (p.status === "succeeded") {
           setPlanLabel(p.plan_label);
+          setBinding({
+            requested: p.auto_renew_requested,
+            enabled: p.auto_renew_enabled,
+            methodLabel: p.method_label,
+          });
           setPhase("success");
           // Тариф изменился — перечитываем подписку, иначе сайдбар и ЛК
           // показывали бы старый план до следующей загрузки страницы.
@@ -94,6 +133,8 @@ function ReturnInner() {
           return;
         }
         if (p.status === "canceled") {
+          setCancelHint(p.cancellation_hint);
+          setWantedAutoRenew(p.auto_renew_requested);
           setPhase("canceled");
           return;
         }
@@ -120,16 +161,7 @@ function ReturnInner() {
       stopped = true;
       clearTimeout(timer);
     };
-  }, [paymentId, api]);
-
-  // После успеха уводим в приложение сами — но не мгновенно: подтверждение
-  // должно успеть прочитаться, иначе переход выглядит как сбой.
-  const goToApp = useCallback(() => router.push("/chat"), [router]);
-  useEffect(() => {
-    if (phase !== "success") return;
-    const timer = setTimeout(goToApp, 2_500);
-    return () => clearTimeout(timer);
-  }, [phase, goToApp]);
+  }, [paymentId, api, status]);
 
   return (
     <section className="relative flex min-h-screen items-center justify-center px-6 py-24">
@@ -167,7 +199,33 @@ function ReturnInner() {
               title={t.success.title}
               text={t.success.text(planLabel)}
             />
-            <Button onClick={goToApp} magnetic={false} className="mt-6 w-full">
+
+            {/* Автопродление просили, но привязка не удалась. Тариф при этом
+                оплачен и работает — поэтому это дополнение к успеху, а не
+                ошибка: пугать человека нечем, деньги на месте. */}
+            {binding?.requested && !binding.enabled && (
+              <div className="mt-5 rounded-2xl border border-[#e08a1e]/35 bg-[#e08a1e]/[0.08] p-4 text-left">
+                <p className="flex items-start gap-2 text-[13.5px] font-medium text-ink">
+                  <AlertCircle
+                    className="mt-0.5 h-4 w-4 flex-none text-[#c2761a]"
+                    strokeWidth={1.9}
+                    aria-hidden
+                  />
+                  {t.bindingFailed.title}
+                </p>
+                <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
+                  {t.bindingFailed.text(binding.methodLabel)}
+                </p>
+                <p className="mt-2 text-[12.5px] leading-relaxed text-ink-soft">
+                  {t.bindingFailed.notice}
+                </p>
+                <p className="mt-2 border-t border-[#e08a1e]/25 pt-2 text-[12px] leading-relaxed text-muted">
+                  {t.bindingFailed.hint}
+                </p>
+              </div>
+            )}
+
+            <Button href="/chat" magnetic={false} className="mt-6 w-full">
               {t.success.action}
             </Button>
           </>
@@ -179,8 +237,21 @@ function ReturnInner() {
               tone="warn"
               icon={<AlertCircle className="h-5 w-5" strokeWidth={1.9} aria-hidden />}
               title={t.canceled.title}
-              text={t.canceled.text}
+              // Причина от банка вместо общей фразы, когда она известна: с
+              // «попробуйте ещё раз» человек повторяет ту же карту, хотя при
+              // 3-D Secure или лимите банка повтор не поможет никогда.
+              text={cancelHint || t.canceled.text}
             />
+
+            {/* Выход из тупика для тех, кто оформлял автопродление: им мы
+                открыли форму карты, и без этой подсказки другие способы
+                оплаты остаются для них невидимыми. */}
+            {wantedAutoRenew && (
+              <p className="mt-4 rounded-2xl border border-line bg-surface/60 px-4 py-3 text-left text-[12.5px] leading-relaxed text-ink-soft">
+                {t.canceled.withoutAutoRenew}
+              </p>
+            )}
+
             <Button href="/billing" magnetic={false} className="mt-6 w-full">
               {t.canceled.action}
             </Button>
@@ -194,7 +265,7 @@ function ReturnInner() {
               title={t.timeout.title}
               text={t.timeout.text}
             />
-            <Button onClick={goToApp} magnetic={false} className="mt-6 w-full">
+            <Button href="/chat" magnetic={false} className="mt-6 w-full">
               {t.timeout.action}
             </Button>
           </>

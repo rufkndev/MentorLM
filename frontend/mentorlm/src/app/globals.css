@@ -552,13 +552,23 @@ body {
 }
 
 /* ── «Жидкое стекло»: полупрозрачные поверхности с блюром ── */
-.glass,
-.glass-strong,
-.glass-card {
-  position: relative;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  isolation: isolate;
+
+/* Общий каркас стекла — намеренно в слое `components`, а не вне слоёв.
+   Tailwind держит утилиты в `@layer utilities`, а незаслоённые правила по
+   каскаду сильнее ЛЮБОГО слоя: пока этот блок лежал вне слоя, `position:
+   relative` перебивал `absolute`/`fixed`, а `border-radius` — `rounded-full`
+   на том же элементе. Отсюда «поплывшее» меню аккаунта и квадратный аватар.
+   В слое `components` утилита выигрывает — как и ожидает разметка, — а
+   значения ниже остаются разумными умолчаниями для стекла без утилит. */
+@layer components {
+  .glass,
+  .glass-strong,
+  .glass-card {
+    position: relative;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    isolation: isolate;
+  }
 }
 
 /* Настоящее «жидкое стекло»: `url(#glass-refract)` преломляет (искажает) фон

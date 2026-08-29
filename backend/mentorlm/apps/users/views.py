@@ -122,9 +122,15 @@ class SubscriptionView(APIView):
                 # «отключение в личном кабинете» из п. 7.4 оферты. Реквизитов
                 # карты здесь нет и быть не может: только маска для узнавания.
                 "auto_renew": bool(sub and sub.auto_renew),
+                # Согласие отдельно от факта. Расхождение (просил, но не
+                # работает) значит одно: привязать платёжное средство не
+                # удалось — и ЛК обязан это объяснить, а не показывать
+                # «автосписаний нет» человеку, который их заказывал.
+                "auto_renew_requested": bool(sub and sub.auto_renew_requested),
                 "card_title": sub.card_title if sub else "",
                 "card_last4": sub.card_last4 if sub else "",
                 "card_type": sub.card_type if sub else "",
+                "payment_method_type": sub.payment_method_type if sub else "",
                 "canceled_at": (
                     sub.canceled_at.isoformat() if sub and sub.canceled_at else None
                 ),

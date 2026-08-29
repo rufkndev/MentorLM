@@ -259,7 +259,12 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
             <h1 className="text-display text-[22px] font-semibold text-ink">
               {t.title}
             </h1>
-            <p className="mt-0.5 text-[13px] text-muted">{t.subtitle}</p>
+            {/* С автопродлением бэкенд открывает форму ввода карты, без него —
+                обычную форму со всеми способами. Подзаголовок обязан говорить
+                то же самое, иначе он врёт в одном из двух состояний. */}
+            <p className="mt-0.5 text-[13px] text-muted">
+              {autoRenew ? t.subtitleCard : t.subtitle}
+            </p>
           </div>
         </div>
 
@@ -326,6 +331,21 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
             <p className="mt-1.5 pl-[30px] text-[12.5px] leading-relaxed text-muted">
               {autoRenew ? t.autoRenew.hint(price) : t.autoRenew.off}
             </p>
+
+            {/* Какой будет форма оплаты — только когда автопродление реально
+                просят: тому, кто платит разово, способ оплаты не навязывается.
+                Оформление намеренно нейтральное, не «внимание»: это не риск и
+                не ограничение, а объяснение того, что человек сейчас увидит. */}
+            {autoRenew && (
+              <p className="ml-[30px] mt-2 flex gap-2 text-[12.5px] leading-relaxed text-muted">
+                <CreditCard
+                  className="mt-0.5 h-3.5 w-3.5 flex-none"
+                  strokeWidth={1.8}
+                  aria-hidden
+                />
+                {t.autoRenew.methodNotice}
+              </p>
+            )}
           </div>
 
           <div className="border-t border-line pt-4">

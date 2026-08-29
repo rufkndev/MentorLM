@@ -195,8 +195,8 @@ function FloatingChip({
   style?: MotionStyle;
 }) {
   return (
-    // position:absolute задаём inline — правило .glass-strong (position:relative)
-    // перебивает одноимённую утилиту Tailwind, а inline-стиль сильнее их обоих.
+    // position задаём inline рядом с координатами из `pos` — они всё равно
+    // приходят стилем, и держать позиционирование в одном месте проще.
     <motion.div
       style={{ position: "absolute", ...pos, ...style }}
       className="glass-strong glass-plain pointer-events-none z-[5] hidden items-center gap-2.5 whitespace-nowrap rounded-full px-4 py-2 will-change-transform xl:flex"

@@ -63,9 +63,10 @@ function PaymentRow({ payment }: { payment: PaymentRecord }) {
         </p>
         <p className="mt-0.5 text-[12px] text-muted">
           {formatMoment(payment.created_at)}
-          {payment.card_last4 && (
-            <> · {payment.card_type || "Карта"} •••• {payment.card_last4}</>
-          )}
+          {/* Способ оплаты собирает бэкенд: у не-карточных способов нет ни
+              маски, ни платёжной системы, и склеивать подпись здесь значило бы
+              называть картой, например, СБП. */}
+          {payment.method_label && <> · {payment.method_label}</>}
         </p>
         {payment.external_id && (
           <p className="mt-0.5 font-mono text-[10.5px] text-muted/80">

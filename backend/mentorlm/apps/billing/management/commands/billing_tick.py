@@ -35,6 +35,7 @@ from apps.billing.limits import (
 from apps.billing.models import BillingEvent, Payment, Subscription, log_event
 from apps.billing.payments import (
     PaymentError,
+    billing_url,
     charge_renewal,
     format_date,
     manage_url,
@@ -106,6 +107,7 @@ class Command(BaseCommand):
                 return
 
             notified = self._notify_upcoming(dry)
+            expiring = self._notify_expiring(dry)
             charged, failed = self._charge_due(dry)
             synced = self._sync_stale(dry)
             refunded = self._refund_unlawful(dry)
@@ -114,8 +116,9 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Такт биллинга{' (dry-run)' if dry else ''}: "
-                f"уведомлений {notified}, списаний {charged}, "
-                f"неудач {failed}, синхронизаций {synced}, возвратов {refunded}"
+                f"уведомлений {notified}, писем об окончании {expiring}, "
+                f"списаний {charged}, неудач {failed}, "
+                f"синхронизаций {synced}, возвратов {refunded}"
             )
         )
         if pending_receipts:
@@ -181,6 +184,70 @@ class Command(BaseCommand):
             sent += 1
         return sent
 
+    # ── Шаг 1б: подписки, которые просто закончатся ──────────────────────────
+
+    def _notify_expiring(self, dry: bool) -> int:
+        """Предупредить тех, у кого автосписания не будет.
+
+        Ровно дополнение к шагу 1: там — «завтра спишем», здесь — «завтра
+        закончится, спишем ничего». Вместе они покрывают все активные подписки,
+        и человек ни при каком раскладе не узнаёт об окончании доступа задним
+        числом.
+
+        Отдельный смысл у случая `auto_renew_requested and not auto_renew`:
+        человек ПРОСИЛ автопродление, но привязать платёжное средство не
+        удалось (у нас автосписания работают только с банковской карты). Такой
+        подписке письмо нужно больше всех — ожидания у человека ровно
+        противоположные тому, что произойдёт.
+        """
+        now = timezone.now()
+        due = Subscription.objects.filter(
+            auto_renew=False,
+            expiry_notified_at__isnull=True,
+            status=Subscription.Status.ACTIVE,
+            current_period_end__gte=now + _NOTICE_WINDOW_START,
+            current_period_end__lte=now + _NOTICE_WINDOW_END,
+        ).select_related("user")
+
+        sent = 0
+        for sub in due:
+            if sub.user is None:
+                continue
+            binding_failed = sub.auto_renew_requested and not sub.payment_method_id
+            if dry:
+                self.stdout.write(
+                    f"[dry] предупредил бы {sub.user.email} об окончании "
+                    f"{sub.current_period_end}"
+                    f"{' (привязка не удалась)' if binding_failed else ''}"
+                )
+                sent += 1
+                continue
+
+            context = {
+                "plan_label": limits_for(sub.plan)["label"],
+                "amount": plan_price(sub.plan),
+                "period_end": format_date(sub.current_period_end),
+                "billing_url": billing_url(),
+                # Различает два текста письма: «вы отключили» и «привязать не
+                # получилось». Спутать их — значит обвинить человека в том,
+                # чего он не делал.
+                "binding_failed": binding_failed,
+            }
+            # Синхронно и с отметкой только по факту отправки — по той же
+            # причине, что и в шаге 1: отметка «уведомили» без письма хуже, чем
+            # её отсутствие, потому что второй попытки уже не будет.
+            if not send(sub.user.email, "subscription_expiring", context):
+                logger.error(
+                    "Не отправлено письмо об окончании подписки для %s",
+                    sub.user.email,
+                )
+                continue
+
+            sub.expiry_notified_at = timezone.now()
+            sub.save(update_fields=["expiry_notified_at", "updated_at"])
+            sent += 1
+        return sent
+
     # ── Шаг 2: списания ──────────────────────────────────────────────────────
 
     def _charge_due(self, dry: bool) -> tuple[int, int]:
@@ -217,8 +284,11 @@ class Command(BaseCommand):
 
             if payment.status == Payment.Status.SUCCEEDED:
                 charged += 1
-            else:
+            elif payment.status == Payment.Status.CANCELED:
                 failed += 1
+            # pending / waiting_for_capture — платёж в пути, ни успех, ни
+            # неудача. Его добьёт шаг 3, а до тех пор подписку от повторного
+            # списания бережёт renewal_blocked_reason.
         return charged, failed
 
     # ── Шаг 3: зависшие платежи ──────────────────────────────────────────────

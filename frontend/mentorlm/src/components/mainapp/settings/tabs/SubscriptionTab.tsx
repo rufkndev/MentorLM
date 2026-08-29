@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, CreditCard, Loader2, Sparkles } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, Loader2, Sparkles } from "lucide-react";
 import { Section } from "../controls";
 import {
   useSubscription,
@@ -166,6 +166,30 @@ function AutoRenewControls() {
           </>
         )}
       </p>
+
+      {/* Автопродление просили, но привязать средство не удалось. Без этого
+          объяснения человек видит «автоматических списаний нет» ровно там, где
+          он их заказывал, — и справедливо считает это ошибкой сервиса. */}
+      {!sub.auto_renew && sub.auto_renew_requested && !sub.card_title && (
+        <div className="mt-3 rounded-xl border border-[#e08a1e]/35 bg-[#e08a1e]/[0.08] px-4 py-3">
+          <p className="flex items-start gap-2 text-[13px] font-medium text-ink">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 flex-none text-[#c2761a]"
+              strokeWidth={1.9}
+              aria-hidden
+            />
+            Автопродление не подключилось
+          </p>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
+            При оформлении вы просили продлевать подписку автоматически, но
+            привязать платёжное средство не удалось: списывать мы умеем только с
+            банковской карты. Автоматических списаний не будет — мы напомним
+            письмом за сутки до окончания подписки, чтобы вы успели продлить её
+            вручную. При следующей оплате с этой галочкой форма карты откроется
+            сама, и продление снова станет автоматическим.
+          </p>
+        </div>
+      )}
 
       {/* Привязанная карта: показываем маску, чтобы было понятно, что удаляем */}
       {sub.card_title && (

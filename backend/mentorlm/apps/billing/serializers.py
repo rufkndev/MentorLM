@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from rest_framework import serializers
 
-from .models import Payment, Plan
+from .models import (
+    AUTO_RENEW_METHODS,
+    CANCELLATION_REASONS,
+    PAYMENT_METHOD_TITLES,
+    Payment,
+    Plan,
+)
 
 
 class CheckoutSerializer(serializers.Serializer):
@@ -46,6 +52,13 @@ class PaymentSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     kind_label = serializers.CharField(source="get_kind_display", read_only=True)
     refunded = serializers.SerializerMethodField()
+    method_label = serializers.SerializerMethodField()
+    # Чем закончилась попытка привязки. Отдаётся, чтобы страница возврата могла
+    # объяснить человеку результат сразу после оплаты, а не отправлять его
+    # искать правду в настройках.
+    auto_renew_enabled = serializers.SerializerMethodField()
+    auto_renew_supported = serializers.SerializerMethodField()
+    cancellation_hint = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
@@ -61,6 +74,13 @@ class PaymentSerializer(serializers.ModelSerializer):
             "currency",
             "description",
             "external_id",
+            "payment_method_type",
+            "method_label",
+            "auto_renew_requested",
+            "auto_renew_enabled",
+            "auto_renew_supported",
+            "cancellation_reason",
+            "cancellation_hint",
             "card_last4",
             "card_type",
             "period_start",
@@ -82,6 +102,37 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     def get_refunded(self, obj: Payment) -> bool:
         return obj.refunded_amount > 0
+
+    def get_method_label(self, obj: Payment) -> str:
+        """Чем заплатили, словами: «Банковская карта», «СБП»."""
+        if obj.card_last4:
+            return f"{obj.card_type or 'Карта'} •••• {obj.card_last4}"
+        return PAYMENT_METHOD_TITLES.get(obj.payment_method_type, "")
+
+    def get_auto_renew_enabled(self, obj: Payment) -> bool:
+        """Работает ли автопродление по итогам этого платежа.
+
+        Смотрим на подписку, а не на сам платёж: включение автопродления —
+        свойство подписки, и только там сходятся согласие и удавшаяся привязка.
+        """
+        return bool(obj.subscription and obj.subscription.auto_renew)
+
+    def get_auto_renew_supported(self, obj: Payment) -> bool:
+        """Мог ли выбранный способ оплаты в принципе дать привязку.
+
+        Нужен, чтобы отличить «способ не тот» от «способ тот, но привязка
+        сорвалась»: человеку это две разные новости, и советы разные.
+        """
+        return obj.payment_method_type in AUTO_RENEW_METHODS
+
+    def get_cancellation_hint(self, obj: Payment) -> str:
+        """Почему не прошло — словами. Пусто, если причина нам незнакома.
+
+        Отдаём именно расшифровку, а не голый код: код ЮKassa человеку ничего
+        не говорит, а от причины зависит совет — сменить карту, пополнить её
+        или просто повторить.
+        """
+        return CANCELLATION_REASONS.get(obj.cancellation_reason, "")
 
 
 class CheckoutResultSerializer(serializers.Serializer):

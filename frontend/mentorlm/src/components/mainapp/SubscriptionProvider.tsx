@@ -30,10 +30,19 @@ export type SubscriptionInfo = {
   current_period_end: string | null;
   /** Будет ли списание в конце периода. False — доступ просто закончится. */
   auto_renew: boolean;
-  /** «Visa •••• 4444» — только маска, реквизитов карты у нас нет. */
+  /**
+   * Просил ли человек автопродление при оформлении. Расходится с `auto_renew`
+   * ровно в одном случае: согласие есть, а привязать платёжное средство не
+   * удалось (платили не банковской картой). Тогда ЛК обязан объяснить, почему
+   * обещанного автопродления нет.
+   */
+  auto_renew_requested: boolean;
+  /** «Visa •••• 4444» — только маска, реквизитов карты у нас нет. Пусто = привязки нет. */
   card_title: string;
   card_last4: string;
   card_type: string;
+  /** Тип привязанного способа: bank_card, sbp, … Пусто, если привязки нет. */
+  payment_method_type: string;
   /** Когда пользователь отказался от автопродления; null — не отказывался. */
   canceled_at: string | null;
   allow_web_search: boolean;
@@ -55,6 +64,20 @@ export type PaymentRecord = {
   currency: string;
   description: string;
   external_id: string | null;
+  /** Тип способа оплаты из ЮKassa: bank_card, sbp, sberbank… */
+  payment_method_type: string;
+  /** Чем заплатили, словами: «Visa •••• 4444» или «СБП». */
+  method_label: string;
+  /** Просили ли автопродление при оформлении этого платежа. */
+  auto_renew_requested: boolean;
+  /** Включилось ли автопродление по итогу (привязка удалась). */
+  auto_renew_enabled: boolean;
+  /** Мог ли выбранный способ дать привязку в принципе. */
+  auto_renew_supported: boolean;
+  /** Код отказа от ЮKassa (3d_secure_failed и т.п.); пусто, если платёж не отклонён. */
+  cancellation_reason: string;
+  /** Тот же отказ человеческим языком; пусто, если код нам незнаком. */
+  cancellation_hint: string;
   card_last4: string;
   card_type: string;
   period_start: string | null;

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import logging
 from decimal import ROUND_HALF_UP, Decimal
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.conf import settings
 from django.db import transaction
@@ -143,17 +143,42 @@ def _receipt(payment: Payment) -> dict[str, Any] | None:
     return receipt
 
 
-def _card_from(obj: dict) -> tuple[str, str, str]:
-    """Вытащить из ответа ЮKassa (id метода, последние 4 цифры, тип карты).
+class SavedMethod(NamedTuple):
+    """Что мы узнали о платёжном средстве из ответа ЮKassa.
+
+    `id` пуст ⇔ привязки не произошло. Это ровно тот признак, который
+    документация («Привязка во время платежа») велит проверять: сохранение
+    подтверждается флагом `payment_method.saved`, а не тем, что мы попросили
+    `save_payment_method`. Попросить можно всегда, а сохраниться — нет:
+    человек мог заплатить способом без поддержки привязки, отказаться на
+    форме или наткнуться на сбой.
+    """
+
+    id: str
+    type: str
+    last4: str
+    card_type: str
+
+
+def _method_from(obj: dict) -> SavedMethod:
+    """Разобрать `payment_method` из ответа ЮKassa.
 
     Больше ничего из объекта платежа мы не сохраняем: политика
     конфиденциальности перечисляет хранимые платёжные данные исчерпывающе.
+
+    Тип способа берём всегда, а идентификатор — только при `saved: true`.
+    Записать id непривязанного способа значило бы получить подписку, с которой
+    планировщик будет пытаться списать несписываемое.
     """
     method = obj.get("payment_method") or {}
     card = method.get("card") or {}
     saved = bool(method.get("saved"))
-    method_id = str(method.get("id", "")) if saved else ""
-    return method_id, str(card.get("last4", ""))[:4], str(card.get("card_type", ""))[:32]
+    return SavedMethod(
+        id=str(method.get("id", "")) if saved else "",
+        type=str(method.get("type", ""))[:32],
+        last4=str(card.get("last4", ""))[:4],
+        card_type=str(card.get("card_type", ""))[:32],
+    )
 
 
 # ── Оформление подписки ───────────────────────────────────────────────────────
@@ -225,6 +250,15 @@ def start_checkout(user, plan: str, *, auto_renew: bool, ip: str | None = None) 
     if auto_renew:
         # Только при явном согласии. Отсутствие ключа = карта не привязывается.
         payload["save_payment_method"] = True
+        # И сразу открываем форму ввода карты вместо общего экрана выбора.
+        # Привязать у нас можно только банковскую карту, поэтому предупреждать
+        # «выберите карту, иначе автопродления не будет» бессмысленно: человек
+        # прочитает это на нашей странице, а решение примет на чужой, где СБП
+        # стоит первым как самый быстрый. Проще не создавать ситуацию, чем
+        # объяснять её. Это предвыбор, а не запрет — сменить способ на форме
+        # ЮKassa по-прежнему можно, и на этот случай остаётся вся страховка:
+        # `saved: false` не включит автопродление (см. _activate_subscription).
+        payload["payment_method_data"] = {"type": "bank_card"}
 
     try:
         obj = create_payment(payload, idempotence_key=str(payment.idempotence_key))
@@ -298,6 +332,21 @@ def renewal_blocked_reason(sub: Subscription) -> str:
     if sub.renewal_attempts >= RENEWAL_MAX_ATTEMPTS:
         return f"исчерпаны попытки списания ({RENEWAL_MAX_ATTEMPTS})"
 
+    # Незавершённое списание по этой подписке. Автоплатёж может задержаться в
+    # `pending` (документация ЮKassa: платёж ждёт онлайн-кассу), а планировщик
+    # ходит каждые 10 минут — без этой проверки он создал бы второй платёж,
+    # пока первый ещё в пути, и человек заплатил бы дважды за один месяц.
+    if (
+        Payment.objects.filter(
+            subscription=sub,
+            kind=Payment.Kind.RENEWAL,
+            status__in=(Payment.Status.PENDING, Payment.Status.WAITING_FOR_CAPTURE),
+        )
+        .exclude(external_id=None)
+        .exists()
+    ):
+        return "предыдущее списание ещё выполняется"
+
     # Главное условие: уведомление за 24 часа (п. 7.3). Списание без него
     # обязывает вернуть всю сумму (п. 7.6), поэтому просто не списываем.
     if not sub.renewal_notified_at:
@@ -369,11 +418,24 @@ def charge_renewal(sub: Subscription) -> Payment:
     payment.external_id = obj.get("id") or None
     payment.save(update_fields=["external_id", "updated_at"])
 
-    # Автоплатёж завершается синхронно: ответ уже несёт финальный статус.
+    # Обычно ответ уже несёт финальный статус, но не обязан: документация
+    # («Проведение автоплатежа») прямо допускает `pending` — платёж ждёт
+    # ответа онлайн-кассы. Дожать его — работа `_sync_stale` в планировщике.
     apply_provider_state(payment, obj)
     payment.refresh_from_db()
-    if payment.status != Payment.Status.SUCCEEDED:
+
+    # Провалом считаем ТОЛЬКО отказ. Считать провалом «ещё не завершён» значит
+    # разослать письмо «не удалось списать» по платежу, который через минуту
+    # пройдёт, и заодно приблизить подписку к отмене по счётчику попыток.
+    if payment.status == Payment.Status.CANCELED:
         _register_failed_renewal(sub, reason=payment.cancellation_reason or "отклонён")
+    elif payment.status != Payment.Status.SUCCEEDED:
+        logger.info(
+            "Подписка %s: автоплатёж %s в статусе %r — ждём подтверждения",
+            sub.pk,
+            payment.pk,
+            payment.status,
+        )
     return payment
 
 
@@ -388,9 +450,13 @@ def _register_failed_renewal(sub: Subscription, *, reason: str) -> None:
         # П. 7.8: списание не проходит — подписка не продлевается, дальше Free.
         sub.status = Subscription.Status.CANCELED
         sub.auto_renew = False
+        # И согласие тоже: автопродление здесь работало, просто карта не
+        # потянула. Оставить «запрошено» — значит показать в ЛК объяснение
+        # «привязка не удалась», которого не было.
+        sub.auto_renew_requested = False
         sub.canceled_at = timezone.now()
         sub.cancel_reason = "Не удалось списать оплату"
-        fields += ["auto_renew", "canceled_at", "cancel_reason"]
+        fields += ["auto_renew", "auto_renew_requested", "canceled_at", "cancel_reason"]
 
     sub.save(update_fields=fields)
     log_event(
@@ -449,14 +515,15 @@ def _apply_succeeded(payment: Payment, obj: dict) -> Payment:
         if locked.status == Payment.Status.SUCCEEDED:
             return locked
 
-        method_id, last4, card_type = _card_from(obj)
+        method = _method_from(obj)
         locked.status = Payment.Status.SUCCEEDED
         locked.paid_at = timezone.now()
-        locked.payment_method_id = method_id
-        locked.card_last4 = last4
-        locked.card_type = card_type
+        locked.payment_method_id = method.id
+        locked.payment_method_type = method.type
+        locked.card_last4 = method.last4
+        locked.card_type = method.card_type
 
-        sub = _activate_subscription(locked, method_id=method_id, last4=last4, card_type=card_type)
+        sub = _activate_subscription(locked, method=method)
         locked.subscription = sub
         locked.period_start = sub.current_period_start
         locked.period_end = sub.current_period_end
@@ -526,14 +593,16 @@ def payments_awaiting_npd_receipt():
     ).order_by("paid_at")
 
 
-def _activate_subscription(
-    payment: Payment, *, method_id: str, last4: str, card_type: str
-) -> Subscription:
+def _activate_subscription(payment: Payment, *, method: SavedMethod) -> Subscription:
     """Включить оплаченный тариф. Вызывается только внутри транзакции.
 
     Продление своего же тарифа сдвигает конец периода; покупка другого тарифа
     закрывает старую подписку и открывает новую с сегодняшнего дня — принятое
     правило смены тарифа (полная цена, период заново).
+
+    Здесь же держится главный инвариант автопродления: `auto_renew` включается
+    только там, где есть чем списать. Согласие пользователя — необходимое
+    условие, но не достаточное.
     """
     now = timezone.now()
     user = payment.user
@@ -573,34 +642,80 @@ def _activate_subscription(
         sub.current_period_start = sub.current_period_start or now
         sub.current_period_end = add_billing_month(base)
 
-    # Согласие берём из строки платежа, где оно зафиксировано при нажатии
-    # кнопки. Вернувшийся сохранённый метод — независимое подтверждение:
-    # `save_payment_method` отправляется только вместе с согласием.
-    auto_renew = payment.auto_renew_requested or bool(method_id)
-    consent_ip = payment.consent_ip
-
     sub.status = Subscription.Status.ACTIVE
     sub.provider = "yookassa"
     sub.renewal_attempts = 0
-    # Уведомление относилось к прошедшему списанию — под следующий цикл сбрасываем.
+    # Уведомления относились к прошедшему циклу — под следующий сбрасываем оба.
     sub.renewal_notified_at = None
+    sub.expiry_notified_at = None
     sub.offer_version = settings.OFFER_VERSION
 
-    if method_id:
-        sub.payment_method_id = method_id
-        sub.card_last4 = last4
-        sub.card_type = card_type
+    if method.id:
+        sub.payment_method_id = method.id
+        sub.payment_method_type = method.type
+        sub.card_last4 = method.last4
+        sub.card_type = method.card_type
 
-    if auto_renew and not sub.auto_renew:
-        sub.auto_renew = True
-        sub.auto_renew_consent_at = now
-        sub.auto_renew_consent_ip = consent_ip
+    # Согласие берём из строки платежа, где оно зафиксировано при нажатии
+    # кнопки, — это юридический факт, и он сохраняется независимо от того,
+    # удалась ли привязка.
+    sub.auto_renew_requested = payment.auto_renew_requested
+
+    # А вот включить автопродление можно, только если есть чем списывать.
+    # `sub.payment_method_id` в условии — не лишний: апгрейд, оплаченный
+    # способом без привязки, не должен сносить карту, привязанную раньше.
+    can_charge = bool(sub.payment_method_id)
+    auto_renew = payment.auto_renew_requested and can_charge
+
     if auto_renew:
+        if not sub.auto_renew:
+            sub.auto_renew = True
+            sub.auto_renew_consent_at = now
+            sub.auto_renew_consent_ip = payment.consent_ip
         # Оплатили заново после отказа — отказ больше не действует.
         sub.canceled_at = None
         sub.cancel_reason = ""
+    else:
+        # Два разных случая, и оба ведут сюда:
+        #
+        # 1. Согласие есть, привязки нет. Молчаливое `auto_renew = True` было
+        #    бы обещанием, которого планировщик физически не выполнит:
+        #    подписка погасла бы без предупреждения.
+        # 2. Галочку не ставили. Экран оформления обещает буквально:
+        #    «автоматических списаний не будет» — значит их и не должно быть,
+        #    даже если карта осталась привязанной с прошлой покупки. Гасим
+        #    ранее выданное согласие: продолжать списывать после такого экрана
+        #    значило бы списывать без выраженного согласия (ст. 16 ЗоЗПП).
+        was_on = sub.auto_renew
+        sub.auto_renew = False
+        if was_on and not payment.auto_renew_requested:
+            log_event(
+                kind=BillingEvent.Kind.AUTORENEW_OFF,
+                user=payment.user,
+                subscription=sub,
+                note="Оплата оформлена без автопродления — согласие снято",
+            )
 
     sub.save()
+
+    if payment.auto_renew_requested and not auto_renew:
+        logger.info(
+            "Платёж %s: автопродление запрошено, но привязка не удалась "
+            "(способ %r) — подписка %s останется без автосписаний",
+            payment.pk,
+            method.type or "неизвестен",
+            sub.pk,
+        )
+        log_event(
+            kind=BillingEvent.Kind.CONSENT_GIVEN,
+            user=payment.user,
+            subscription=sub,
+            note=(
+                "Согласие на автосписания дано, но платёжное средство не "
+                f"привязано (способ оплаты: {method.type or 'неизвестен'})"
+            )[:255],
+        )
+
     return sub
 
 
@@ -641,9 +756,20 @@ def cancel_autorenew(sub: Subscription, *, reason: str = "", ip: str | None = No
     """
     now = timezone.now()
     sub.auto_renew = False
+    # Снимаем и само пожелание: человек передумал, и ЛК не должен продолжать
+    # объяснять, почему «запрошенное» автопродление не работает.
+    sub.auto_renew_requested = False
     sub.canceled_at = now
     sub.cancel_reason = (reason or "Отказ пользователя в личном кабинете")[:255]
-    sub.save(update_fields=["auto_renew", "canceled_at", "cancel_reason", "updated_at"])
+    sub.save(
+        update_fields=[
+            "auto_renew",
+            "auto_renew_requested",
+            "canceled_at",
+            "cancel_reason",
+            "updated_at",
+        ]
+    )
 
     log_event(
         kind=BillingEvent.Kind.AUTORENEW_OFF,
@@ -674,6 +800,7 @@ def enable_autorenew(sub: Subscription, *, ip: str | None = None) -> Subscriptio
         )
     now = timezone.now()
     sub.auto_renew = True
+    sub.auto_renew_requested = True
     sub.canceled_at = None
     sub.cancel_reason = ""
     sub.auto_renew_consent_at = now
@@ -681,6 +808,7 @@ def enable_autorenew(sub: Subscription, *, ip: str | None = None) -> Subscriptio
     sub.save(
         update_fields=[
             "auto_renew",
+            "auto_renew_requested",
             "canceled_at",
             "cancel_reason",
             "auto_renew_consent_at",
@@ -706,17 +834,21 @@ def forget_payment_method(sub: Subscription, *, ip: str | None = None) -> Subscr
     чтобы не осталось согласия без средства.
     """
     sub.payment_method_id = ""
+    sub.payment_method_type = ""
     sub.card_last4 = ""
     sub.card_type = ""
     sub.auto_renew = False
+    sub.auto_renew_requested = False
     sub.canceled_at = sub.canceled_at or timezone.now()
     sub.cancel_reason = sub.cancel_reason or "Платёжное средство удалено пользователем"
     sub.save(
         update_fields=[
             "payment_method_id",
+            "payment_method_type",
             "card_last4",
             "card_type",
             "auto_renew",
+            "auto_renew_requested",
             "canceled_at",
             "cancel_reason",
             "updated_at",

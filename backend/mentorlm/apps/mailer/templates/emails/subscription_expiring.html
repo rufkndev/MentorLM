@@ -1,0 +1,64 @@
+{% extends "emails/base.html" %}
+
+{% comment %}
+Подписка заканчивается, автосписания не будет. Письмо уходит за сутки до конца
+оплаченного периода — тем, у кого автопродление выключено ЛИБО у кого оно не
+подключилось (оплата прошла не банковской картой, привязать средство ЮKassa не
+дала). Второй случай важнее: человек ставил галочку «продлевать автоматически»
+и вправе рассчитывать, что его хотя бы предупредят.
+
+`binding_failed` различает эти два случая. Формулировки не смешивать: «вы
+отключили» тому, кто ничего не отключал, — худший вариант письма.
+{% endcomment %}
+
+{% block preheader %}Тариф {{ plan_label }} действует до {{ period_end }}. Автоматического списания не будет — продлите вручную.{% endblock %}
+
+{% block content %}
+  <h1 style="margin:0 0 12px 0; font-size:20px; font-weight:600; line-height:1.35;
+             letter-spacing:-0.2px; color:#090f1f;">
+    Подписка заканчивается {{ period_end }}
+  </h1>
+
+  {% if binding_failed %}
+    <p style="margin:0 0 18px 0;">
+      При оформлении вы просили продлевать подписку автоматически, но привязать
+      платёжное средство не удалось: автосписания у нас работают только при
+      оплате <strong style="color:#090f1f;">банковской картой</strong>, а оплата
+      прошла другим способом. Денег мы поэтому не спишем — чтобы сохранить
+      доступ, подписку нужно продлить вручную.
+    </p>
+  {% else %}
+    <p style="margin:0 0 18px 0;">
+      Автоматическое продление у этой подписки отключено, поэтому мы ничего не
+      спишем. Предупреждаем заранее, чтобы доступ не закончился неожиданно.
+    </p>
+  {% endif %}
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+         style="background-color:#f7f8fb; border:1px solid #dce2ee; border-radius:12px;
+                margin:0 0 20px 0;">
+    <tr>
+      <td style="padding:18px 20px; font-size:15px; line-height:1.9; color:#1b2437;">
+        <span style="color:#6a7285;">Тариф:</span>
+        <strong style="color:#090f1f;">MentorLM {{ plan_label }}</strong><br>
+        <span style="color:#6a7285;">Действует до:</span>
+        <strong style="color:#090f1f;">{{ period_end }}</strong><br>
+        <span style="color:#6a7285;">Продление:</span>
+        <strong style="color:#090f1f;">{{ amount }} ₽ за месяц</strong>
+      </td>
+    </tr>
+  </table>
+
+  {% include "emails/_button.html" with url=billing_url label="Продлить подписку" %}
+
+  <p style="margin:0; padding-top:18px; border-top:1px solid #dce2ee; font-size:13px; color:#6a7285;">
+    Если ничего не делать, {{ period_end }} аккаунт перейдёт на бесплатный тариф.
+    Диалоги, настройки и память останутся на месте — изменятся только лимиты и
+    набор доступных возможностей. Вернуться на {{ plan_label }} можно в любой
+    момент.{% if binding_failed %} Чтобы в следующий раз подписка продлевалась
+    сама, при оплате отметьте «Продлевать автоматически» — форма ввода карты
+    откроется сразу, привязка произойдёт вместе с оплатой.{% endif %}
+    Вопросы — на
+    <a href="mailto:{{ support_email }}" style="color:#6a7285;">{{ support_email }}</a>.
+  </p>
+{% endblock %}

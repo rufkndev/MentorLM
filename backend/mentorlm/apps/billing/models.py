@@ -24,6 +24,50 @@ import uuid
 
 from django.db import models
 
+# Как называть способ оплаты человеку. Ключи — значения `payment_method.type`
+# из ответа ЮKassa; список неполный намеренно, это словарь для показа, а не
+# перечисление допустимых значений — незнакомый тип просто получит нейтральную
+# подпись, а не сломает страницу.
+PAYMENT_METHOD_TITLES: dict[str, str] = {
+    "bank_card": "Банковская карта",
+    "sbp": "СБП",
+    "sberbank": "SberPay",
+    "tinkoff_bank": "T-Pay",
+    "mir_pay": "Mir Pay",
+    "yoo_money": "ЮMoney",
+}
+
+# Способы, с которых мы умеем списывать повторно. Наш магазин подключён к
+# автоплатежам по банковской карте — привязать что-то ещё ЮKassa нам не даст,
+# и обещать автопродление при другом способе нельзя. Всё, что зависит от этого
+# факта (текст на оформлении, объяснение после оплаты), смотрит сюда.
+AUTO_RENEW_METHODS: frozenset[str] = frozenset({"bank_card"})
+
+# Почему платёж не прошёл — человеческим языком. Ключи из `cancellation_details.
+# reason` ЮKassa. Существует потому, что без причины экран отказа говорит
+# «попробуйте ещё раз», и человек честно пробует ту же карту столько раз,
+# сколько хватит терпения: при `3d_secure_failed` или `insufficient_funds`
+# повтор не поможет никогда, а совет нужен разный.
+CANCELLATION_REASONS: dict[str, str] = {
+    "3d_secure_failed": "Банк не подтвердил оплату по 3-D Secure. Повторять той "
+    "же картой обычно бесполезно — попробуйте другую карту или другой способ.",
+    "insufficient_funds": "На карте недостаточно средств.",
+    "card_expired": "Срок действия карты истёк.",
+    "invalid_card_number": "Номер карты введён неверно.",
+    "invalid_csc": "Неверный код с обратной стороны карты.",
+    "call_issuer": "Банк отклонил операцию — уточните причину у него.",
+    "issuer_unavailable": "Банк не ответил. Попробуйте через несколько минут.",
+    "payment_method_restricted": "Банк запретил операции такого типа по этой карте.",
+    "payment_method_limit_exceeded": "Превышен лимит операций по этой карте.",
+    "country_forbidden": "Оплата картой этой страны не поддерживается.",
+    "fraud_suspected": "Операция отклонена как подозрительная.",
+    "general_decline": "Банк отклонил операцию без объяснения причины.",
+    "expired_on_confirmation": "Оплата не была подтверждена вовремя.",
+    "canceled_by_merchant": "Платёж отменён.",
+    "identification_required": "Банк требует пройти идентификацию.",
+    "internal_timeout": "Платёжный сервис не успел обработать операцию.",
+}
+
 
 class Plan(models.TextChoices):
     """Тарифы — единственное объявление на весь проект.
@@ -75,7 +119,18 @@ class Subscription(models.Model):
     # ── Автопродление ────────────────────────────────────────────────────────
     # Согласие, а не настройка: по умолчанию False, включается только явным
     # действием пользователя (ст. 16 ЗоЗПП запрещает предпроставленные согласия).
+    # ВАЖНО: True здесь означает «мы реально можем списать», а не «человек не
+    # против». Флаг включается только вместе с непустым payment_method_id —
+    # инвариант держит billing.payments._activate_subscription. Иначе ЛК обещал
+    # бы списание, которого технически не может произойти.
     auto_renew = models.BooleanField(default=False, verbose_name="Автопродление")
+    # Согласие как факт: галочка на оформлении стояла. Отдельно от auto_renew,
+    # потому что согласие может быть дано, а привязка не удаться (оплата не
+    # картой, отказ на форме, сбой). Без этого поля «я просил автопродление, а
+    # его нет» неотличимо от «я его не просил», и объяснить человеку нечего.
+    auto_renew_requested = models.BooleanField(
+        default=False, verbose_name="Запрошено автопродление"
+    )
     # Когда и с какого адреса согласие дано — доказательство «выраженного
     # согласия» из п. 7.2 оферты и ст. 16.1 ЗоЗПП.
     auto_renew_consent_at = models.DateTimeField(null=True, blank=True)
@@ -85,12 +140,21 @@ class Subscription(models.Model):
     # не может — только идентификатор привязки и маска для показа в ЛК, иначе
     # человеку нечего было бы «удалять» по п. 7.4.
     payment_method_id = models.CharField(max_length=255, blank=True)
+    # Тип способа из ответа ЮKassa (bank_card, sbp, sberbank…). Нужен, чтобы не
+    # называть «картой» то, что картой не является: card_last4/card_type
+    # заполняются только у банковской карты, у остальных способов их просто нет.
+    payment_method_type = models.CharField(max_length=32, blank=True)
     card_last4 = models.CharField(max_length=4, blank=True)
     card_type = models.CharField(max_length=32, blank=True)
 
     # Когда ушло письмо о предстоящем списании. Ключевое поле: без него
     # автосписание запрещено (п. 7.3 и 7.6 оферты, ФЗ-376).
     renewal_notified_at = models.DateTimeField(null=True, blank=True)
+    # Когда ушло письмо «подписка заканчивается, продлите вручную» — зеркало
+    # renewal_notified_at для подписок БЕЗ автопродления. Отдельное поле, а не
+    # общее: эти два письма исключают друг друга, и общий флаг однажды дал бы
+    # «уведомили об окончании» вместо «уведомили о списании».
+    expiry_notified_at = models.DateTimeField(null=True, blank=True)
     # Неудачные попытки списания подряд; сбрасывается успешным платежом.
     renewal_attempts = models.PositiveSmallIntegerField(default=0)
 
@@ -121,11 +185,18 @@ class Subscription(models.Model):
 
     @property
     def card_title(self) -> str:
-        """Как показать привязанную карту человеку: «Visa •••• 4444»."""
+        """Как показать привязанный способ оплаты: «Visa •••• 4444».
+
+        Пустая строка = привязки нет, и это единственный признак, по которому
+        ЛК отличает «карта привязана» от «списывать нечем». Не-карточные
+        способы подписываем по типу: у них нет ни маски, ни платёжной системы,
+        и слово «Карта» было бы просто неправдой.
+        """
         if not self.payment_method_id:
             return ""
-        kind = self.card_type or "Карта"
-        return f"{kind} •••• {self.card_last4}" if self.card_last4 else kind
+        if self.card_last4:
+            return f"{self.card_type or 'Карта'} •••• {self.card_last4}"
+        return PAYMENT_METHOD_TITLES.get(self.payment_method_type, "Способ оплаты")
 
 
 class Payment(models.Model):
@@ -197,7 +268,13 @@ class Payment(models.Model):
 
     # Что вернула ЮKassa о платёжном средстве. Полный объект платежа не храним:
     # политика конфиденциальности перечисляет платёжные данные исчерпывающе.
+    # `payment_method_id` заполняется, ТОЛЬКО если привязка удалась
+    # (payment_method.saved == true), — см. billing.payments._method_from.
     payment_method_id = models.CharField(max_length=255, blank=True)
+    # Чем человек заплатил (bank_card, sbp, sberbank…). Пишется всегда, даже
+    # когда привязки не было: именно по нему экран после оплаты объясняет,
+    # почему автопродление не подключилось.
+    payment_method_type = models.CharField(max_length=32, blank=True)
     card_last4 = models.CharField(max_length=4, blank=True)
     card_type = models.CharField(max_length=32, blank=True)
 
