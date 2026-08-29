@@ -114,6 +114,13 @@ services:
       POSTGRES_PORT: "5432"
     command: >
       /bin/sh -c "while :; do python manage.py billing_tick || true; sleep 600; done"
+    # Образ общий с backend, а вместе с ним наследуется и его HEALTHCHECK —
+    # HTTP-проба /api/health/. Здесь gunicorn не запущен, отвечать на неё некому,
+    # и контейнер вечно висит `unhealthy`, хотя такты идут нормально. Ложная
+    # тревога дороже отсутствия пробы: перезапускать по ней compose всё равно не
+    # умеет (это поведение Swarm), а глазами потом ищешь несуществующую поломку.
+    healthcheck:
+      disable: true
     depends_on:
       db:
         condition: service_healthy
