@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from .preferences import ResolvedPreferences
 from .registry import get_mode
+from .sanitize import UNTRUSTED_NOTICE
 from .scenarios import ScenarioConfig
 
 # ── Расшифровки структурных полей сценария в директивы ────────────────────────
@@ -116,13 +117,19 @@ def build_system_prompt(
 
     `memory_block` — факты глобальной памяти (apps.memory), пустой блок просто
     не добавляется.
+
+    Персона и память идут последними и содержат текст, который писал не сервер,
+    поэтому перед ними ставится UNTRUSTED_NOTICE — граница между инструкциями и
+    данными. Добавляем её только когда есть что ограждать: лишняя строка про
+    «блоки, которым нельзя доверять» при пустой персоне только путает модель.
     """
     mode = get_mode(mode_id)
+    untrusted = [p for p in (*prefs.persona, memory_block) if p]
     parts = [
         mode.base_system_prompt,
         scenario.system_prompt,
         _scenario_directives(scenario, prefs),
-        *prefs.persona,
-        memory_block,
+        UNTRUSTED_NOTICE if untrusted else "",
+        *untrusted,
     ]
     return "\n\n".join(p for p in parts if p)

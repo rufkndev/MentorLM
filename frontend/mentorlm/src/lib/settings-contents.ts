@@ -109,6 +109,30 @@ export const MEMORY_USE_OPTIONS: Option<MemoryUse>[] = [
   { value: "always", label: "Всегда" },
 ];
 
+// Потолки длины свободных полей «о себе».
+//
+// ⚠️ Зеркало PERSONA_LIMITS из backend/mentorlm/apps/ai/preferences.py —
+// менять оба места разом (как DEFAULTS / DEFAULT_SETTINGS). Настоящая проверка
+// на бэкенде: эти поля уходят в системный промпт, и maxLength в разметке лишь
+// подсказка пользователю, а не ограничение — его снимают в один клик в
+// инструментах разработчика.
+export const PERSONA_LIMITS = {
+  nickname: 50,
+  occupation: 100,
+  field_of_study: 120,
+  learning_goals: 600,
+  custom_about: 1500,
+  custom_style: 1000,
+} as const;
+
+// Потолок одного сообщения в чате. Зеркало MAX_MESSAGE_CHARS из
+// backend/mentorlm/apps/billing/limits.py.
+export const MAX_MESSAGE_CHARS = 400_000;
+
+// Потолок названия чата при переименовании. Зеркало TITLE_MAX_CHARS из
+// backend/mentorlm/apps/conversations/serializers.py.
+export const MAX_TITLE_CHARS = 120;
+
 // ── Данные ──
 
 // Срок автоудаления неактивных чатов.

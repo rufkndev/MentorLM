@@ -54,7 +54,7 @@ export function MarketingNavbar() {
             <li key={l.href}>
               <Link
                 href={l.href}
-                className="rounded-full px-4 py-2 text-[15px] font-medium text-ink-soft hover:text-ink hover:bg-ink/5 transition-colors"
+                className="whitespace-nowrap rounded-full px-3 py-2 text-[15px] font-medium text-ink-soft transition-colors hover:bg-ink/5 hover:text-ink lg:px-4"
               >
                 {l.label}
               </Link>

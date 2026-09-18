@@ -14,6 +14,7 @@ import { AuthError, useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Input, PasswordInput } from "@/components/ui/Input";
 import { authContents } from "@/lib/auth-contents";
+import { safeInternalPath } from "@/lib/safe-url";
 
 const t = authContents.signIn;
 
@@ -35,9 +36,9 @@ function SignInForm() {
     try {
       await login(email, password);
       // Только внутренние адреса: ?next=https://чужой.сайт превратил бы форму
-      // входа в открытый редирект.
-      const next = searchParams.get("next");
-      router.replace(next?.startsWith("/") ? next : "/chat");
+      // входа в открытый редирект. Почему одной проверки на «/» мало — в
+      // src/lib/safe-url.ts.
+      router.replace(safeInternalPath(searchParams.get("next")));
     } catch (err) {
       setError(
         err instanceof AuthError ? err.message : authContents.errors.unknown,

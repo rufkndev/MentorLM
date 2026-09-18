@@ -128,6 +128,14 @@ SILENCED_SYSTEM_CHECKS = ['security.W021']
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 
+# Сессия и CSRF относятся только к админке (приложение живёт на своих токенах),
+# но раз cookie выдаются — пусть выдаются с полным набором флагов. SameSite=Lax
+# закрывает межсайтовые POST'ы в /admin/, HttpOnly убирает CSRF-токен из
+# досягаемости скриптов: Django сверяет его с полем формы, а не читает из JS.
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = True
+
 # Cookie с refresh-токеном — только по https. По сути это ключ от сессии на
 # месяц, и по открытому каналу его отдавать нельзя.
 AUTH_COOKIE_SECURE = True

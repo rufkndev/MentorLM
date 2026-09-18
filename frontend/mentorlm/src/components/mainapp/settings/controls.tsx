@@ -176,10 +176,12 @@ export function TextInput({
   value,
   onChange,
   placeholder,
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  maxLength?: number;
 }) {
   return (
     <input
@@ -187,6 +189,7 @@ export function TextInput({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
+      maxLength={maxLength}
       className="min-w-[220px] rounded-lg border border-line bg-surface px-3 py-1.5 text-[13px] text-ink outline-none transition-colors placeholder:text-muted hover:bg-paper-2/40 focus:border-[var(--brand-primary)]"
     />
   );
@@ -197,20 +200,40 @@ export function Textarea({
   onChange,
   placeholder,
   rows = 3,
+  maxLength,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   rows?: number;
+  maxLength?: number;
 }) {
+  // Счётчик показываем только у края (последние 10% лимита): постоянный «0/1500»
+  // над каждым полем — визуальный шум, а вот упереться в предел молча неприятно.
+  const nearLimit =
+    maxLength !== undefined && value.length >= Math.floor(maxLength * 0.9);
+
   return (
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={rows}
-      className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] leading-relaxed text-ink outline-none transition-colors placeholder:text-muted focus:border-[var(--brand-primary)]"
-    />
+    <div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        maxLength={maxLength}
+        className="w-full resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[13.5px] leading-relaxed text-ink outline-none transition-colors placeholder:text-muted focus:border-[var(--brand-primary)]"
+      />
+      {nearLimit && (
+        <p
+          className={cn(
+            "mt-1 text-right text-[11.5px] tabular-nums",
+            value.length >= maxLength! ? "text-[#d4334a]" : "text-muted",
+          )}
+        >
+          {value.length} / {maxLength}
+        </p>
+      )}
+    </div>
   );
 }
 

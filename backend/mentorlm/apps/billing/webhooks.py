@@ -14,13 +14,9 @@
    ошибка — всё это не повод устраивать себе поток повторов: пишем в лог и
    отвечаем 200.
 
-3. **⚠️ Адрес отправителя берётся из `X-Forwarded-For` СПРАВА.** nginx у нас
-   настроен как `$proxy_add_x_forwarded_for` (infra/nginx/proxy_params.conf) —
-   он ДОПИСЫВАЕТ реальный адрес соединения в конец списка. Левые элементы
-   пришли от клиента и подделываются одной строкой в curl. Существующий
-   `_client_ip` в apps/users/auth_views.py берёт как раз левый: для счётчика
-   попыток входа это нормально, для аллоу-листа — дыра, поэтому здесь своя
-   реализация, и подменять её на «общую» нельзя.
+3. **⚠️ Адрес отправителя берётся из `X-Forwarded-For` СПРАВА** — через общий
+   `apps.core.net.client_ip`, где объяснено почему. Коротко: nginx дописывает
+   реальный адрес соединения в конец списка, всё левее прислал клиент.
 
 CSRF здесь не мешает: DRF проверяет его только для SessionAuthentication, а у
 вьюхи `authentication_classes = []` — тот же приём, что в apps/core/views.py.
@@ -35,9 +31,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.core.net import client_ip
+
 from .models import Payment
 from .payments import apply_provider_state
-from .yookassa import YooKassaError, get_payment
+from .yookassa import YooKassaError, get_payment, get_refund
 
 logger = logging.getLogger(__name__)
 
@@ -60,18 +58,6 @@ _ALLOWED_NETWORKS = tuple(
 _HANDLED_EVENTS = {"payment.succeeded", "payment.canceled", "refund.succeeded"}
 
 
-def _peer_ip(request) -> str:
-    """Адрес, с которого пришёл запрос, — не подделываемый клиентом.
-
-    Берём ПОСЛЕДНИЙ элемент X-Forwarded-For: его дописал наш nginx, всё что
-    левее прислал сам клиент. Без nginx (локальный запуск) остаётся REMOTE_ADDR.
-    """
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[-1].strip()
-    return request.META.get("REMOTE_ADDR", "")
-
-
 def _is_trusted(ip: str) -> bool:
     """Принадлежит ли адрес сетям ЮKassa."""
     try:
@@ -91,7 +77,7 @@ class WebhookView(APIView):
 
     def post(self, request):
         """Принять уведомление и привести локальный платёж в соответствие."""
-        ip = _peer_ip(request)
+        ip = client_ip(request)
         if not _is_trusted(ip):
             # Единственный случай, когда отвечаем не 200: это не ЮKassa, и
             # повторов от неё не будет — значит, и провоцировать нечего.
@@ -162,16 +148,40 @@ class WebhookView(APIView):
         Возврат мог быть сделан и не нами — например, руками в кабинете ЮKassa.
         Тогда локальной строки `Refund` нет, но сумму в платеже учесть надо:
         иначе следующий возврат посчитает доступный остаток неправильно.
+
+        Сумму берём из API, а не из тела уведомления (правило 3 в шапке модуля).
+        Тело здесь — только сигнал «сходи посмотри»: оно прибавляется к
+        `refunded_amount`, то есть меняет деньги, и на слово ему верить нельзя.
         """
-        from decimal import Decimal
+        from decimal import Decimal, InvalidOperation
 
         from django.db import transaction
 
         from .models import Refund
 
         refund_id = obj.get("id")
-        payment_external_id = obj.get("payment_id")
-        amount = Decimal(str((obj.get("amount") or {}).get("value", "0")))
+        if not refund_id:
+            logger.warning("Уведомление о возврате без идентификатора — пропущено")
+            return
+
+        try:
+            fresh = get_refund(str(refund_id))
+        except YooKassaError:
+            logger.exception("Не удалось перечитать возврат %s", refund_id)
+            return
+
+        if str(fresh.get("status", "")) != "succeeded":
+            logger.info("Возврат %s ещё не проведён — пропускаем", refund_id)
+            return
+
+        payment_external_id = fresh.get("payment_id") or obj.get("payment_id")
+        try:
+            amount = Decimal(str((fresh.get("amount") or {}).get("value", "0")))
+        except InvalidOperation:
+            logger.warning("Возврат %s: непонятная сумма — пропущен", refund_id)
+            return
+        if amount <= 0:
+            return
 
         refund = Refund.objects.filter(external_id=refund_id).first()
         if refund is not None:

@@ -5,6 +5,7 @@
  */
 
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { CookieNotice } from "@/components/ui/CookieNotice";
 import { GlassFilters } from "@/components/ui/GlassFilters";
@@ -66,9 +67,13 @@ export const viewport: Viewport = {
 };
 
 // Разметка <html>/<body> со всеми провайдерами и глобальными настройками.
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // nonce из middleware — без него анти-FOUC скрипт ниже заблокирует CSP.
+  // Именно это чтение делает все маршруты динамическими (см. src/middleware.ts).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     // Провайдер сессии оборачивает и лендинг: навбар и тизер меняют кнопку в
     // зависимости от того, вошёл ли пользователь.
@@ -81,7 +86,13 @@ export default function RootLayout({
         <head>
           {/* Анти-FOUC: ставим тему и размер шрифта из localStorage
               синхронно, до первой отрисовки — чтобы не мигало. */}
+          {/* suppressHydrationWarning — про nonce, а не про содержимое: браузер
+              обнуляет атрибут nonce в DOM сразу после применения CSP (защита от
+              кражи значения через CSS-селекторы), поэтому на гидратации клиент
+              видит nonce="" против серверного значения. Расхождение мнимое. */}
           <script
+            nonce={nonce}
+            suppressHydrationWarning
             dangerouslySetInnerHTML={{
               __html: `(function(){try{
                 var t=localStorage.getItem('mentorlm-theme')||'system';

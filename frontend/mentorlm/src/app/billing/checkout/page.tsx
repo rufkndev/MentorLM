@@ -47,6 +47,7 @@ import {
   type BillingPlan,
 } from "@/lib/billing-contents";
 import { cn } from "@/lib/cn";
+import { safeExternalUrl, YOOKASSA_HOSTS } from "@/lib/safe-url";
 import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
 
 const gate = authContents.verifyGate;
@@ -226,7 +227,17 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
       );
       // Уходим на форму ЮKassa. Именно assign, а не router.push: адрес внешний,
       // и вернётся человек уже на /billing/return.
-      window.location.assign(res.confirmation_url);
+      //
+      // Адрес проверяем, хотя он и от нашего бэка: это единственное место, где
+      // мы уводим пользователя с сайта по данным из ответа API, и уводим прямо
+      // с формы оплаты. Ошибка в данных здесь дороже одной проверки.
+      const target = safeExternalUrl(res.confirmation_url, YOOKASSA_HOSTS);
+      if (!target) {
+        setError(t.errors.generic);
+        setBusy(false);
+        return;
+      }
+      window.location.assign(target);
     } catch (e) {
       // Сообщение бэка информативнее нашего: он знает, тариф ли уже подключён,
       // не отвечает ли провайдер или не подтверждена почта.
@@ -354,6 +365,7 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
               <Link
                 href="/legal/offer"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="text-[var(--brand-primary)] underline-offset-2 hover:underline"
               >
                 {t.offer.offerLabel}
@@ -362,6 +374,7 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
               <Link
                 href="/legal/privacy"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="text-[var(--brand-primary)] underline-offset-2 hover:underline"
               >
                 {t.offer.privacyLabel}

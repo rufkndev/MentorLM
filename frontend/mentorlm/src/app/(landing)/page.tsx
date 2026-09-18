@@ -9,6 +9,7 @@ import { SolutionSection } from "@/components/landing/SolutionSection";
 import { FeaturesSection } from "@/components/landing/FeaturesSection";
 import { WorkflowSection } from "@/components/landing/WorkflowSection";
 import { SocialproofSection } from "@/components/landing/SocialproofSection";
+import { FAQSection } from "@/components/landing/FAQSection";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { CTASection } from "@/components/landing/CTASection";
 
@@ -22,6 +23,7 @@ export default function LandingPage() {
       <FeaturesSection />
       <WorkflowSection />
       <SocialproofSection />
+      <FAQSection />
       <PricingSection />
       <CTASection />
     </>

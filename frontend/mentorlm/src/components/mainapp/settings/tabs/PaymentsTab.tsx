@@ -23,6 +23,7 @@ import { Section } from "../controls";
 import type { PaymentRecord } from "@/components/mainapp/SubscriptionProvider";
 import { useApi } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 // Дата и время операции в зоне пользователя: «22 августа 2026, 14:31».
 function formatMoment(iso: string): string {
@@ -54,6 +55,11 @@ function statusTone(status: PaymentRecord["status"]): string {
 
 function PaymentRow({ payment }: { payment: PaymentRecord }) {
   const refunded = payment.refunded;
+  // Адрес чека попадает прямо в href. React не блокирует `javascript:` в href —
+  // только предупреждает в dev, — поэтому пропускаем лишь https. Домен не
+  // ограничиваем: ссылку вписывает администратор из «Мой налог», и угадывать за
+  // ФНС её адреса значит однажды спрятать настоящий чек.
+  const receiptUrl = safeExternalUrl(payment.npd_receipt_url);
   return (
     <li className="flex items-start justify-between gap-4 border-b border-line py-3 last:border-b-0">
       <div className="min-w-0">
@@ -77,9 +83,9 @@ function PaymentRow({ payment }: { payment: PaymentRecord }) {
         {/* Чек. Пока он не выписан, честно пишем «готовится»: у оплаченного
             платежа человек ищет чек, и молчание он читает как «его не будет». */}
         {payment.status === "succeeded" &&
-          (payment.npd_receipt_url ? (
+          (receiptUrl ? (
             <a
-              href={payment.npd_receipt_url}
+              href={receiptUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-1 inline-flex items-center gap-1 text-[12px] text-[var(--brand-primary)] underline-offset-2 hover:underline"

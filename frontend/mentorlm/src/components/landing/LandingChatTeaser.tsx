@@ -11,6 +11,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 import { saveDraft } from "@/lib/draft";
+import { MAX_MESSAGE_CHARS } from "@/lib/settings-contents";
 
 // Мини-композер для лендинга.
 export function LandingChatTeaser() {
@@ -61,6 +62,7 @@ export function LandingChatTeaser() {
           onKeyDown={handleKeyDown}
           placeholder="Спросите что угодно по учёбе…"
           rows={2}
+          maxLength={MAX_MESSAGE_CHARS}
           className="min-h-[72px] w-full resize-none bg-transparent px-3 py-2 text-[16px] leading-relaxed text-ink outline-none placeholder:text-muted"
         />
 

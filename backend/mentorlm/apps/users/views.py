@@ -42,6 +42,11 @@ class MeView(APIView):
 class MeSettingsView(APIView):
     """GET/PATCH /api/me/settings/ — чтение и частичное обновление настроек."""
 
+    # Фронт шлёт PATCH с дебаунсом на каждое нажатие клавиши в полях «о себе»,
+    # поэтому лимит выше обычного — но он есть: эндпоинт принимает несколько
+    # килобайт текста и пишет их в базу.
+    throttle_scope = "settings"
+
     def _settings(self, request) -> UserSettings:
         """Настройки пользователя; аутентификация их создаёт, но подстрахуемся."""
         settings_obj, _ = UserSettings.objects.get_or_create(user=request.user)

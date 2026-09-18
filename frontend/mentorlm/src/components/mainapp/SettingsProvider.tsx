@@ -28,6 +28,12 @@ import type {
   ReasoningDepth,
   RetentionDays,
 } from "@/lib/settings-contents";
+import {
+  DEFAULTS_STORAGE_KEY,
+  FONT_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+} from "@/lib/settings-storage";
 
 // Тип настроек — зеркало UserSettingsSerializer на бэке.
 export type Theme = "system" | "light" | "dark";
@@ -89,12 +95,9 @@ const FALLBACK_SETTINGS: Settings = {
   chat_retention_days: 30,
 };
 
-// Ключи localStorage для темы, шрифта и полного объекта настроек.
-const THEME_STORAGE_KEY = "mentorlm-theme";
-const FONT_STORAGE_KEY = "mentorlm-font-size";
-const SETTINGS_STORAGE_KEY = "mentorlm-settings";
-// Кэш канонических дефолтов с бэка (/api/me/settings/defaults/).
-const DEFAULTS_STORAGE_KEY = "mentorlm-settings-defaults";
+// Ключи localStorage живут в @/lib/settings-storage — их же использует
+// AuthProvider, чтобы стереть настройки при выходе (там объяснено, почему
+// отдельным модулем).
 
 // База дефолтов: закэшированные значения бэка поверх резерва (бэк — источник).
 function readCachedDefaults(): Settings {

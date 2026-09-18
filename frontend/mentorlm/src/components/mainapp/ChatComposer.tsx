@@ -38,6 +38,7 @@ import {
 import { cn } from "@/lib/cn";
 import { takeDraft } from "@/lib/draft";
 import type { Scenario, ScenarioIconId } from "@/lib/mainapp-contents";
+import { MAX_MESSAGE_CHARS } from "@/lib/settings-contents";
 
 export type ComposerSubmit = {
   text: string;
@@ -93,6 +94,8 @@ const MAX_FILE_MB = 10;
 // Форматы, из которых бэк умеет извлекать текст (pdf/docx/текст/код).
 const ACCEPT_ATTACHMENTS =
   ".pdf,.docx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.py,.js,.ts,.tsx,.jsx,.java,.c,.h,.cpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.sql,.sh,.css,.scss";
+// Тот же список, но пригодный для проверки: accept браузер не навязывает.
+const ALLOWED_EXTENSIONS = new Set(ACCEPT_ATTACHMENTS.split(","));
 
 // Композер: текст + вложения + ряд сценариев; hero (центр) или dock (низ).
 export function ChatComposer({
@@ -156,7 +159,7 @@ export function ChatComposer({
     ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
   };
 
-  // Добавление файлов с валидацией размера и количества (как на бэке).
+  // Добавление файлов с валидацией размера, типа и количества (как на бэке).
   const handleFiles = (e: ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = "";
@@ -166,6 +169,15 @@ export function ChatComposer({
     const fitting = picked.filter((f) => {
       if (f.size > MAX_FILE_MB * 1024 * 1024) {
         errors.push(`«${f.name}» больше ${MAX_FILE_MB} МБ`);
+        return false;
+      }
+      // accept у input — только подсказка диалогу выбора файлов: перетаскиванием
+      // или программно туда кладётся что угодно. Бэк такой файл всё равно
+      // отвергнет, но лучше сказать об этом здесь, чем после загрузки 10 МБ.
+      const dot = f.name.lastIndexOf(".");
+      const ext = dot === -1 ? "" : f.name.slice(dot).toLowerCase();
+      if (!ALLOWED_EXTENSIONS.has(ext)) {
+        errors.push(`«${f.name}» — неподдерживаемый формат`);
         return false;
       }
       return true;
@@ -228,6 +240,7 @@ export function ChatComposer({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           rows={variant === "hero" ? 2 : 1}
+          maxLength={MAX_MESSAGE_CHARS}
           className={cn(
             "thin-scroll min-h-[44px] w-full resize-none bg-transparent px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-muted",
             variant === "hero" && "min-h-[80px] text-[16px]"

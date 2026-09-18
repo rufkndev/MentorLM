@@ -2,6 +2,9 @@
 
 from rest_framework import serializers
 
+from apps.ai.preferences import PERSONA_LIMITS
+from apps.ai.sanitize import clean_prompt_text
+
 from .models import UserProfile, UserSettings
 
 
@@ -42,7 +45,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 
 class UserSettingsSerializer(serializers.ModelSerializer):
-    """Настройки пользователя; набор полей совпадает с фронтовым типом Settings."""
+    """Настройки пользователя; набор полей совпадает с фронтовым типом Settings.
+
+    Свободные поля «о себе» уходят в системный промпт (ai.preferences._persona),
+    поэтому здесь они и ограничиваются по длине, и обезвреживаются:
+
+    * `max_length` приходится задавать руками — DRF выводит его из модели только
+      для `CharField`; у `TextField` ограничение модели до сериализатора не
+      доезжает, и поле осталось бы безразмерным;
+    * `clean_prompt_text` снимает разметку ролей и невидимые символы ДО записи.
+      Чинить это на чтении было бы поздно: в базе уже лежал бы текст, который
+      любой новый код мог бы взять напрямую.
+    """
 
     class Meta:
         model = UserSettings
@@ -74,3 +88,28 @@ class UserSettingsSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = ["updated_at"]
+        extra_kwargs = {
+            name: {"max_length": limit} for name, limit in PERSONA_LIMITS.items()
+        }
+
+    def validate_nickname(self, value: str) -> str:
+        return self._clean("nickname", value, max_lines=1)
+
+    def validate_occupation(self, value: str) -> str:
+        return self._clean("occupation", value, max_lines=1)
+
+    def validate_field_of_study(self, value: str) -> str:
+        return self._clean("field_of_study", value, max_lines=1)
+
+    def validate_learning_goals(self, value: str) -> str:
+        return self._clean("learning_goals", value)
+
+    def validate_custom_about(self, value: str) -> str:
+        return self._clean("custom_about", value)
+
+    def validate_custom_style(self, value: str) -> str:
+        return self._clean("custom_style", value)
+
+    @staticmethod
+    def _clean(name: str, value: str, max_lines: int = 20) -> str:
+        return clean_prompt_text(value, limit=PERSONA_LIMITS[name], max_lines=max_lines)

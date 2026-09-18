@@ -307,6 +307,18 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
 }
 
 
+def is_known_scenario(mode_id: str, scenario_id) -> bool:
+    """Существует ли такой сценарий у режима.
+
+    Нужна там, где id не только выбирает пресет, но и СОХРАНЯЕТСЯ: get_scenario
+    молча делает фолбэк, а колонка в БД — нет. Проверяем и тип: из JSON вместо
+    строки может прийти список или словарь, а они ещё и нехэшируемы.
+    """
+    if not isinstance(scenario_id, str):
+        return False
+    return scenario_id in SCENARIOS.get(mode_id, {})
+
+
 def get_scenario(mode_id: str, scenario_id: str | None) -> ScenarioConfig:
     """Пресет по режиму и id; неизвестный или пустой id — дефолтный сценарий режима."""
     mode = get_mode(mode_id)

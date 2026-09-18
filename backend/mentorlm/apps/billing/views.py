@@ -97,6 +97,10 @@ class CheckoutView(APIView):
     """POST /api/billing/checkout/ — создать платёж за тариф."""
 
     permission_classes = [EmailVerified]
+    # Каждый вызов заводит строку Payment и идёт живым запросом в ЮKassa.
+    # Человек оформляет подписку раз в месяц, десяти попыток в час хватит с
+    # запасом даже на «передумал и вернулся».
+    throttle_scope = "checkout"
 
     def post(self, request):
         """Оформить подписку и вернуть адрес платёжной формы ЮKassa."""

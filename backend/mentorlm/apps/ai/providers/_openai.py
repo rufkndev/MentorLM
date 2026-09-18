@@ -7,7 +7,15 @@ env — поэтому не угадываем заранее, а снимаем
 
 from __future__ import annotations
 
+import threading
 from typing import Any, Callable
+
+# Что каждая модель уже отвергла в этом процессе: {model: {имя опции}}. Ответ
+# 400 стоит целого похода к провайдеру (а в проде — ещё и через прокси), и без
+# памяти мы платили бы им за каждый запрос к одной и той же модели. Кэш живёт в
+# памяти процесса: смена модели в env — это перезапуск, то есть чистый кэш.
+_unsupported: dict[str, set[str]] = {}
+_lock = threading.Lock()
 
 
 def create_with_optional(
@@ -20,8 +28,14 @@ def create_with_optional(
 
     На BadRequestError убираем те опции, чьё имя встретилось в тексте ошибки, и
     повторяем; если снимать нечего — дело не в опциях, пробрасываем ошибку.
+    Снятое запоминаем по модели, чтобы следующий запрос уже не ловил тот же 400.
     """
-    opt = {k: v for k, v in optional.items() if v is not None}
+    model = str(base_kwargs.get("model", ""))
+    with _lock:
+        known = set(_unsupported.get(model, ()))
+    opt = {
+        k: v for k, v in optional.items() if v is not None and k not in known
+    }
     while True:
         try:
             return create(**base_kwargs, **opt)
@@ -32,3 +46,5 @@ def create_with_optional(
                 raise
             for key in dropped:
                 opt.pop(key)
+            with _lock:
+                _unsupported.setdefault(model, set()).update(dropped)

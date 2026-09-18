@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { modes, type ChatPreview } from "@/lib/mainapp-contents";
+import { MAX_TITLE_CHARS } from "@/lib/settings-contents";
 import { useChatRowMenu } from "./useChatRowMenu";
 
 /** Подпись режима для строки чата в сайдбаре. */
@@ -63,8 +64,11 @@ function ChatRow({
   const handleRename = () => {
     close();
     const next = window.prompt("Новое название чата", chat.title);
-    if (next && next.trim() && next.trim() !== chat.title) {
-      onRename(chat.id, next.trim());
+    // Обрезаем здесь же: prompt длину не ограничивает, а бэк такое название
+    // просто подрежет — и человек не поймёт, почему сохранилось не то.
+    const title = next?.trim().slice(0, MAX_TITLE_CHARS);
+    if (title && title !== chat.title) {
+      onRename(chat.id, title);
     }
   };
 

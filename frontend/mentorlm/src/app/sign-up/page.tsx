@@ -118,6 +118,7 @@ export default function SignUpPage() {
             <Link
               href={consent.terms.href}
               target="_blank"
+              rel="noopener noreferrer"
               className="text-[var(--brand-primary)] underline-offset-4 hover:underline"
             >
               {consent.terms.label}
@@ -126,6 +127,7 @@ export default function SignUpPage() {
             <Link
               href={consent.privacy.href}
               target="_blank"
+              rel="noopener noreferrer"
               className="text-[var(--brand-primary)] underline-offset-4 hover:underline"
             >
               {consent.privacy.label}

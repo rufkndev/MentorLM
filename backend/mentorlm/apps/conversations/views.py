@@ -20,6 +20,7 @@ from rest_framework.views import APIView
 
 from apps.ai import service as ai_service
 from apps.ai.context import count_tokens
+from apps.ai.scenarios import is_known_scenario
 from apps.billing.guard import (
     LOCK_WAIT_SECONDS,
     STOP_WAIT_SECONDS,
@@ -34,7 +35,7 @@ from apps.billing.guard import (
     stop_requested,
     wait_generation_finished,
 )
-from apps.billing.limits import limits_for, request_timeout
+from apps.billing.limits import MAX_MESSAGE_CHARS, limits_for, request_timeout
 from apps.billing.models import Plan
 from apps.billing.plans import effective_plan
 from apps.memory.services import extract_facts_in_background
@@ -192,8 +193,27 @@ class MessageCreateView(APIView):
             return Response(status=status.HTTP_404_NOT_FOUND)
 
         content = (request.data.get("content") or "").strip()
+        # Потолок по символам — до токенизации: count_tokens в preflight сам по
+        # себе недёшев, и гонять tiktoken по мегабайтам, чтобы затем отказать,
+        # значит отдать процессор тому, кто прислал мусор.
+        if len(content) > MAX_MESSAGE_CHARS:
+            return Response(
+                {
+                    "code": "input_too_long",
+                    "message": "Сообщение слишком длинное. Сократите его или разбейте на части.",
+                },
+                status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            )
+
         # Клиент шлёт только id сценария: промпт и параметры собирает бэк.
+        # Значение проверяем здесь, а не при сохранении: get_scenario умеет
+        # мягкий фолбэк, но строка длиннее колонки (40) падает раньше — на
+        # conversation.save(), которое валидаторы не вызывает, то есть 500.
         scenario_id = request.data.get("scenario_id") or None
+        if scenario_id is not None and not is_known_scenario(
+            conversation.mode, scenario_id
+        ):
+            scenario_id = None
         # «Повторить» после сбоя: отвечаем на последний вопрос, не копируя его, и
         # убираем неудачный хвост — иначе в диалоге копился бы мусор от попыток.
         retry = bool(request.data.get("retry"))

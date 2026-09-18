@@ -26,6 +26,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { clearAllCache } from "@/lib/chat-cache";
+import { clearStoredSettings } from "@/lib/settings-storage";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -200,8 +202,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Сервер недоступен — локальную сессию всё равно закрываем: пользователь
       // нажал «Выйти», и остаться внутри он не должен.
     }
+    // Чистим локальные копии данных: в localStorage лежат тексты переписки
+    // (chat-cache) и поля «о себе» (SettingsProvider). Именно здесь, а не в
+    // clearSession: тот же вызов происходит при протухшей сессии, и стирать
+    // кэш из-за истёкшего токена значило бы терять смысл кэша.
+    //
+    // Через logout проходит и удаление аккаунта (DataTab) — иначе после
+    // «удалить навсегда» переписка осталась бы на устройстве.
+    const uid = user ? String(user.id) : null;
+    clearAllCache(uid);
+    clearStoredSettings();
     clearSession();
-  }, [clearSession]);
+  }, [clearSession, user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

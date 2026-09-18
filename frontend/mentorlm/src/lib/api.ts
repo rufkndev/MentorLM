@@ -59,6 +59,10 @@ export type StreamResult = {
   usage: ModeUsage | null;
 };
 
+// Потолок незавершённого SSE-события: одна дельта — это несколько слов, так что
+// мегабайт без разделителя означает, что поток сломан.
+const MAX_SSE_BUFFER = 1024 * 1024;
+
 // Собирает ApiError из тела ответа: у лимитов бэк отдаёт JSON {code, message}.
 async function apiErrorFrom(res: Response): Promise<ApiError> {
   const text = await res.text().catch(() => "");
@@ -70,7 +74,12 @@ async function apiErrorFrom(res: Response): Promise<ApiError> {
   } catch {
     // тело не JSON — вернём как обычную ошибку ниже
   }
-  return new ApiError(res.status, text || res.statusText);
+  // Не-JSON тело пользователю не показываем. Так отвечает не наш обработчик, а
+  // прокси или сам Django в отладочном режиме, и в такой странице бывают
+  // внутренние пути и куски трейсбека. Человеку это ничего не объясняет, а нам
+  // нужно в консоли — поэтому текст остаётся там.
+  if (text) console.debug("Ответ сервера не в формате JSON:", text.slice(0, 500));
+  return new ApiError(res.status, res.statusText || "Ошибка сервера.");
 }
 
 const offlineError = () =>
@@ -210,12 +219,22 @@ export function useApi() {
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
+        // Предохранитель: если разделителя событий так и не пришло, буфер растёт
+        // на всю длину ответа. Наш бэк такого не делает, но между нами есть
+        // прокси, а вкладку съедает молча — поэтому обрываем чтение сами.
+        if (buffer.length > MAX_SSE_BUFFER) {
+          throw new ApiError(0, "Сервер вернул некорректный поток ответа.", "bad_stream");
+        }
+
         let sep: number;
         while ((sep = buffer.indexOf("\n\n")) !== -1) {
           const rawEvent = buffer.slice(0, sep);
           buffer = buffer.slice(sep + 2);
 
-          for (const line of rawEvent.split("\n")) {
+          for (const rawLine of rawEvent.split("\n")) {
+            // \r убираем сами: по спецификации SSE строки могут разделяться и
+            // \r\n, и тогда он приезжает в хвосте JSON и ломает разбор.
+            const line = rawLine.replace(/\r$/, "");
             if (!line.startsWith("data:")) continue;
             const json = line.slice(5).trim();
             if (!json) continue;

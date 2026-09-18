@@ -15,6 +15,7 @@ from apps.ai.preferences import (
     MEMORY_SCOPE_CHOICES,
     MEMORY_USE_CHOICES,
     MODEL_TIER_CHOICES,
+    PERSONA_LIMITS,
     REASONING_DEPTH_CHOICES,
     RESPONSE_LENGTH_PREF_CHOICES,
     RETENTION_CHOICES,
@@ -241,18 +242,26 @@ class UserSettings(models.Model):
     # — Память и персональные инструкции —
     # Свободные поля идут в промпт строками персонализации, переключатели
     # памяти — в apps.memory.
-    nickname = models.CharField(max_length=100, blank=True)
-    occupation = models.CharField(max_length=150, blank=True)
+    nickname = models.CharField(max_length=PERSONA_LIMITS["nickname"], blank=True)
+    occupation = models.CharField(max_length=PERSONA_LIMITS["occupation"], blank=True)
     education_level = models.CharField(
         max_length=20,
         choices=EDUCATION_LEVEL_CHOICES,
         blank=True,
         default=DEFAULTS["education_level"],
     )
-    field_of_study = models.CharField(max_length=150, blank=True)
-    learning_goals = models.TextField(blank=True)
-    custom_about = models.TextField(blank=True)
-    custom_style = models.TextField(blank=True)
+    field_of_study = models.CharField(
+        max_length=PERSONA_LIMITS["field_of_study"], blank=True
+    )
+    learning_goals = models.TextField(
+        max_length=PERSONA_LIMITS["learning_goals"], blank=True
+    )
+    custom_about = models.TextField(
+        max_length=PERSONA_LIMITS["custom_about"], blank=True
+    )
+    custom_style = models.TextField(
+        max_length=PERSONA_LIMITS["custom_style"], blank=True
+    )
     context_depth = models.CharField(
         max_length=20,
         choices=CONTEXT_DEPTH_CHOICES,

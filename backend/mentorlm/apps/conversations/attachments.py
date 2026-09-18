@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import os
 
+from apps.ai.sanitize import clean_prompt_text, wrap_untrusted
+
 # Глобальные потолки-предохранители, едины для всех тарифов. Пер-тарифное число
 # файлов — в billing.limits (max_attachments), проверяется во вьюхе.
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 МБ на файл
 MAX_FILES_HARD = 10  # абсолютный потолок файлов на сообщение
 MAX_TEXT_CHARS = 20_000  # потолок извлечённого текста на файл
+MAX_TEXT_LINES = 2000  # потолок строк на файл: 20k символов «столбиком» тоже мусор
 
 # Белый список по расширению: только документы, из которых извлекаем текст.
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".markdown"}
@@ -120,13 +123,22 @@ def extract_text(filename: str, data: bytes) -> str:
 
 
 def render_attachments_block(attachments) -> str:
-    """Собрать текст вложений в блок для промпта; без текста — пустая строка."""
+    """Собрать текст вложений в блок для промпта; без текста — пустая строка.
+
+    И имя файла, и его содержимое пишет не наш сервер: имя целиком выбирает
+    пользователь, а текст внутри документа мог написать кто угодно. Поэтому оба
+    проходят ai.sanitize и оборачиваются в <file> — заголовка «### Файл:» мало,
+    его ничего не стоит подделать строкой внутри самого документа.
+    """
     parts = []
     for att in attachments:
-        text = (att.extracted_text or "").strip()
+        text = clean_prompt_text(
+            att.extracted_text or "", limit=MAX_TEXT_CHARS, max_lines=MAX_TEXT_LINES
+        )
         if not text:
             continue
-        parts.append(f"### Файл: {att.filename}\n{text}")
+        name = clean_prompt_text(att.filename or "файл", limit=120, max_lines=1)
+        parts.append(wrap_untrusted("file", text, name=name))
     if not parts:
         return ""
     body = "\n\n".join(parts)

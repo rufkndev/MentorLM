@@ -171,3 +171,30 @@ export function dropMessages(uid: string | null, id: string): void {
     // ignore
   }
 }
+
+/**
+ * Стирает ВЕСЬ локальный кэш — вызывается при выходе из аккаунта.
+ *
+ * Здесь лежат тексты переписки целиком, и до сих пор они переживали и выход, и
+ * удаление аккаунта: человек нажимал «удалить навсегда», сервер честно всё
+ * стирал, а на общем компьютере его чаты оставались лежать в localStorage.
+ *
+ * Идём по префиксу, а не по известным ключам: кэш сообщений заводит ключ на
+ * каждый диалог, и список этих ключей сам хранится в кэше — при малейшем
+ * рассогласовании остались бы «осиротевшие» записи с перепиской внутри.
+ */
+export function clearAllCache(uid: string | null): void {
+  const s = ls();
+  if (!s) return;
+  try {
+    const prefix = uid ? `mlm.${VERSION}.${uid}.` : `mlm.${VERSION}.`;
+    const doomed: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const key = s.key(i);
+      if (key && (key.startsWith(prefix) || key === scenariosKey)) doomed.push(key);
+    }
+    for (const key of doomed) s.removeItem(key);
+  } catch {
+    // ignore
+  }
+}

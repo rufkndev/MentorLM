@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from django.conf import settings
 
 from .registry import ModeConfig
+from .sanitize import clean_prompt_text, wrap_untrusted
 from .scenarios import ScenarioConfig
 
 # ── Канонические варианты настроек ────────────────────────────────────────────
@@ -66,6 +67,23 @@ MEMORY_USE_CHOICES = [
     ("auto", "Автоматически"),
     ("always", "Всегда"),
 ]
+
+# Свободные поля «о себе»: потолок длины в символах.
+#
+# Это не про удобство формы, а про безопасность и деньги. Текст этих полей
+# уходит в СИСТЕМНЫЙ промпт на каждом запросе, а preflight (apps.billing.guard)
+# считает токены только сообщения и вложений — системный промпт он не видит.
+# Значит без потолка здесь «рассказ о себе» на мегабайт ехал бы в модель мимо
+# MAX_INPUT_TOKENS, и он же был бы удобным местом для длинной инъекции.
+# Значения зеркалит фронт: frontend/mentorlm/src/lib/settings-contents.ts.
+PERSONA_LIMITS: dict[str, int] = {
+    "nickname": 50,
+    "occupation": 100,
+    "field_of_study": 120,
+    "learning_goals": 600,
+    "custom_about": 1500,
+    "custom_style": 1000,
+}
 
 # «Данные»: автоудаление диалогов, в днях (0 — не удалять).
 RETENTION_CHOICES = [
@@ -233,33 +251,53 @@ def _persona(user_settings) -> list[str]:
 
     Только то, что пользователь указал сам. Автопамять (auto_memory /
     memory_scope / memory_use) сюда не входит — она живёт в apps.memory.
+
+    Весь текст проходит через ai.sanitize — это второй рубеж после сериализатора
+    (apps.users.serializers). Он нужен для строк, записанных до появления
+    лимитов, и для любого будущего пути записи мимо API: промпт не должен
+    зависеть от того, кто и как положил значение в базу.
     """
     lines: list[str] = []
 
     def val(name: str) -> str:
-        return (getattr(user_settings, name, "") or "").strip()
+        raw = getattr(user_settings, name, "") or ""
+        return clean_prompt_text(raw, limit=PERSONA_LIMITS[name], max_lines=1)
 
     if val("nickname"):
         lines.append(f"Обращайся к пользователю по имени: {val('nickname')}.")
     if val("occupation"):
         lines.append(f"Род занятий пользователя: {val('occupation')}.")
 
-    level = val("education_level")
+    level = (getattr(user_settings, "education_level", "") or "").strip()
     level_label = dict(EDUCATION_LEVEL_CHOICES).get(level, "")
     if level and level_label:
         lines.append(f"Уровень обучения: {level_label.lower()}.")
     if val("field_of_study"):
         lines.append(f"Направление/специальность: {val('field_of_study')}.")
-    if val("learning_goals"):
-        lines.append(f"Цели обучения: {val('learning_goals')}")
-    if val("custom_about"):
-        lines.append(f"О пользователе: {val('custom_about')}")
-    if val("custom_style"):
-        lines.append(f"Предпочтительный стиль ответов: {val('custom_style')}")
 
-    if not lines:
+    # Длинные поля — многострочные, поэтому каждому свой блок с делимитером:
+    # модель должна видеть, где кончается наша инструкция и начинается текст,
+    # который написал пользователь.
+    blocks: list[str] = []
+    for name, title in (
+        ("learning_goals", "цели обучения"),
+        ("custom_about", "о пользователе"),
+        ("custom_style", "предпочтительный стиль ответов"),
+    ):
+        raw = getattr(user_settings, name, "") or ""
+        block = wrap_untrusted(
+            "user_data",
+            clean_prompt_text(raw, limit=PERSONA_LIMITS[name]),
+            name=title,
+        )
+        if block:
+            blocks.append(block)
+
+    if lines:
+        blocks.insert(0, "\n".join(lines))
+    if not blocks:
         return []
-    return ["\n".join(lines)]
+    return ["\n".join(blocks)]
 
 
 @dataclass(frozen=True)

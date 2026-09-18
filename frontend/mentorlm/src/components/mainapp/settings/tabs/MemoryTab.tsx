@@ -6,6 +6,7 @@ import {
   EDUCATION_LEVEL_OPTIONS,
   MEMORY_SCOPE_OPTIONS,
   MEMORY_USE_OPTIONS,
+  PERSONA_LIMITS,
   type EducationLevel,
 } from "@/lib/settings-contents";
 import {
@@ -34,6 +35,7 @@ export function MemoryTab() {
             value={settings.nickname}
             onChange={(nickname) => update({ nickname })}
             placeholder="Например: Босс"
+            maxLength={PERSONA_LIMITS.nickname}
           />
         </Row>
         <Row label="Чем вы занимаетесь" hint="Помогает подбирать примеры">
@@ -41,6 +43,7 @@ export function MemoryTab() {
             value={settings.occupation}
             onChange={(occupation) => update({ occupation })}
             placeholder="Например: студент-программист"
+            maxLength={PERSONA_LIMITS.occupation}
           />
         </Row>
         <Row label="Уровень обучения" hint="Влияет на глубину объяснений и терминологию">
@@ -60,6 +63,7 @@ export function MemoryTab() {
             value={settings.field_of_study}
             onChange={(field_of_study) => update({ field_of_study })}
             placeholder="Например: Инженер ПО"
+            maxLength={PERSONA_LIMITS.field_of_study}
           />
         </Row>
         <Field
@@ -70,6 +74,7 @@ export function MemoryTab() {
             value={settings.learning_goals}
             onChange={(learning_goals) => update({ learning_goals })}
             placeholder="Чего вы хотите достичь…"
+            maxLength={PERSONA_LIMITS.learning_goals}
             rows={3}
           />
         </Field>
@@ -81,6 +86,7 @@ export function MemoryTab() {
             value={settings.custom_about}
             onChange={(custom_about) => update({ custom_about })}
             placeholder="Расскажите о себе, своей учёбе и интересах…"
+            maxLength={PERSONA_LIMITS.custom_about}
             rows={4}
           />
         </Field>
@@ -92,6 +98,7 @@ export function MemoryTab() {
             value={settings.custom_style}
             onChange={(custom_style) => update({ custom_style })}
             placeholder="Опишите предпочитаемый стиль ответов…"
+            maxLength={PERSONA_LIMITS.custom_style}
             rows={4}
           />
         </Field>

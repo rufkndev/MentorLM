@@ -11,6 +11,9 @@
 
 from __future__ import annotations
 
+import logging
+
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -18,12 +21,14 @@ from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import APIException
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from django.conf import settings
 
+from apps.core.net import client_ip
 from apps.mailer.sender import send_async
 
 from .models import EmailToken, UserProfile, UserSettings
@@ -43,6 +48,22 @@ from .tokens import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
+
+logger = logging.getLogger(__name__)
+
+
+class CacheUnavailable(APIException):
+    """Счётчик лимитов недоступен — пускать запрос дальше нельзя.
+
+    Наследник APIException, чтобы DRF сам отдал 503 из любой вьюхи: иначе
+    каждому вызову лимитера потребовался бы свой try/except, и первый же
+    забытый превратил бы отказ кэша в открытую дверь.
+    """
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    default_detail = "Сервис временно недоступен, попробуйте через минуту."
+    default_code = "service_unavailable"
+
 
 # ── Ограничение попыток ───────────────────────────────────────────────────────
 # Форма входа без него — открытый перебор паролей. Считаем в общем кэше (Redis),
@@ -67,23 +88,27 @@ MAX_EMAILS_PER_IP = 30
 
 
 def _client_ip(request) -> str:
-    """IP клиента с учётом nginx (см. infra/nginx/proxy_params.conf)."""
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "") or "unknown"
+    """IP клиента; общее определение — apps.core.net (там же почему именно так)."""
+    return client_ip(request) or "unknown"
 
 
 def _hit_limit(key: str, allowed: int, window: int) -> bool:
     """Засчитать обращение по ключу и сказать, исчерпан ли лимит."""
     # add ставит счётчик только если его не было — так окно начинается с
     # первой попытки и не продлевается следующими.
-    cache.add(key, 0, timeout=window)
     try:
-        used = cache.incr(key)
-    except ValueError:  # ключ истёк между add и incr
-        cache.set(key, 1, timeout=window)
-        used = 1
+        cache.add(key, 0, timeout=window)
+        try:
+            used = cache.incr(key)
+        except ValueError:  # ключ истёк между add и incr
+            cache.set(key, 1, timeout=window)
+            used = 1
+    except Exception:  # noqa: BLE001 — кэш недоступен
+        # Считать попытки негде. Пускать без счёта нельзя — это ровно та
+        # ситуация, когда форма входа превращается в перебор паролей, — поэтому
+        # закрываемся. Вьюхи превращают это в честный 503 (см. _limit_response).
+        logger.exception("Счётчик лимитов недоступен: %s", key)
+        raise CacheUnavailable() from None
     return used > allowed
 
 
@@ -125,6 +150,35 @@ def _reset_attempts(request, email: str) -> None:
 def _error(code: str, message: str, http_status: int) -> Response:
     """Ошибка в формате, который разбирает фронт (src/lib/api.ts)."""
     return Response({"code": code, "message": message}, status=http_status)
+
+
+# Потолки учётных данных. Не косметика:
+#   * почта длиннее колонки (EmailField → varchar(254)) проходит validate_email,
+#     а падает уже на save() — DataError, который `except IntegrityError` не
+#     ловит, то есть 500 вместо внятного ответа;
+#   * пароль хэшируется PBKDF2 с сотней тысяч итераций, и его длина — это время
+#     нашего процессора. Мегабайтный пароль в форме входа считается секундами.
+# 128 символов — тот же предел, что у форм самого Django.
+MAX_EMAIL_CHARS = 254
+MAX_PASSWORD_CHARS = 128
+
+# Хэш-пустышка для холостой проверки пароля при неизвестной почте.
+_DUMMY_PASSWORD_HASH = make_password("mentorlm-dummy-password")
+
+
+def _burn_password_time() -> None:
+    """Потратить столько же времени, сколько ушло бы на проверку пароля.
+
+    Без этого «нет такой почты» отвечает заметно быстрее, чем «неверный
+    пароль», и форма входа снова становится способом узнать, кто у нас
+    зарегистрирован, — только по секундомеру, а не по тексту ошибки.
+    """
+    check_password("x", _DUMMY_PASSWORD_HASH)
+
+
+def _credentials_too_long(email: str, password: str) -> bool:
+    """Выходят ли почта или пароль за разумные пределы."""
+    return len(email) > MAX_EMAIL_CHARS or len(password) > MAX_PASSWORD_CHARS
 
 
 def _session_response(profile: UserProfile, raw_refresh: str) -> Response:
@@ -200,6 +254,13 @@ class RegisterView(_PublicView):
 
         if not email or not password:
             return _error("invalid_input", "Укажите почту и пароль.", status.HTTP_400_BAD_REQUEST)
+        # Длину проверяем до всего остального — и до хэширования пароля.
+        if _credentials_too_long(email, password):
+            return _error(
+                "invalid_input",
+                "Слишком длинная почта или пароль.",
+                status.HTTP_400_BAD_REQUEST,
+            )
         try:
             validate_email(email)
         except DjangoValidationError:
@@ -287,9 +348,20 @@ class LoginView(_PublicView):
                 status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
+        # Такой длины учётных данных нет ни у кого: регистрация их не примет.
+        # Отвечаем как на неверный пароль — длина не повод подсказывать лишнее.
+        if _credentials_too_long(email, password):
+            return _error(
+                "invalid_credentials",
+                "Неверная почта или пароль.",
+                status.HTTP_401_UNAUTHORIZED,
+            )
+
         profile = UserProfile.objects.filter(email=email).first()
         # Один и тот же ответ на «нет такой почты» и «неверный пароль»: иначе
         # форма входа превращается в способ узнать, кто зарегистрирован.
+        if profile is None:
+            _burn_password_time()
         if profile is None or not profile.check_password(password) or not profile.is_active:
             return _error(
                 "invalid_credentials",
@@ -350,6 +422,23 @@ class PasswordChangeView(APIView):
         new = request.data.get("new_password") or ""
         profile = request.user
 
+        if _credentials_too_long("", current) or _credentials_too_long("", new):
+            return _error(
+                "invalid_input",
+                "Слишком длинный пароль.",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Эндпоинт требует входа, но лимит всё равно нужен: угнанный access-токен
+        # живёт 15 минут, и за них можно было бы спокойно подбирать текущий
+        # пароль, чтобы сменить его и забрать аккаунт насовсем.
+        if _too_many_attempts(request, profile.email):
+            return _error(
+                "rate_limited",
+                "Слишком много попыток. Попробуйте через 15 минут.",
+                status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+
         if not profile.check_password(current):
             return _error(
                 "invalid_credentials",
@@ -363,6 +452,9 @@ class PasswordChangeView(APIView):
 
         profile.set_password(new)
         profile.save(update_fields=["password"])
+        # Текущий пароль назван верно — счётчик обнуляем, иначе человек,
+        # меняющий пароль несколько раз подряд, запер бы сам себя.
+        _reset_attempts(request, profile.email)
 
         # Смена пароля — типичная реакция на «кажется, меня взломали», поэтому
         # выкидываем все остальные устройства. Текущее оставляем: заставлять
@@ -475,6 +567,11 @@ class PasswordResetConfirmView(_PublicView):
     def post(self, request):
         raw = request.data.get("token") or ""
         new = request.data.get("password") or ""
+
+        if _credentials_too_long("", new):
+            return _error(
+                "invalid_input", "Слишком длинный пароль.", status.HTTP_400_BAD_REQUEST
+            )
 
         # Сначала проверяем ссылку, но НЕ гасим её: если пароль не пройдёт
         # валидацию, человек должен иметь возможность ввести другой по той же
