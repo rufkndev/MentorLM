@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import logging
+from zoneinfo import ZoneInfo
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
@@ -241,6 +242,39 @@ def _send_link_letter(profile: UserProfile, purpose: str, request) -> None:
     )
 
 
+# Время в письме — московское, а не серверное: TIME_ZONE проекта UTC, и строка
+# «изменён в 15:42» на три часа мимо превращает единственную полезную деталь
+# письма о безопасности в повод для лишнего письма в поддержку.
+_LETTER_TZ = ZoneInfo("Europe/Moscow")
+
+
+def notify_password_changed(profile: UserProfile, *, via_reset: bool) -> None:
+    """Сообщить владельцу адреса, что пароль его аккаунта только что сменили.
+
+    Письмо ничего не предлагает подтвердить — подтверждать уже поздно. Оно
+    существует ради обратного случая: смена пароля иначе не оставляет следа,
+    который человек увидит, и захват аккаунта проходит молча. Строка в ящике —
+    то место, где владелец о нём узнаёт, даже если прочитает письмо неделей
+    позже.
+
+    `via_reset` различает два пути (ссылка из письма против настроек) — от него
+    зависит и текст, и правда про сессии: сброс гасит все, смена в настройках
+    оставляет текущую.
+    """
+    send_async(
+        profile.email,
+        "password_changed",
+        {
+            "email": profile.email,
+            "changed_at": timezone.localtime(timezone.now(), _LETTER_TZ).strftime(
+                "%d.%m.%Y в %H:%M МСК"
+            ),
+            "via_reset": via_reset,
+            "reset_link": f"{settings.PUBLIC_SITE_URL}/forgot-password",
+        },
+    )
+
+
 # ── Эндпоинты ─────────────────────────────────────────────────────────────────
 
 
@@ -461,6 +495,11 @@ class PasswordChangeView(APIView):
         # пользователя логиниться сразу после смены пароля незачем.
         raw = request.COOKIES.get(settings.AUTH_COOKIE_NAME, "")
         revoke_all(profile, except_raw=raw)
+
+        # Текущий пароль знал не обязательно владелец: угнанного access-токена
+        # хватило бы и здесь. Письмо — единственный способ сказать об этом тому,
+        # у кого остался только ящик.
+        notify_password_changed(profile, via_reset=False)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -602,4 +641,9 @@ class PasswordResetConfirmView(_PublicView):
         # ВСЕ сессии, включая ту, из которой пришёл запрос. Здесь, в отличие от
         # PasswordChangeView, исключений не делаем.
         revoke_all(profile)
+
+        # Уходит на текущий адрес профиля, а не на тот, что записан в токене:
+        # уведомить надо владельца аккаунта сейчас, а не адрес, которым ссылку
+        # когда-то заказали.
+        notify_password_changed(profile, via_reset=True)
         return Response(status=status.HTTP_204_NO_CONTENT)
