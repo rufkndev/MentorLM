@@ -7,7 +7,8 @@ import {
   MODEL_MODE_FIELDS,
   MODEL_TIER_OPTIONS,
   REASONING_DEPTH_OPTIONS,
-} from "@/lib/settings-contents";
+  modelTabCopy,
+} from "@/content/settings";
 import { Row, Section, SegmentedControl } from "../controls";
 
 export function ModelTab() {
@@ -16,8 +17,8 @@ export function ModelTab() {
   return (
     <div className="flex flex-col gap-7">
       <Section
-        title="Модель ИИ"
-        description="Выбор грейда модели ИИ для каждого режима."
+        title={modelTabCopy.modelsTitle}
+        description={modelTabCopy.modelsDescription}
       >
         {MODEL_MODE_FIELDS.map((f) => (
           <Row key={f.key} label={f.label} hint={f.hint}>
@@ -31,12 +32,12 @@ export function ModelTab() {
       </Section>
 
       <Section
-        title="Стиль ответов"
-        description="Применяется во всех режимах поверх выбранного сценария."
+        title={modelTabCopy.styleTitle}
+        description={modelTabCopy.styleDescription}
       >
         <Row
-          label="Креативность"
-          hint="Сдвигает «температуру» сценария к точным или к более свободным ответам"
+          label={modelTabCopy.creativity.label}
+          hint={modelTabCopy.creativity.hint}
         >
           <SegmentedControl
             value={settings.creativity}
@@ -45,8 +46,8 @@ export function ModelTab() {
           />
         </Row>
         <Row
-          label="Длина ответов"
-          hint="Короче или подробнее"
+          label={modelTabCopy.length.label}
+          hint={modelTabCopy.length.hint}
         >
           <SegmentedControl
             value={settings.response_length_preference}
@@ -57,8 +58,8 @@ export function ModelTab() {
           />
         </Row>
         <Row
-          label="Глубина проработки"
-          hint="Быстрее и проще или тщательнее с проверкой логики и ограничений"
+          label={modelTabCopy.reasoning.label}
+          hint={modelTabCopy.reasoning.hint}
         >
           <SegmentedControl
             value={settings.reasoning_depth}

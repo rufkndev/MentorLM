@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { pricing } from "@/lib/landing-contents";
+import { pricing } from "@/content/landing";
 
 // Секция тарифов лендинга.
 export function PricingSection() {
@@ -18,9 +18,11 @@ export function PricingSection() {
           <header className="mx-auto max-w-3xl text-center">
             <p className="text-eyebrow">{pricing.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Начните{" "}
-              <span className="font-editorial text-gradient">бесплатно</span>.
-              Платите, когда станет тесно.
+              {pricing.headline.before}
+              <span className="font-editorial text-gradient">
+                {pricing.headline.accent}
+              </span>
+              {pricing.headline.after}
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-muted">
               {pricing.description}
@@ -80,7 +82,7 @@ function FeaturedPlan({ plan }: { plan: Plan }) {
       }}
     >
       <span className="absolute left-7 top-0 z-10 inline-flex -translate-y-1/2 items-center gap-1.5 rounded-full bg-[var(--brand-primary)] px-3 py-1 text-[11px] font-medium uppercase tracking-widest text-white shadow-[0_8px_20px_-6px_rgba(23,70,245,0.6)]">
-        Рекомендуем
+        {pricing.featuredBadge}
       </span>
       <PlanHead plan={plan} featured />
       <PlanFeatures plan={plan} featured />

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSettings } from "@/components/mainapp/SettingsProvider";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
-import { useApi } from "@/lib/api";
-import { RETENTION_OPTIONS, type RetentionDays } from "@/lib/settings-contents";
+import { useApi } from "@/hooks/useApi";
+import { RETENTION_OPTIONS, dataTabCopy as t } from "@/content/settings";
+import type { RetentionDays } from "@/types/settings";
 import { DangerButton, Row, Section, SelectBox } from "../controls";
 
 export function DataTab() {
@@ -18,7 +19,7 @@ export function DataTab() {
   const [deleting, setDeleting] = useState(false);
 
   const deleteAllChats = () => {
-    if (!window.confirm("Удалить все чаты безвозвратно?")) return;
+    if (!window.confirm(t.deleteChatsConfirm)) return;
     api
       .delete("/api/conversations/")
       .then(() => refresh())
@@ -30,10 +31,7 @@ export function DataTab() {
   // лендинг. Это же реализация права на удаление ПДн — удаление настоящее.
   const deleteAccount = async () => {
     if (!user || deleting) return;
-    const ok = window.confirm(
-      "Удалить аккаунт безвозвратно? Будут стёрты все чаты, настройки и память. " +
-        "Это действие нельзя отменить.",
-    );
+    const ok = window.confirm(t.deleteAccountConfirm);
     if (!ok) return;
 
     setDeleting(true);
@@ -43,18 +41,13 @@ export function DataTab() {
       router.push("/");
     } catch {
       setDeleting(false);
-      window.alert(
-        "Не удалось удалить аккаунт. Попробуйте позже или напишите в поддержку.",
-      );
+      window.alert(t.deleteAccountError);
     }
   };
 
   return (
-    <Section title="Данные и приватность">
-      <Row
-        label="Автоудаление старых чатов"
-        hint="Диалоги без активности дольше выбранного срока удаляются автоматически"
-      >
+    <Section title={t.title}>
+      <Row label={t.retention.label} hint={t.retention.hint}>
         <SelectBox
           value={String(settings.chat_retention_days)}
           onChange={(v) =>
@@ -69,16 +62,16 @@ export function DataTab() {
 
       <div className="mt-4 rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-500/25 dark:bg-red-500/10">
         <p className="text-[13.5px] font-medium text-red-700 dark:text-red-300">
-          Опасная зона
+          {t.dangerTitle}
         </p>
         <p className="mt-1 text-[12.5px] text-red-700/70 dark:text-red-300/60">
-          Эти действия необратимы.
+          {t.dangerDescription}
         </p>
 
         <div className="mt-3 flex flex-col gap-2">
-          <DangerButton label="Удалить все чаты" onClick={deleteAllChats} />
+          <DangerButton label={t.deleteChats} onClick={deleteAllChats} />
           <DangerButton
-            label={deleting ? "Удаление…" : "Удалить аккаунт"}
+            label={deleting ? t.deletingAccount : t.deleteAccount}
             onClick={deleteAccount}
             disabled={deleting}
           />

@@ -37,8 +37,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { takeDraft } from "@/lib/draft";
-import type { Scenario, ScenarioIconId } from "@/lib/mainapp-contents";
-import { MAX_MESSAGE_CHARS } from "@/lib/settings-contents";
+import { composerCopy, modes } from "@/content/app";
+import { MAX_FILES, MAX_FILE_MB, MAX_MESSAGE_CHARS } from "@/lib/limits";
+import type { Scenario, ScenarioIconId } from "@/types/app";
 
 export type ComposerSubmit = {
   text: string;
@@ -88,9 +89,6 @@ const SCENARIO_ICONS: Record<ScenarioIconId, LucideIcon> = {
   facts: BadgeCheck,
 };
 
-// Ограничения вложений — совпадают с бэком (apps/conversations/attachments.py).
-const MAX_FILES = 5;
-const MAX_FILE_MB = 10;
 // Форматы, из которых бэк умеет извлекать текст (pdf/docx/текст/код).
 const ACCEPT_ATTACHMENTS =
   ".pdf,.docx,.txt,.md,.markdown,.csv,.tsv,.json,.yaml,.yml,.xml,.html,.py,.js,.ts,.tsx,.jsx,.java,.c,.h,.cpp,.cs,.go,.rs,.rb,.php,.swift,.kt,.sql,.sh,.css,.scss";
@@ -107,7 +105,7 @@ export function ChatComposer({
   disabled,
   streaming = false,
   onStop,
-  placeholder = "Спросите что угодно по учёбе…",
+  placeholder = modes[0].placeholder,
   seedDraft = false,
 }: Props) {
   // При seedDraft одноразово забираем черновик с лендинга как стартовый текст.
@@ -168,7 +166,7 @@ export function ChatComposer({
     const errors: string[] = [];
     const fitting = picked.filter((f) => {
       if (f.size > MAX_FILE_MB * 1024 * 1024) {
-        errors.push(`«${f.name}» больше ${MAX_FILE_MB} МБ`);
+        errors.push(composerCopy.fileTooBig(f.name, MAX_FILE_MB));
         return false;
       }
       // accept у input — только подсказка диалогу выбора файлов: перетаскиванием
@@ -177,7 +175,7 @@ export function ChatComposer({
       const dot = f.name.lastIndexOf(".");
       const ext = dot === -1 ? "" : f.name.slice(dot).toLowerCase();
       if (!ALLOWED_EXTENSIONS.has(ext)) {
-        errors.push(`«${f.name}» — неподдерживаемый формат`);
+        errors.push(composerCopy.fileBadFormat(f.name));
         return false;
       }
       return true;
@@ -186,7 +184,7 @@ export function ChatComposer({
     let merged = [...files, ...fitting];
     if (merged.length > MAX_FILES) {
       merged = merged.slice(0, MAX_FILES);
-      errors.push(`не больше ${MAX_FILES} файлов за раз`);
+      errors.push(composerCopy.tooManyFiles(MAX_FILES));
     }
     setFiles(merged);
     setFileError(errors.length ? errors.join("; ") : null);
@@ -258,7 +256,7 @@ export function ChatComposer({
             className="hidden"
           />
           <ToolButton
-            label="Прикрепить файл"
+            label={composerCopy.attach}
             onClick={() => fileRef.current?.click()}
           >
             <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.7} />
@@ -369,7 +367,7 @@ function SendButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label="Отправить"
+      aria-label={composerCopy.send}
       className={cn(
         "grid h-9 w-9 place-items-center rounded-full transition-all duration-300",
         disabled
@@ -388,8 +386,8 @@ function StopButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      aria-label="Остановить ответ"
-      title="Остановить ответ"
+      aria-label={composerCopy.stop}
+      title={composerCopy.stop}
       className="grid h-9 w-9 place-items-center rounded-full bg-[var(--brand-ink)] text-white shadow-[0_10px_24px_-10px_rgba(7,27,77,0.6)] transition-all duration-300 hover:bg-[var(--brand-ink-soft)]"
     >
       <Square className="h-[13px] w-[13px] fill-current" strokeWidth={0} />
@@ -408,7 +406,7 @@ function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
       <button
         type="button"
         onClick={onRemove}
-        aria-label="Убрать файл"
+        aria-label={composerCopy.removeFile}
         className="grid h-4 w-4 place-items-center rounded-full text-muted hover:text-ink"
       >
         ×

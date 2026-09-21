@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import { savedFactsCopy as t } from "@/content/settings";
 import { useMemoryFacts } from "../hooks";
 
 export function SavedFacts() {
@@ -11,7 +12,7 @@ export function SavedFacts() {
     <div className="rounded-xl border border-line bg-paper-2/30 p-4">
       <div className="flex items-center justify-between">
         <p className="text-[13.5px] font-medium text-ink">
-          Сохранённые факты{count > 0 && ` · ${count}`}
+          {t.title}{count > 0 && ` · ${count}`}
         </p>
         <button
           type="button"
@@ -19,17 +20,14 @@ export function SavedFacts() {
           disabled={count === 0}
           className="text-[12.5px] text-muted transition-colors hover:text-ink disabled:opacity-50 disabled:hover:text-muted"
         >
-          Очистить все
+          {t.clearAll}
         </button>
       </div>
 
       {facts === null ? (
-        <p className="mt-2 text-[12.5px] text-muted">Загрузка…</p>
+        <p className="mt-2 text-[12.5px] text-muted">{t.loading}</p>
       ) : count === 0 ? (
-        <p className="mt-1 text-[12.5px] text-muted">
-          Пока ничего не сохранено. Если включена автоматическая память, модель
-          будет добавлять сюда устойчивые факты о вас из диалогов.
-        </p>
+        <p className="mt-1 text-[12.5px] text-muted">{t.empty}</p>
       ) : (
         <ul className="mt-2 flex flex-col gap-1.5">
           {facts.map((f) => (
@@ -43,7 +41,7 @@ export function SavedFacts() {
               <button
                 type="button"
                 onClick={() => removeOne(f.id)}
-                aria-label="Удалить факт"
+                aria-label={t.remove}
                 className="mt-0.5 shrink-0 text-muted opacity-0 transition-opacity hover:text-ink group-hover:opacity-100"
               >
                 <X className="h-3.5 w-3.5" strokeWidth={1.7} />

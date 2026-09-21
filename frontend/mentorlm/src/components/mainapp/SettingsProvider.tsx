@@ -16,7 +16,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useApi } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 import type {
   ContextDepth,
   Creativity,
@@ -27,7 +27,7 @@ import type {
   ModelTier,
   ReasoningDepth,
   RetentionDays,
-} from "@/lib/settings-contents";
+} from "@/types/settings";
 import {
   DEFAULTS_STORAGE_KEY,
   FONT_STORAGE_KEY,

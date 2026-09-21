@@ -11,7 +11,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { cn } from "@/lib/cn";
 import { saveDraft } from "@/lib/draft";
-import { MAX_MESSAGE_CHARS } from "@/lib/settings-contents";
+import { teaser } from "@/content/landing";
+import { MAX_MESSAGE_CHARS } from "@/lib/limits";
 
 // Мини-композер для лендинга.
 export function LandingChatTeaser() {
@@ -60,7 +61,7 @@ export function LandingChatTeaser() {
           value={text}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder="Спросите что угодно по учёбе…"
+          placeholder={teaser.placeholder}
           rows={2}
           maxLength={MAX_MESSAGE_CHARS}
           className="min-h-[72px] w-full resize-none bg-transparent px-3 py-2 text-[16px] leading-relaxed text-ink outline-none placeholder:text-muted"
@@ -72,7 +73,7 @@ export function LandingChatTeaser() {
             type="button"
             onClick={handleSend}
             disabled={!canSend}
-            aria-label="Отправить"
+            aria-label={teaser.send}
             className={cn(
               "ml-auto grid h-9 w-9 place-items-center rounded-full transition-colors",
               canSend

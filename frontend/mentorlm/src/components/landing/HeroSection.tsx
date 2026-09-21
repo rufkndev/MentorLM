@@ -23,7 +23,7 @@ import {
 import { useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { Mascot } from "@/components/ui/Mascot";
-import { hero } from "@/lib/landing-contents";
+import { hero } from "@/content/landing";
 
 // Секция героя.
 export function HeroSection() {
@@ -120,27 +120,27 @@ export function HeroSection() {
       <FloatingChip
         pos={{ left: "5%", top: "27%" }}
         style={{ x: chipLX, y: chipLY }}
-        label="AI-powered"
-        tag="чат"
+        label={hero.chips[0].label}
+        tag={hero.chips[0].tag}
         accent
       />
       <FloatingChip
         pos={{ right: "5%", top: "24%" }}
         style={{ x: chipRX, y: chipRY }}
-        label="Исследование"
-        tag="веб-поиск"
+        label={hero.chips[1].label}
+        tag={hero.chips[1].tag}
       />
       <FloatingChip
         pos={{ right: "6%", bottom: "22%" }}
         style={{ x: chipRX, y: chipRY }}
-        label="Память диалогов"
-        tag="контекст"
+        label={hero.chips[2].label}
+        tag={hero.chips[2].tag}
       />
       <FloatingChip
         pos={{ left: "7%", bottom: "24%" }}
         style={{ x: chipLX, y: chipLY }}
-        label="Работа с кодом"
-        tag="код"
+        label={hero.chips[3].label}
+        tag={hero.chips[3].tag}
       />
 
       <div

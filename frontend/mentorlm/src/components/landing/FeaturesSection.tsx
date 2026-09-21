@@ -6,7 +6,7 @@
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { features } from "@/lib/landing-contents";
+import { features } from "@/content/landing";
 
 // Раскладка bento: размеры плиток по индексу карточки.
 const bento = [
@@ -30,9 +30,11 @@ export function FeaturesSection() {
           <Reveal>
             <p className="text-eyebrow">{features.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Всё для учёбы в{" "}
-              <span className="font-editorial text-gradient">одном</span>{" "}
-              окне.
+              {features.headline.before}
+              <span className="font-editorial text-gradient">
+                {features.headline.accent}
+              </span>
+              {features.headline.after}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
@@ -89,10 +91,7 @@ export function FeaturesSection() {
 function Visual0() {
   return (
     <div className="flex items-center gap-2">
-      {[
-        "Объясни тему простыми словами",
-        "Конечно. Начнём с главного…",
-      ].map((t, i) => (
+      {features.visuals.chat.map((t, i) => (
         <div
           key={i}
           className={cn(
@@ -128,7 +127,7 @@ function Visual1() {
 function Visual2() {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {["Изучить", "Практика", "Ревью", "Источники"].map((s, i) => (
+      {features.visuals.scenarios.map((s, i) => (
         <span
           key={s}
           className={cn(
@@ -159,10 +158,12 @@ function Visual3() {
             strokeLinecap="round"
           />
         </svg>
-        <span className="font-mono text-[11px] text-muted">актуальные источники по теме</span>
+        <span className="font-mono text-[11px] text-muted">
+          {features.visuals.researchQuery}
+        </span>
       </div>
       <div className="flex flex-wrap gap-1.5">
-        {["[1] arxiv.org", "[2] habr.com", "[3] cyberleninka"].map((s) => (
+        {features.visuals.researchSources.map((s) => (
           <span
             key={s}
             className="rounded-md border border-line bg-surface/80 px-2 py-0.5 font-mono text-[10px] text-[var(--brand-primary)]"
@@ -179,10 +180,7 @@ function Visual3() {
 function Visual4() {
   return (
     <ul className="space-y-1.5">
-      {[
-        "Учится на 3 курсе прикладной математики",
-        "Предпочитает короткие ответы с примерами",
-      ].map((t) => (
+      {features.visuals.memoryFacts.map((t) => (
         <li
           key={t}
           className="flex items-center gap-2 rounded-lg border border-line bg-surface/80 px-2.5 py-1.5 text-[12px] text-ink-soft"
@@ -199,7 +197,7 @@ function Visual4() {
 function Visual5() {
   return (
     <div className="space-y-1.5">
-      {["Лекция_04.pdf", "Конспект.docx"].map((name) => (
+      {features.visuals.attachments.map((name) => (
         <div
           key={name}
           className="flex items-center gap-2 rounded-lg border border-line bg-surface/80 px-2.5 py-1.5"

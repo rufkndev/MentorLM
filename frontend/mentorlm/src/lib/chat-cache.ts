@@ -7,7 +7,7 @@
  */
 
 import type { Message } from "@/components/mainapp/ChatMessage";
-import type { ChatPreview } from "@/lib/mainapp-contents";
+import type { ChatPreview } from "@/types/app";
 
 const VERSION = "v1";
 const MAX_CACHED_CONVS = 40; // сколько чатов держим в кэше сообщений (LRU)

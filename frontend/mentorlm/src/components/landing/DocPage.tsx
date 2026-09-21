@@ -5,6 +5,7 @@
 
 import type { ReactNode } from "react";
 import { Mascot, type MascotExpression } from "@/components/ui/Mascot";
+import { uiCopy } from "@/content/site";
 
 interface DocPageProps {
   eyebrow?: string;
@@ -50,7 +51,7 @@ export function DocPage({
             ) : null}
             {updatedAt ? (
               <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
-                обновлено · {updatedAt}
+                {uiCopy.updatedAt(updatedAt)}
               </p>
             ) : null}
           </div>

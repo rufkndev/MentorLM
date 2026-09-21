@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
+import { uiCopy } from "@/content/site";
 
 // Каркас страниц биллинга: кнопка «Назад» + контент.
 export default function BillingLayout({
@@ -27,11 +28,11 @@ export default function BillingLayout({
           уводил человека на чужой сайт вместо приложения. */}
       <Link
         href="/chat"
-        aria-label="Назад в приложение"
+        aria-label={uiCopy.backToApp}
         className="glass-strong fixed left-6 top-6 z-30 inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[13px] font-medium text-ink-soft transition-all hover:translate-y-[-1px] hover:text-ink"
       >
         <ArrowLeft className="h-4 w-4" strokeWidth={1.8} />
-        Назад
+        {uiCopy.back}
       </Link>
       <main className="min-h-screen">{children}</main>
     </SubscriptionProvider>

@@ -6,7 +6,7 @@
 "use client";
 
 import { ChatScreen } from "@/components/mainapp/ChatScreen";
-import { chatScenarios, chatDefaultScenarioId } from "@/lib/mainapp-contents";
+import { chatScenarios, chatDefaultScenarioId, modes } from "@/content/app";
 
 // Экран чата со сценариями режима «Общий».
 export default function ChatPage() {
@@ -14,7 +14,7 @@ export default function ChatPage() {
     <ChatScreen
       scenarios={chatScenarios}
       defaultScenarioId={chatDefaultScenarioId}
-      placeholder="Спросите что угодно по учёбе…"
+      placeholder={modes.find((m) => m.id === "chat")?.placeholder}
     />
   );
 }

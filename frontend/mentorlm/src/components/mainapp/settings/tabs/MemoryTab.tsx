@@ -6,9 +6,10 @@ import {
   EDUCATION_LEVEL_OPTIONS,
   MEMORY_SCOPE_OPTIONS,
   MEMORY_USE_OPTIONS,
-  PERSONA_LIMITS,
-  type EducationLevel,
-} from "@/lib/settings-contents";
+  memoryTabCopy as t,
+} from "@/content/settings";
+import { PERSONA_LIMITS } from "@/lib/limits";
+import type { EducationLevel } from "@/types/settings";
 import {
   Field,
   Row,
@@ -26,27 +27,24 @@ export function MemoryTab() {
 
   return (
     <div className="flex flex-col gap-7">
-      <Section
-        title="О вас"
-        description="Модель учитывает это в каждом разговоре, чтобы подбирать примеры и уровень объяснений. Можно оставить пустым."
-      >
-        <Row label="Как к вам обращаться" hint="Имя или ник для ответов модели">
+      <Section title={t.personaTitle} description={t.personaDescription}>
+        <Row label={t.nickname.label} hint={t.nickname.hint}>
           <TextInput
             value={settings.nickname}
             onChange={(nickname) => update({ nickname })}
-            placeholder="Например: Босс"
+            placeholder={t.nickname.placeholder}
             maxLength={PERSONA_LIMITS.nickname}
           />
         </Row>
-        <Row label="Чем вы занимаетесь" hint="Помогает подбирать примеры">
+        <Row label={t.occupation.label} hint={t.occupation.hint}>
           <TextInput
             value={settings.occupation}
             onChange={(occupation) => update({ occupation })}
-            placeholder="Например: студент-программист"
+            placeholder={t.occupation.placeholder}
             maxLength={PERSONA_LIMITS.occupation}
           />
         </Row>
-        <Row label="Уровень обучения" hint="Влияет на глубину объяснений и терминологию">
+        <Row label={t.educationLevel.label} hint={t.educationLevel.hint}>
           <SelectBox
             value={settings.education_level}
             onChange={(v) =>
@@ -55,63 +53,45 @@ export function MemoryTab() {
             options={EDUCATION_LEVEL_OPTIONS}
           />
         </Row>
-        <Row
-          label="Направление / специальность"
-          hint="Помогает подбирать предметные примеры"
-        >
+        <Row label={t.fieldOfStudy.label} hint={t.fieldOfStudy.hint}>
           <TextInput
             value={settings.field_of_study}
             onChange={(field_of_study) => update({ field_of_study })}
-            placeholder="Например: Инженер ПО"
+            placeholder={t.fieldOfStudy.placeholder}
             maxLength={PERSONA_LIMITS.field_of_study}
           />
         </Row>
-        <Field
-          label="Цели обучения"
-          hint="Например: подготовиться к экзамену, закрыть практические работы, разобраться в алгоритмах"
-        >
+        <Field label={t.learningGoals.label} hint={t.learningGoals.hint}>
           <Textarea
             value={settings.learning_goals}
             onChange={(learning_goals) => update({ learning_goals })}
-            placeholder="Чего вы хотите достичь…"
+            placeholder={t.learningGoals.placeholder}
             maxLength={PERSONA_LIMITS.learning_goals}
             rows={3}
           />
         </Field>
-        <Field
-          label="Что ещё важно знать о вас"
-          hint="Например: студент 3 курса CS; интересуют ML и алгоритмы; учу английский"
-        >
+        <Field label={t.customAbout.label} hint={t.customAbout.hint}>
           <Textarea
             value={settings.custom_about}
             onChange={(custom_about) => update({ custom_about })}
-            placeholder="Расскажите о себе, своей учёбе и интересах…"
+            placeholder={t.customAbout.placeholder}
             maxLength={PERSONA_LIMITS.custom_about}
             rows={4}
           />
         </Field>
-        <Field
-          label="Как вы хотите получать ответы"
-          hint="Например: короче, с примерами кода, без воды"
-        >
+        <Field label={t.customStyle.label} hint={t.customStyle.hint}>
           <Textarea
             value={settings.custom_style}
             onChange={(custom_style) => update({ custom_style })}
-            placeholder="Опишите предпочитаемый стиль ответов…"
+            placeholder={t.customStyle.placeholder}
             maxLength={PERSONA_LIMITS.custom_style}
             rows={4}
           />
         </Field>
       </Section>
 
-      <Section
-        title="Память диалога"
-        description="Сколько прошлого контекста учитывать."
-      >
-        <Row
-          label="Глубина памяти"
-          hint="Больше истории — точнее для сложных задач, но дороже и медленнее"
-        >
+      <Section title={t.contextTitle} description={t.contextDescription}>
+        <Row label={t.contextDepth.label} hint={t.contextDepth.hint}>
           <SegmentedControl
             value={settings.context_depth}
             onChange={(context_depth) => update({ context_depth })}
@@ -120,33 +100,21 @@ export function MemoryTab() {
         </Row>
       </Section>
 
-      <Section
-        title="Долговременная память"
-        description="Устойчивые факты о вас, которые модель запоминает между чатами и учитывает в ответах. Ниже их можно посмотреть и удалить."
-      >
-        <Row
-          label="Автоматическая память"
-          hint="Разрешить модели самой запоминать полезные факты о вас"
-        >
+      <Section title={t.longTermTitle} description={t.longTermDescription}>
+        <Row label={t.autoMemory.label} hint={t.autoMemory.hint}>
           <Toggle
             checked={settings.auto_memory}
             onChange={(auto_memory) => update({ auto_memory })}
           />
         </Row>
-        <Row
-          label="Объём автопамяти"
-          hint="Насколько подробно запоминать учебный контекст"
-        >
+        <Row label={t.memoryScope.label} hint={t.memoryScope.hint}>
           <SegmentedControl
             value={settings.memory_scope}
             onChange={(memory_scope) => update({ memory_scope })}
             options={MEMORY_SCOPE_OPTIONS}
           />
         </Row>
-        <Row
-          label="Использование памяти"
-          hint="Насколько активно подмешивать сохранённые факты в ответы"
-        >
+        <Row label={t.memoryUse.label} hint={t.memoryUse.hint}>
           <SegmentedControl
             value={settings.memory_use}
             onChange={(memory_use) => update({ memory_use })}

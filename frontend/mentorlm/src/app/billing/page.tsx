@@ -17,11 +17,12 @@ import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
 import {
   billingHero,
+  billingPageCopy,
   billingPlans,
   type BillingPlan,
   type PlanCta,
-} from "@/lib/billing-contents";
-import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
+} from "@/content/billing";
+import { priceOf, usePlanPrices } from "@/hooks/usePlanPrices";
 
 // Тарифы по возрастанию — по этому порядку решаем, что предлагать, а что у
 // пользователя уже есть.
@@ -33,10 +34,14 @@ const PLAN_ORDER: readonly Plan[] = ["free", "plus", "pro"];
 function ctaFor(plan: BillingPlan, current: Plan | null): PlanCta {
   if (!current) return plan.cta;
   if (plan.id === current) {
-    return { label: "Текущий план", href: null, disabled: true };
+    return { label: billingPageCopy.currentPlan, href: null, disabled: true };
   }
   if (PLAN_ORDER.indexOf(plan.id) < PLAN_ORDER.indexOf(current)) {
-    return { label: "Включено в ваш тариф", href: null, disabled: true };
+    return {
+      label: billingPageCopy.includedInPlan,
+      href: null,
+      disabled: true,
+    };
   }
   return plan.cta;
 }
@@ -128,7 +133,8 @@ function PlanCard({
 }) {
   const featured = !!plan.featured;
   const cta = ctaFor(plan, current);
-  const tagline = plan.id === current ? "Ваш текущий план" : plan.tagline;
+  const tagline =
+    plan.id === current ? billingPageCopy.currentTagline : plan.tagline;
 
   // Выделенный план отличается только фоном и цветом текста, не геометрией —
   // так названия и цены выравниваются по горизонтали между карточками.
@@ -248,7 +254,7 @@ function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
           featured ? "text-white" : "text-ink"
         )}
       >
-        По запросу
+        {billingPageCopy.onRequest}
       </p>
     );
   }
@@ -269,7 +275,7 @@ function Price({ plan, featured }: { plan: BillingPlan; featured: boolean }) {
           featured ? "text-white/70" : "text-muted"
         )}
       >
-        / месяц
+        {billingPageCopy.perMonth}
       </span>
     </div>
   );

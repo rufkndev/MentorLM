@@ -9,8 +9,8 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { useApi } from "@/lib/api";
-import { authContents } from "@/lib/auth-contents";
+import { useApi } from "@/hooks/useApi";
+import { authContents } from "@/content/auth";
 
 type State = "idle" | "sending" | "sent";
 

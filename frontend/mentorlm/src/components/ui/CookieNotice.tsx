@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { cookieNoticeCopy as t } from "@/content/site";
 
 // Ключ localStorage с признаком того, что уведомление уже показано.
 const STORAGE_KEY = "mentorlm-cookie-consent";
@@ -43,13 +44,12 @@ export function CookieNotice() {
     <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4">
       <div className="glass-strong flex w-full max-w-3xl flex-col items-start gap-4 rounded-2xl px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm leading-relaxed text-ink-soft">
-          Мы используем технически необходимые cookie для работы сервиса.
-          Подробнее — в{" "}
+          {t.text} {t.linkLead}{" "}
           <Link
             href="/legal/privacy"
             className="font-medium text-ink underline underline-offset-2 hover:text-[var(--brand-primary)]"
           >
-            Политике конфиденциальности
+            {t.linkLabel}
           </Link>
           .
         </p>
@@ -59,7 +59,7 @@ export function CookieNotice() {
           magnetic={false}
           className="shrink-0"
         >
-          Понятно
+          {t.accept}
         </Button>
       </div>
     </div>

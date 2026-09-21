@@ -9,6 +9,7 @@ import { headers } from "next/headers";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { CookieNotice } from "@/components/ui/CookieNotice";
 import { GlassFilters } from "@/components/ui/GlassFilters";
+import { siteMeta } from "@/content/site";
 import { JetBrains_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 
@@ -34,24 +35,16 @@ const jetbrains = JetBrains_Mono({
 // SEO-метаданные сайта по умолчанию.
 export const metadata: Metadata = {
   title: {
-    default: "Mentor LM — единая AI-платформа для учёбы",
-    template: "%s · Mentor LM",
+    default: siteMeta.title,
+    template: siteMeta.titleTemplate,
   },
-  description:
-    "Единое рабочее пространство для учёбы: чат, код, конспекты, разбор задач и поиск по материалам — без десятка вкладок и сервисов.",
-  applicationName: "Mentor LM",
-  keywords: [
-    "AI для учёбы",
-    "AI-платформа",
-    "учебный AI",
-    "Mentor LM",
-    "AI-ассистент студента",
-  ],
-  metadataBase: new URL("https://mentorlm.ru"),
+  description: siteMeta.description,
+  applicationName: siteMeta.name,
+  keywords: [...siteMeta.keywords],
+  metadataBase: new URL(siteMeta.url),
   openGraph: {
-    title: "Mentor LM — единая AI-платформа для учёбы",
-    description:
-      "Один интерфейс для всех учебных задач. Чат, код, разбор материалов, конспекты.",
+    title: siteMeta.og.title,
+    description: siteMeta.og.description,
     type: "website",
     locale: "ru_RU",
   },

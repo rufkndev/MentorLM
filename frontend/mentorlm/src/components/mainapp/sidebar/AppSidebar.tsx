@@ -9,10 +9,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
-import {
-  groupChatsByDate,
-  type ChatPreview,
-} from "@/lib/mainapp-contents";
+import { chatGroupLabels, sidebarCopy } from "@/content/app";
+import { groupChatsByDate } from "@/lib/chats";
+import type { ChatPreview } from "@/types/app";
 import { ChatGroup } from "./ChatList";
 import {
   ModeSwitcher,
@@ -71,14 +70,14 @@ export function AppSidebar({ open, onToggle, onOpenSettings }: Props) {
                 // Пока идёт первая загрузка — молчим, чтобы не мигало «нет чатов».
                 loading ? null : (
                   <p className="mt-6 text-center text-[13px] text-muted">
-                    Чатов пока нет
+                    {sidebarCopy.emptyList}
                   </p>
                 )
               ) : (
-                grouped.map(([label, chats]) => (
+                grouped.map(([groupId, chats]) => (
                   <ChatGroup
-                    key={label}
-                    label={label}
+                    key={groupId}
+                    label={chatGroupLabels[groupId]}
                     chats={chats}
                     activeId={activeId}
                     onRename={rename}

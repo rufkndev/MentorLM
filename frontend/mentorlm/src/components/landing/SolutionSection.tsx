@@ -7,7 +7,7 @@
 "use client";
 
 import { Reveal } from "@/components/ui/Reveal";
-import { solution } from "@/lib/landing-contents";
+import { solution } from "@/content/landing";
 
 // Секция «Решение».
 export function SolutionSection() {
@@ -19,9 +19,11 @@ export function SolutionSection() {
           <Reveal>
             <p className="text-eyebrow">{solution.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Единое пространство, которое{" "}
-              <span className="font-editorial text-gradient">понимает</span>{" "}
-              ваш контекст.
+              {solution.headline.before}
+              <span className="font-editorial text-gradient">
+                {solution.headline.accent}
+              </span>
+              {solution.headline.after}
             </h2>
             <p className="mt-5 text-lg leading-relaxed text-muted">
               {solution.description}
@@ -83,7 +85,7 @@ function SolutionAppPreview() {
             ))}
           </span>
           <div className="ml-1 flex items-center gap-1">
-            {["Общий", "Код", "Исследовать"].map((m, i) => (
+            {solution.demo.modes.map((m, i) => (
               <span
                 key={m}
                 className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
@@ -102,12 +104,12 @@ function SolutionAppPreview() {
         <div className="flex flex-1 flex-col gap-3 px-4 py-4">
           {/* Сообщение пользователя */}
           <div className="self-end rounded-2xl rounded-br-sm bg-[var(--brand-primary)] px-3.5 py-2 text-[12px] text-white shadow-sm">
-            Помоги разобраться с темой по загруженной лекции
+            {solution.demo.question}
           </div>
 
           {/* Ответ модели */}
           <div className="max-w-[85%] self-start rounded-2xl rounded-bl-sm border border-line bg-surface/80 px-3.5 py-2.5 text-[12px] leading-relaxed text-ink-soft">
-            <p>Конечно. Разберём по шагам, опираясь на ваш конспект:</p>
+            <p>{solution.demo.answer}</p>
             <div className="mt-2 space-y-1.5">
               {[92, 78, 64].map((w, i) => (
                 <span
@@ -123,7 +125,7 @@ function SolutionAppPreview() {
         {/* Нижняя панель: чипы сценариев и поле ввода */}
         <div className="border-t border-line/70 px-4 py-3">
           <div className="mb-2.5 flex flex-wrap gap-1.5">
-            {["Изучить", "Практическая работа", "Текст"].map((s, i) => (
+            {solution.demo.scenarios.map((s, i) => (
               <span
                 key={s}
                 className={`rounded-full border px-2.5 py-1 text-[11px] ${
@@ -138,7 +140,7 @@ function SolutionAppPreview() {
           </div>
           <div className="flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3.5 py-2">
             <span className="flex-1 text-[12px] text-muted">
-              Спросите что угодно по учёбе…
+              {solution.demo.placeholder}
             </span>
             <span className="grid h-6 w-6 place-items-center rounded-full bg-[var(--brand-primary)] text-white">
               <ArrowUpIcon />

@@ -15,7 +15,7 @@ import { useSearchParams } from "next/navigation";
 import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthError, useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
-import { authContents } from "@/lib/auth-contents";
+import { authContents } from "@/content/auth";
 import { confirmEmailVerification } from "@/lib/auth-api";
 
 const t = authContents.verifyEmail;

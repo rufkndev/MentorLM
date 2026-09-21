@@ -12,15 +12,16 @@ import { ChatComposer } from "@/components/mainapp/ChatComposer";
 import { ChatEmpty } from "@/components/mainapp/ChatEmpty";
 import { ChatMessage } from "@/components/mainapp/ChatMessage";
 import { useChatSession } from "@/components/mainapp/useChatSession";
-import type { Scenario } from "@/lib/mainapp-contents";
-import { useOnline } from "@/lib/use-online";
+import { chatCopy } from "@/content/app";
+import type { Scenario } from "@/types/app";
+import { useOnline } from "@/hooks/useOnline";
 
 // Честное «нет связи» вместо непонятной ошибки при отправке.
 function OfflineNotice({ online }: { online: boolean }) {
   if (online) return null;
   return (
     <div className="glass-chip mx-auto mb-2 w-fit rounded-full px-3 py-1 text-[12px] text-muted">
-      Нет соединения — сообщение не отправится
+      {chatCopy.offline}
     </div>
   );
 }

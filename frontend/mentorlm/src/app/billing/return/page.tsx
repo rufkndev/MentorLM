@@ -22,8 +22,8 @@ import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import { Button } from "@/components/ui/Button";
-import { ApiError, useApi } from "@/lib/api";
-import { returnContents as t } from "@/lib/billing-contents";
+import { ApiError, useApi } from "@/hooks/useApi";
+import { returnContents as t } from "@/content/billing";
 
 // Как часто спрашивать статус и сколько всего ждать. 1.5 с — заметно быстрее
 // человеческого терпения, 30 с — потолок, после которого дальнейшее ожидание
@@ -289,7 +289,7 @@ function ReturnInner() {
           href="/billing"
           className="mt-5 inline-block text-[13px] text-muted transition-colors hover:text-ink"
         >
-          Все тарифы
+          {t.allPlans}
         </Link>
       </div>
     </section>

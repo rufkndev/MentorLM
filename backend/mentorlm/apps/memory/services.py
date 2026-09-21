@@ -9,11 +9,11 @@ import json
 import logging
 import threading
 
-from django.conf import settings
 from django.db import connections
 from django.utils import timezone
 
 from apps.ai.sanitize import clean_prompt_text, wrap_untrusted
+from apps.billing.limits import MEMORY_MODEL
 
 from .models import UserMemoryFact
 
@@ -157,7 +157,7 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
             record_usage(
                 user,
                 mode=mode,
-                model=settings.OPENAI_MEMORY_MODEL,
+                model=MEMORY_MODEL,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
                 scenario="memory:extract",
@@ -246,7 +246,7 @@ def _call_extractor(
     resp = create_with_optional(
         client.chat.completions.create,
         dict(
-            model=settings.OPENAI_MEMORY_MODEL,
+            model=MEMORY_MODEL,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},

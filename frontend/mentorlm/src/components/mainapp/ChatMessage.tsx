@@ -18,6 +18,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { messageCopy } from "@/content/app";
 import { cn } from "@/lib/cn";
 import { Markdown } from "@/components/mainapp/Markdown";
 
@@ -106,7 +107,7 @@ export function ChatMessage({
             <Markdown content={message.content} />
             {message.stopped && (
               <p className="mt-1.5 font-mono text-[11px] uppercase tracking-widest text-muted">
-                ответ остановлен
+                {messageCopy.stopped}
               </p>
             )}
             {message.error && (
@@ -144,8 +145,8 @@ function MessageActions({ text }: { text: string }) {
       <button
         type="button"
         onClick={copy}
-        aria-label={copied ? "Скопировано" : "Скопировать ответ"}
-        title={copied ? "Скопировано" : "Скопировать ответ"}
+        aria-label={copied ? messageCopy.copied : messageCopy.copy}
+        title={copied ? messageCopy.copied : messageCopy.copy}
         className="grid h-7 w-7 place-items-center rounded-lg text-muted transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_7%,transparent)] hover:text-ink"
       >
         {copied ? (
@@ -181,7 +182,7 @@ function ErrorNotice({
           className="flex items-center gap-1.5 rounded-lg bg-[var(--brand-ink)] px-2.5 py-1 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-ink-soft)]"
         >
           <RotateCw className="h-3 w-3" strokeWidth={2} />
-          Повторить
+          {messageCopy.retry}
         </button>
       )}
     </div>
@@ -217,7 +218,7 @@ function LimitNotice({
               href="/billing"
               className="mt-2 inline-flex rounded-xl bg-[var(--brand-primary)] px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)]"
             >
-              Посмотреть тарифы
+              {messageCopy.seePlans}
             </Link>
           )}
         </div>
@@ -235,17 +236,17 @@ function DegradedNotice({ canUpgrade }: { canUpgrade?: boolean }) {
     <div className="mb-2 flex items-start gap-2 rounded-xl border border-amber-300/50 bg-amber-50/70 px-3 py-2 text-[12.5px] text-amber-900 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200">
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.8} />
       <p className="min-w-0 flex-1">
-        Лимит режима исчерпан — отвечаем на упрощённой модели.{" "}
+        {messageCopy.degraded}{" "}
         {canUpgrade && (
           <Link href="/billing" className="font-medium underline underline-offset-2">
-            Перейти на тариф выше
+            {messageCopy.degradedUpgrade}
           </Link>
         )}
       </p>
       <button
         type="button"
         onClick={() => setHidden(true)}
-        aria-label="Закрыть"
+        aria-label={messageCopy.close}
         className="shrink-0 rounded-md p-0.5 text-amber-700/70 transition-colors hover:text-amber-900 dark:text-amber-300/70 dark:hover:text-amber-100"
       >
         <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -256,9 +257,10 @@ function DegradedNotice({ canUpgrade }: { canUpgrade?: boolean }) {
 
 // Человекочитаемый размер файла (Б / КБ / МБ).
 function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} Б`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  if (bytes < 1024) return `${bytes} ${messageCopy.bytes}`;
+  if (bytes < 1024 * 1024)
+    return `${Math.round(bytes / 1024)} ${messageCopy.kilobytes}`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} ${messageCopy.megabytes}`;
 }
 
 // Ряд чипсов с прикреплёнными файлами (в пузырьке пользователя).
@@ -310,7 +312,7 @@ function ThinkingDots() {
         />
       ))}
       <span className="ml-1 font-mono text-[11px] uppercase tracking-widest">
-        думаю
+        {messageCopy.thinking}
       </span>
     </span>
   );

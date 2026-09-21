@@ -15,8 +15,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { modes, type ChatPreview } from "@/lib/mainapp-contents";
-import { MAX_TITLE_CHARS } from "@/lib/settings-contents";
+import { modes, sidebarCopy } from "@/content/app";
+import { MAX_TITLE_CHARS } from "@/lib/limits";
+import type { ChatPreview } from "@/types/app";
 import { useChatRowMenu } from "./useChatRowMenu";
 
 /** Подпись режима для строки чата в сайдбаре. */
@@ -63,7 +64,7 @@ function ChatRow({
 
   const handleRename = () => {
     close();
-    const next = window.prompt("Новое название чата", chat.title);
+    const next = window.prompt(sidebarCopy.renamePrompt, chat.title);
     // Обрезаем здесь же: prompt длину не ограничивает, а бэк такое название
     // просто подрежет — и человек не поймёт, почему сохранилось не то.
     const title = next?.trim().slice(0, MAX_TITLE_CHARS);
@@ -114,7 +115,7 @@ function ChatRow({
           ref={btnRef}
           type="button"
           onClick={toggle}
-          aria-label="Действия с чатом"
+          aria-label={sidebarCopy.rowMenu}
           className={cn(
             "grid h-7 w-7 shrink-0 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_12%,transparent)] hover:text-ink",
             open || active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
@@ -134,12 +135,12 @@ function ChatRow({
           >
             <MenuItem
               icon={Pencil}
-              label="Переименовать"
+              label={sidebarCopy.rename}
               onClick={handleRename}
             />
             <MenuItem
               icon={chat.pinned ? PinOff : Pin}
-              label={chat.pinned ? "Открепить" : "Закрепить"}
+              label={chat.pinned ? sidebarCopy.unpin : sidebarCopy.pin}
               onClick={() => {
                 close();
                 onTogglePin(chat.id, !chat.pinned);
@@ -147,7 +148,7 @@ function ChatRow({
             />
             <MenuItem
               icon={Trash2}
-              label="Удалить"
+              label={sidebarCopy.delete}
               onClick={handleDelete}
               danger
             />

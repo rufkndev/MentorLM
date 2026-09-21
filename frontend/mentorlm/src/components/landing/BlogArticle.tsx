@@ -5,7 +5,7 @@
  * данными в blog-contents.ts, а не JSX. Новый тип блока = одна ветка в switch.
  */
 
-import type { BlogBlock } from "@/lib/blog-contents";
+import type { BlogBlock } from "@/content/blog";
 
 // Рисует последовательность блоков статьи.
 export function BlogArticle({ content }: { content: readonly BlogBlock[] }) {

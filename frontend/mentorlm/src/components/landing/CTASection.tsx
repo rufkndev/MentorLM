@@ -6,7 +6,7 @@
 import { LandingChatTeaser } from "@/components/landing/LandingChatTeaser";
 import { Mascot } from "@/components/ui/Mascot";
 import { Reveal } from "@/components/ui/Reveal";
-import { cta } from "@/lib/landing-contents";
+import { cta } from "@/content/landing";
 
 // Секция CTA внизу лендинга.
 export function CTASection() {
@@ -51,10 +51,11 @@ export function CTASection() {
             </div>
 
             <h2 className="text-display relative mx-auto max-w-3xl text-[clamp(2rem,5vw,4rem)] font-semibold text-white">
-              Спокойнее. Сфокусированнее.{" "}
+              {cta.headline.before}
               <span className="font-editorial bg-gradient-to-r from-[var(--brand-focus)] via-white to-[var(--brand-blue-soft)] bg-clip-text text-transparent">
-                Умнее.
+                {cta.headline.accent}
               </span>
+              {cta.headline.after}
             </h2>
             <p className="relative mx-auto mt-5 max-w-xl text-lg leading-relaxed text-white/75">
               {cta.description}

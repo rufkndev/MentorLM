@@ -16,7 +16,7 @@ import { useState } from "react";
 import { MailWarning, X } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useResendVerification } from "@/components/auth/useResendVerification";
-import { authContents } from "@/lib/auth-contents";
+import { authContents } from "@/content/auth";
 
 const t = authContents.verifyBanner;
 

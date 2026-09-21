@@ -19,6 +19,7 @@ import { TABS, type TabId } from "@/components/mainapp/settings/config";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
 import { VerifyEmailBanner } from "@/components/mainapp/VerifyEmailBanner";
+import { sidebarCopy } from "@/content/app";
 
 /* Открывает диалог настроек, если в адресе есть ?settings=<вкладка>, и сразу
  * убирает параметр — иначе диалог возвращался бы при каждом «назад».
@@ -114,8 +115,8 @@ export default function ModesLayout({
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
-              aria-label="Показать сайдбар"
-              title="Показать сайдбар"
+              aria-label={sidebarCopy.expand}
+              title={sidebarCopy.expand}
               className="glass-strong grid h-10 w-10 place-items-center rounded-full text-ink-soft transition-colors hover:text-ink"
             >
               <PanelLeft className="h-4 w-4" strokeWidth={1.7} />

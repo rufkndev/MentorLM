@@ -26,6 +26,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { authContents } from "@/content/auth";
 import { clearAllCache } from "@/lib/chat-cache";
 import { clearStoredSettings } from "@/lib/settings-storage";
 
@@ -80,7 +81,7 @@ async function readError(res: Response): Promise<AuthError> {
   } catch {
     // тело не JSON — ниже общий текст
   }
-  return new AuthError("Не удалось выполнить запрос. Попробуйте ещё раз.");
+  return new AuthError(authContents.errors.requestFailed);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -170,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify(body),
         });
       } catch {
-        throw new AuthError("Нет связи с сервером. Проверьте интернет.", "offline");
+        throw new AuthError(authContents.errors.offline, "offline");
       }
       if (!res.ok) throw await readError(res);
       applySession((await res.json()) as { access: string; user: AuthUser });

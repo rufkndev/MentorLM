@@ -39,16 +39,16 @@ import { useResendVerification } from "@/components/auth/useResendVerification";
 import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import { BrandMark } from "@/components/ui/BrandMark";
 import { Button } from "@/components/ui/Button";
-import { useApi, ApiError } from "@/lib/api";
-import { authContents } from "@/lib/auth-contents";
+import { useApi, ApiError } from "@/hooks/useApi";
+import { authContents } from "@/content/auth";
 import {
   billingPlans,
   checkoutContents as t,
   type BillingPlan,
-} from "@/lib/billing-contents";
+} from "@/content/billing";
 import { cn } from "@/lib/cn";
 import { safeExternalUrl, YOOKASSA_HOSTS } from "@/lib/safe-url";
-import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
+import { priceOf, usePlanPrices } from "@/hooks/usePlanPrices";
 
 const gate = authContents.verifyGate;
 
@@ -185,9 +185,9 @@ function CheckBox({
 
 // Дата окончания оплаченного периода словами — для предупреждения о смене тарифа.
 function formatUntil(iso: string | null): string {
-  if (!iso) return "конца оплаченного периода";
+  if (!iso) return t.untilFallback;
   const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "конца оплаченного периода";
+  if (Number.isNaN(date.getTime())) return t.untilFallback;
   return date.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",

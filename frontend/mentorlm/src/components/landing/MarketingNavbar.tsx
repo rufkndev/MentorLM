@@ -13,7 +13,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/cn";
-import { nav } from "@/lib/landing-contents";
+import { nav } from "@/content/landing";
 
 // Верхняя навигация маркетинговых страниц.
 export function MarketingNavbar() {

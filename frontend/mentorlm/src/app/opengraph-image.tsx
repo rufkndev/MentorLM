@@ -5,11 +5,12 @@
  */
 
 import { ImageResponse } from "next/og";
+import { siteMeta } from "@/content/site";
 import { BRAND_MARK_DATA_URI } from "@/lib/brand-mark-svg";
 
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
-export const alt = "Mentor LM — единая AI-платформа для учёбы";
+export const alt = siteMeta.ogImage.alt;
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -63,10 +64,10 @@ export default function OpengraphImage() {
               maxWidth: 900,
             }}
           >
-            Единая AI-платформа для учёбы
+            {siteMeta.ogImage.title}
           </div>
           <div style={{ display: "flex", fontSize: 32, color: "#AEB8CE", maxWidth: 860 }}>
-            Чат, код и исследования — в одном рабочем пространстве.
+            {siteMeta.ogImage.subtitle}
           </div>
         </div>
       </div>

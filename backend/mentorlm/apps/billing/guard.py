@@ -25,16 +25,10 @@ from .limits import (
     RATE_PER_MIN,
     degrade_requests,
     limits_for,
+    mode_models,
     quota_for,
 )
 from .plans import effective_plan
-
-# Поле настроек с продуктовым тиром модели для каждого режима.
-_MODE_TIER_FIELD = {
-    "chat": "chat_model",
-    "code": "code_model",
-    "research": "research_model",
-}
 
 
 class LimitExceeded(Exception):
@@ -238,10 +232,7 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
     now = timezone.now()
 
     # Доступность тира модели тарифу — апселл на «Максимальную».
-    tier_field = _MODE_TIER_FIELD.get(mode)
-    chosen_tier = (
-        getattr(user.settings, tier_field, "default") if tier_field else "default"
-    )
+    chosen_tier = getattr(user.settings, mode_models(mode).tier_field, "default")
     if chosen_tier not in limits["allowed_tiers"]:
         raise LimitExceeded(
             "feature_locked",

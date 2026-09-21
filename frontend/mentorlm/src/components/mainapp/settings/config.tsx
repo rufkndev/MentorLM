@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
+import { SETTINGS_TAB_LABELS as label } from "@/content/settings";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { ModelTab } from "./tabs/ModelTab";
 import { MemoryTab } from "./tabs/MemoryTab";
@@ -31,10 +32,10 @@ export const TABS: {
   icon: LucideIcon;
   Panel: ComponentType;
 }[] = [
-  { id: "general", label: "Общие", icon: Cog, Panel: GeneralTab },
-  { id: "model", label: "Модель ИИ", icon: Cpu, Panel: ModelTab },
-  { id: "memory", label: "Память", icon: Brain, Panel: MemoryTab },
-  { id: "subscription", label: "Подписка", icon: CreditCard, Panel: SubscriptionTab },
-  { id: "payments", label: "Платежи", icon: Receipt, Panel: PaymentsTab },
-  { id: "data", label: "Данные", icon: Database, Panel: DataTab },
+  { id: "general", label: label.general, icon: Cog, Panel: GeneralTab },
+  { id: "model", label: label.model, icon: Cpu, Panel: ModelTab },
+  { id: "memory", label: label.memory, icon: Brain, Panel: MemoryTab },
+  { id: "subscription", label: label.subscription, icon: CreditCard, Panel: SubscriptionTab },
+  { id: "payments", label: label.payments, icon: Receipt, Panel: PaymentsTab },
+  { id: "data", label: label.data, icon: Database, Panel: DataTab },
 ];

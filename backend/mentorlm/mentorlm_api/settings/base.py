@@ -319,31 +319,11 @@ YOOKASSA_RETURN_URL = os.environ.get('YOOKASSA_RETURN_URL', '').strip()
 LLM_PROXY_URL = os.environ.get('LLM_PROXY_URL', '').strip()
 
 
-# ── Модели провайдеров ────────────────────────────────────────────────────────
-# Задаются через env, чтобы менять их без правок кода; читает apps.ai.registry.
-
-# OpenAI: режим «Общий», «Исследовать» (Responses API + web_search) и дешёвая
-# модель для извлечения фактов памяти.
+# ── Провайдеры моделей ────────────────────────────────────────────────────────
+# Здесь ТОЛЬКО ключи доступа. Сами модели — какие зовём в каждом режиме и тире,
+# модели деградации и памяти — живут вместе со своими ценами в
+# apps/billing/limits.py (MODELS / MODES / MEMORY_MODEL). Через env они раньше
+# и расходились с прайсом: id менялся, цена оставалась старой, и расход молча
+# считался мимо. Согласованность каталога проверяется на старте.
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-OPENAI_CHAT_MODEL = os.environ.get('OPENAI_CHAT_MODEL', 'gpt-5.5')
-OPENAI_RESEARCH_MODEL = os.environ.get('OPENAI_RESEARCH_MODEL', 'gpt-5.5')
-OPENAI_MEMORY_MODEL = os.environ.get('OPENAI_MEMORY_MODEL', 'gpt-5-nano')
-
-# Anthropic: режим «Код».
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
-ANTHROPIC_CODE_MODEL = os.environ.get('ANTHROPIC_CODE_MODEL', 'claude-sonnet-4-6')
-
-# Тиры для настройки «Модель ИИ» (ai.preferences): fast — дешевле базовой,
-# quality пуст → откат на базовую. Цены тиров держать в billing.MODEL_PRICES.
-OPENAI_CHAT_MODEL_FAST = os.environ.get('OPENAI_CHAT_MODEL_FAST', 'gpt-5')
-OPENAI_CHAT_MODEL_QUALITY = os.environ.get('OPENAI_CHAT_MODEL_QUALITY', '')
-ANTHROPIC_CODE_MODEL_FAST = os.environ.get('ANTHROPIC_CODE_MODEL_FAST', 'claude-haiku-4-5')
-ANTHROPIC_CODE_MODEL_QUALITY = os.environ.get('ANTHROPIC_CODE_MODEL_QUALITY', '')
-OPENAI_RESEARCH_MODEL_FAST = os.environ.get('OPENAI_RESEARCH_MODEL_FAST', 'gpt-5')
-OPENAI_RESEARCH_MODEL_QUALITY = os.environ.get('OPENAI_RESEARCH_MODEL_QUALITY', '')
-
-# Модели деградации: несколько ответов на упрощённой модели вместо жёсткого
-# блока при исчерпанной квоте (billing.guard).
-OPENAI_CHAT_MODEL_DEGRADE = os.environ.get('OPENAI_CHAT_MODEL_DEGRADE', 'gpt-5-mini')
-ANTHROPIC_CODE_MODEL_DEGRADE = os.environ.get('ANTHROPIC_CODE_MODEL_DEGRADE', 'claude-haiku-4-5')
-OPENAI_RESEARCH_MODEL_DEGRADE = os.environ.get('OPENAI_RESEARCH_MODEL_DEGRADE', 'gpt-5-mini')

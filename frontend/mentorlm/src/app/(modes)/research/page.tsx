@@ -9,7 +9,8 @@ import { ChatScreen } from "@/components/mainapp/ChatScreen";
 import {
   researchScenarios,
   researchDefaultScenarioId,
-} from "@/lib/mainapp-contents";
+  modes,
+} from "@/content/app";
 
 // Экран чата со сценариями режима «Исследовать».
 export default function ResearchPage() {
@@ -17,7 +18,7 @@ export default function ResearchPage() {
     <ChatScreen
       scenarios={researchScenarios}
       defaultScenarioId={researchDefaultScenarioId}
-      placeholder="Что нужно исследовать?"
+      placeholder={modes.find((m) => m.id === "research")?.placeholder}
     />
   );
 }

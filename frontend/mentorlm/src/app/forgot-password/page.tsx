@@ -14,7 +14,7 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthError } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { authContents } from "@/lib/auth-contents";
+import { authContents } from "@/content/auth";
 import { requestPasswordReset } from "@/lib/auth-api";
 
 const t = authContents.forgotPassword;

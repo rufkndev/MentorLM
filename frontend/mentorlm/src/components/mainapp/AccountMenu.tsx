@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import type { TabId } from "@/components/mainapp/settings/config";
+import { accountMenuCopy as t } from "@/content/app";
 import { cn } from "@/lib/cn";
 
 // Пункт меню: иконка + подпись, одинаковая геометрия у кнопок и ссылок.
@@ -123,7 +124,7 @@ export function AccountMenu({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Личный кабинет"
+        aria-label={t.trigger}
         className={cn(
           "glass-strong grid h-10 w-10 place-items-center rounded-full text-[15px]",
           "font-semibold text-ink ring-1 ring-white/60 transition-all duration-200",
@@ -168,7 +169,7 @@ export function AccountMenu({
                     )}
                     aria-hidden
                   />
-                  Тариф {planLabel}
+                  {t.plan(planLabel)}
                 </p>
               </div>
             </div>
@@ -178,7 +179,7 @@ export function AccountMenu({
               <div className="mx-1 mb-1.5 rounded-2xl border border-line bg-surface/60 px-3 py-2.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="truncate text-[12px] text-muted">
-                    {tightest.label} · за {tightest.window_label}
+                    {t.usage(tightest.label, tightest.window_label)}
                   </span>
                   <span className="flex-none text-[12px] font-medium text-ink">
                     {tightest.remaining_pct}%
@@ -205,7 +206,7 @@ export function AccountMenu({
               >
                 <span className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 flex-none" strokeWidth={1.7} />
-                  Больше лимитов и моделей
+                  {t.upsellTitle}
                 </span>
               </Link>
             )}
@@ -213,13 +214,13 @@ export function AccountMenu({
             <div className="mx-2 my-1 h-px bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)]" />
 
             {/* ── Разделы. Ведут сразу на нужную вкладку настроек ────────── */}
-            <MenuItem icon={Settings} label="Настройки" onClick={() => go("general")} />
+            <MenuItem icon={Settings} label={t.settings} onClick={() => go("general")} />
             <MenuItem
               icon={CreditCard}
-              label="Подписка и лимиты"
+              label={t.subscription}
               onClick={() => go("subscription")}
             />
-            <MenuItem icon={Receipt} label="Платежи" onClick={() => go("payments")} />
+            <MenuItem icon={Receipt} label={t.payments} onClick={() => go("payments")} />
 
             <div className="mx-2 my-1 h-px bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)]" />
 
@@ -230,7 +231,7 @@ export function AccountMenu({
               className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-[13.5px] font-medium text-red-700 transition-colors hover:bg-red-50 dark:text-red-300 dark:hover:bg-red-500/10"
             >
               <LogOut className="h-4 w-4 flex-none" strokeWidth={1.7} />
-              Выйти
+              {t.signOut}
             </button>
           </motion.div>
         )}

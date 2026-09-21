@@ -6,6 +6,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { chatCopy } from "@/content/app";
 
 // Приветственный блок пустого чата (заголовок + подпись).
 export function ChatEmpty() {
@@ -17,8 +18,11 @@ export function ChatEmpty() {
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
         className="text-display text-[clamp(1.8rem,4.4vw,2.6rem)] font-semibold text-ink"
       >
-        С чем помочь сегодня?{" "}
-        <span className="font-editorial text-gradient">учим</span> вместе.
+        {chatCopy.emptyTitleBefore}
+        <span className="font-editorial text-gradient">
+          {chatCopy.emptyTitleAccent}
+        </span>
+        {chatCopy.emptyTitleAfter}
       </motion.h1>
 
       <motion.p
@@ -27,7 +31,7 @@ export function ChatEmpty() {
         transition={{ duration: 0.6, delay: 0.15 }}
         className="mt-4 max-w-lg text-[15px] font-medium leading-relaxed text-ink-soft"
       >
-        Задайте вопрос, прикрепите материалы или выберите подсказку ниже.
+        {chatCopy.emptySubtitle}
       </motion.p>
     </div>
   );

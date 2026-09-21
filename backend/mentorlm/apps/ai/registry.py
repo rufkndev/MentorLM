@@ -1,14 +1,14 @@
 """Реестр режимов: чем и как отвечает каждый режим MentorLM.
 
-Единственное место, где заданы провайдер, модели и базовый системный промпт
-режима, — поменять модель или тон режима можно только здесь.
+Здесь живёт ТОН режима — базовый системный промпт и сценарий по умолчанию.
+Провайдер и модели приходят из каталога `billing.limits.MODES`: модель и её
+цена — один факт, и хранятся они в одном месте. Поменять модель → limits.py,
+поменять тон → сюда.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from django.conf import settings
 
 # ── Базовые системные промпты режимов ─────────────────────────────────────────
 # Задают роль и тон модели. Поверх них ложатся промпт сценария и директивы
@@ -66,41 +66,42 @@ class ModeConfig:
 
     id: str  # "chat" | "code" | "research"
     provider: str  # ключ провайдера: "openai_chat" | "anthropic" | "openai_research"
-    model: str  # реальный id модели
+    model: str  # реальный id модели (тир «Стандартная»)
     degrade_model: str  # дешёвая модель при исчерпанной квоте (billing.guard)
     base_system_prompt: str
     default_scenario_id: str
     web_search: bool = False
 
 
+# Тон режима: базовый промпт и сценарий по умолчанию. Всё остальное — каталог.
+_TONE = {
+    "chat": (CHAT_PROMPT, "chat"),
+    "code": (CODE_PROMPT, "write-code"),
+    "research": (RESEARCH_PROMPT, "overview"),
+}
+
+
 def _modes() -> dict[str, ModeConfig]:
-    """Собрать реестр; лениво — чтобы брать модели из settings на момент вызова."""
+    """Собрать реестр; лениво — импорт каталога только в момент вызова.
+
+    Ленивость не косметическая: `billing.limits` тянет Django-модель `Plan`, а
+    этот модуль оказывается в цепочке импорта `apps.users.models`, которое
+    грузится раньше приложения billing. Импорт на уровне модуля сломал бы старт.
+    """
+    from apps.billing.limits import MODES
+
     return {
-        "chat": ModeConfig(
-            id="chat",
-            provider="openai_chat",
-            model=settings.OPENAI_CHAT_MODEL,
-            degrade_model=settings.OPENAI_CHAT_MODEL_DEGRADE,
-            base_system_prompt=f"{CHAT_PROMPT}\n\n{SAFETY_RULES}",
-            default_scenario_id="chat",
-        ),
-        "code": ModeConfig(
-            id="code",
-            provider="anthropic",
-            model=settings.ANTHROPIC_CODE_MODEL,
-            degrade_model=settings.ANTHROPIC_CODE_MODEL_DEGRADE,
-            base_system_prompt=f"{CODE_PROMPT}\n\n{SAFETY_RULES}",
-            default_scenario_id="write-code",
-        ),
-        "research": ModeConfig(
-            id="research",
-            provider="openai_research",
-            model=settings.OPENAI_RESEARCH_MODEL,
-            degrade_model=settings.OPENAI_RESEARCH_MODEL_DEGRADE,
-            base_system_prompt=f"{RESEARCH_PROMPT}\n\n{SAFETY_RULES}",
-            default_scenario_id="overview",
-            web_search=True,
-        ),
+        mode_id: ModeConfig(
+            id=mode_id,
+            provider=cfg.provider,
+            model=cfg.default,
+            degrade_model=cfg.degrade,
+            base_system_prompt=f"{prompt}\n\n{SAFETY_RULES}",
+            default_scenario_id=scenario,
+            web_search=cfg.web_search,
+        )
+        for mode_id, (prompt, scenario) in _TONE.items()
+        if (cfg := MODES.get(mode_id))
     }
 
 

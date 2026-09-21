@@ -11,7 +11,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { faq } from "@/lib/landing-contents";
+import { faq } from "@/content/landing";
 
 // Секция «Вопросы и ответы».
 export function FAQSection() {
@@ -25,8 +25,11 @@ export function FAQSection() {
           <Reveal>
             <p className="text-eyebrow">{faq.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Вопросы, которые возникают{" "}
-              <span className="font-editorial text-gradient">первыми</span>.
+              {faq.headline.before}
+              <span className="font-editorial text-gradient">
+                {faq.headline.accent}
+              </span>
+              {faq.headline.after}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>

@@ -6,7 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useApi } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 
 // долговременная память
 

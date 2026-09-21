@@ -18,7 +18,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useApi } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 
 export type Plan = "free" | "plus" | "pro";
 

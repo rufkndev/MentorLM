@@ -6,7 +6,7 @@
 
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Reveal } from "@/components/ui/Reveal";
-import { problem } from "@/lib/landing-contents";
+import { problem } from "@/content/landing";
 
 // Секция «Проблема».
 export function ProblemSection() {
@@ -18,9 +18,11 @@ export function ProblemSection() {
           <Reveal>
             <p className="text-eyebrow">{problem.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Учёба{" "}
-              <span className="font-editorial text-muted">распадается</span>{" "}
-              на десятки сервисов.
+              {problem.headline.before}
+              <span className="font-editorial text-muted">
+                {problem.headline.accent}
+              </span>
+              {problem.headline.after}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>

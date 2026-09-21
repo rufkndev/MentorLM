@@ -27,7 +27,7 @@ import type {
 } from "@/components/mainapp/ChatMessage";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
 import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
-import { ApiError, useApi } from "@/lib/api";
+import { ApiError, useApi } from "@/hooks/useApi";
 import {
   loadMessages,
   loadScenario,
@@ -43,7 +43,8 @@ import {
   patchReply,
   subscribeReply,
 } from "@/lib/chat-stream";
-import type { Scenario } from "@/lib/mainapp-contents";
+import { chatErrors } from "@/content/app";
+import type { Scenario } from "@/types/app";
 
 /** Ответ бэка на GET /api/conversations/{id}/ (см. ConversationDetailSerializer). */
 type ApiConversationDetail = {
@@ -379,7 +380,7 @@ export function useChatSession(
           });
         } else if (result.messageId === null && empty) {
           patchReply(id, {
-            error: "Модель не вернула ответ.",
+            error: chatErrors.emptyAnswer,
             canRetry: true,
           });
         }
@@ -424,7 +425,7 @@ export function useChatSession(
           thinking: false,
           error: failure
             ? failure.message
-            : "Не удалось получить ответ. Проверьте связь и попробуйте снова.",
+            : chatErrors.failed,
           canRetry: !busy,
         });
         endReply(id, null);
@@ -474,7 +475,7 @@ export function useChatSession(
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: "Не удалось создать чат.",
+              content: chatErrors.createFailed,
             },
           ]);
           setSending(false);

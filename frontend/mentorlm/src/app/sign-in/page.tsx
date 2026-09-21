@@ -13,7 +13,7 @@ import { AuthCard } from "@/components/auth/AuthCard";
 import { AuthError, useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Input, PasswordInput } from "@/components/ui/Input";
-import { authContents } from "@/lib/auth-contents";
+import { authContents } from "@/content/auth";
 import { safeInternalPath } from "@/lib/safe-url";
 
 const t = authContents.signIn;

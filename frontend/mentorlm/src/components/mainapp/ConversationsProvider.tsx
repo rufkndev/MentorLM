@@ -18,14 +18,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useApi } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
 import {
   dropMessages,
   dropScenario,
   loadConversationList,
   saveConversationList,
 } from "@/lib/chat-cache";
-import { type ChatPreview, type ModeId } from "@/lib/mainapp-contents";
+import { chatCopy } from "@/content/app";
+import type { ChatPreview, ModeId } from "@/types/app";
 
 // Ответ бэка по диалогу (см. ConversationSerializer).
 type ApiConversation = {
@@ -41,7 +42,7 @@ type ApiConversation = {
 function toPreview(c: ApiConversation): ChatPreview {
   return {
     id: String(c.id),
-    title: c.title || "Новый чат",
+    title: c.title || chatCopy.defaultTitle,
     mode: c.mode,
     updatedAt: c.updated_at,
     pinned: c.pinned,

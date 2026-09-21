@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from django.conf import settings
-
 from .registry import ModeConfig
 from .sanitize import clean_prompt_text, wrap_untrusted
 from .scenarios import ScenarioConfig
@@ -115,50 +113,19 @@ DEFAULTS = {
 
 # ── Продуктовый тир модели → реальный id ──────────────────────────────────────
 
-# Поле настроек, из которого берётся тир для каждого режима.
-_MODE_TIER_FIELD = {
-    "chat": "chat_model",
-    "code": "code_model",
-    "research": "research_model",
-}
-
-
-def _tier_map() -> dict[str, dict[str, str]]:
-    """Карта «режим → тир → id модели»; settings читаем лениво, как в registry."""
-
-    def tiers(base: str, fast: str, quality: str) -> dict[str, str]:
-        # Незаданный в env тир откатывается на базовую модель режима.
-        return {
-            "default": base,
-            "fast": fast or base,
-            "quality": quality or base,
-        }
-
-    return {
-        "chat": tiers(
-            settings.OPENAI_CHAT_MODEL,
-            settings.OPENAI_CHAT_MODEL_FAST,
-            settings.OPENAI_CHAT_MODEL_QUALITY,
-        ),
-        "code": tiers(
-            settings.ANTHROPIC_CODE_MODEL,
-            settings.ANTHROPIC_CODE_MODEL_FAST,
-            settings.ANTHROPIC_CODE_MODEL_QUALITY,
-        ),
-        "research": tiers(
-            settings.OPENAI_RESEARCH_MODEL,
-            settings.OPENAI_RESEARCH_MODEL_FAST,
-            settings.OPENAI_RESEARCH_MODEL_QUALITY,
-        ),
-    }
-
 
 def resolve_model(mode: ModeConfig, user_settings) -> str:
-    """Реальный id модели по тиру юзера; неизвестный тир — модель из реестра."""
-    tier_field = _MODE_TIER_FIELD.get(mode.id)
-    tier = (getattr(user_settings, tier_field, "") or "default") if tier_field else "default"
-    by_mode = _tier_map().get(mode.id, {})
-    return by_mode.get(tier) or mode.model
+    """Реальный id модели по тиру юзера; неизвестный тир — стандартная модель.
+
+    Карта «режим → тир → модель» живёт в каталоге (`billing.limits.MODES`), там
+    же, где цены. Импорт ленивый: этот модуль грузится из `apps.users.models`,
+    раньше приложения billing (подробнее — в `ai.registry._modes`).
+    """
+    from apps.billing.limits import mode_models
+
+    cfg = mode_models(mode.id)
+    tier = getattr(user_settings, cfg.tier_field, "") or "default"
+    return cfg.model(tier) or mode.model
 
 
 # ── Согласование настроек со сценарием ────────────────────────────────────────

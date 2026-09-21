@@ -21,9 +21,9 @@ import {
   type ModeUsage,
   type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
-import { ApiError, useApi } from "@/lib/api";
-import { billingPlans } from "@/lib/billing-contents";
-import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
+import { ApiError, useApi } from "@/hooks/useApi";
+import { billingPlans, subscriptionTabCopy as t } from "@/content/billing";
+import { priceOf, usePlanPrices } from "@/hooks/usePlanPrices";
 
 // Точная дата и время, когда лимит начнёт восстанавливаться — в локальной зоне
 // пользователя. Сегодня/завтра называем словом, дальше — датой.
@@ -42,13 +42,13 @@ function formatResetAt(resetsAt: string | null): string | null {
   const days = Math.round(
     (startOfDay(date) - startOfDay(new Date())) / 86_400_000,
   );
-  if (days <= 0) return `сегодня в ${time}`;
-  if (days === 1) return `завтра в ${time}`;
+  if (days <= 0) return t.resetToday(time);
+  if (days === 1) return t.resetTomorrow(time);
   const day = date.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",
   });
-  return `${day} в ${time}`;
+  return t.resetOn(day, time);
 }
 
 // Цвет шкалы включается, только когда остаток реально мал — иначе она спокойная.
@@ -65,8 +65,8 @@ function WindowBar({ window }: { window: UsageWindow }) {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 text-[12px]">
-        <span className="text-muted">за {window.window_label}</span>
-        <span className="font-medium text-ink">Осталось {remaining}%</span>
+        <span className="text-muted">{t.windowLabel(window.window_label)}</span>
+        <span className="font-medium text-ink">{t.remaining(remaining)}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_9%,transparent)]">
         {/* Ширина — остаток, а не расход: пользователь следит именно за ним.
@@ -81,7 +81,7 @@ function WindowBar({ window }: { window: UsageWindow }) {
       </div>
       {resetAt && (
         <p className="mt-1 text-[11px] text-muted">
-          Начнёт восстанавливаться {resetAt}
+          {t.resetsAt(resetAt)}
         </p>
       )}
     </div>
@@ -139,7 +139,7 @@ function AutoRenewControls() {
       await refresh();
       setConfirming(false);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Не удалось выполнить действие");
+      setError(e instanceof ApiError ? e.message : t.autoRenew.error);
     } finally {
       setBusy(null);
     }
@@ -148,23 +148,11 @@ function AutoRenewControls() {
   return (
     <div className="rounded-2xl border border-line bg-paper-2/30 p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
-        Автопродление
+        {t.autoRenew.title}
       </p>
 
       <p className="mt-2 text-[13.5px] leading-relaxed text-ink-soft">
-        {sub.auto_renew ? (
-          <>
-            Подписка продлевается автоматически
-            {until && <> — следующее списание {until}</>}. За сутки до списания
-            мы пришлём письмо с суммой и датой.
-          </>
-        ) : (
-          <>
-            Автоматических списаний нет.
-            {until && <> Доступ к тарифу сохраняется до {until}, затем аккаунт
-            перейдёт на бесплатный тариф.</>}
-          </>
-        )}
+        {sub.auto_renew ? t.autoRenew.on(until) : t.autoRenew.off(until)}
       </p>
 
       {/* Автопродление просили, но привязать средство не удалось. Без этого
@@ -178,15 +166,10 @@ function AutoRenewControls() {
               strokeWidth={1.9}
               aria-hidden
             />
-            Автопродление не подключилось
+            {t.autoRenew.failedTitle}
           </p>
           <p className="mt-1.5 text-[12.5px] leading-relaxed text-ink-soft">
-            При оформлении вы просили продлевать подписку автоматически, но
-            привязать платёжное средство не удалось: списывать мы умеем только с
-            банковской карты. Автоматических списаний не будет — мы напомним
-            письмом за сутки до окончания подписки, чтобы вы успели продлить её
-            вручную. При следующей оплате с этой галочкой форма карты откроется
-            сама, и продление снова станет автоматическим.
+            {t.autoRenew.failedText}
           </p>
         </div>
       )}
@@ -204,7 +187,7 @@ function AutoRenewControls() {
             disabled={busy !== null}
             className="text-[12.5px] text-muted transition-colors hover:text-[#d4334a] disabled:opacity-50"
           >
-            {busy === "card" ? "Удаляем…" : "Удалить"}
+            {busy === "card" ? t.autoRenew.removingCard : t.autoRenew.removeCard}
           </button>
         </div>
       )}
@@ -223,9 +206,7 @@ function AutoRenewControls() {
           confirming ? (
             <div className="rounded-xl border border-line bg-surface/70 p-4">
               <p className="text-[13px] leading-relaxed text-ink-soft">
-                Отключить автопродление?
-                {until && <> Доступ к тарифу сохранится до {until} — оплаченный
-                период не пропадает.</>}
+                {t.autoRenew.confirm(until)}
               </p>
               <div className="mt-3 flex gap-2">
                 {/* Подтверждение — основное действие: отказ не должен требовать
@@ -239,7 +220,7 @@ function AutoRenewControls() {
                   {busy === "cancel" && (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
                   )}
-                  Отключить
+                  {t.autoRenew.confirmYes}
                 </button>
                 <button
                   type="button"
@@ -247,7 +228,7 @@ function AutoRenewControls() {
                   disabled={busy !== null}
                   className="rounded-xl px-3.5 py-2 text-[13px] text-ink-soft transition-colors hover:bg-ink/[0.06]"
                 >
-                  Оставить
+                  {t.autoRenew.confirmNo}
                 </button>
               </div>
             </div>
@@ -257,7 +238,7 @@ function AutoRenewControls() {
               onClick={() => setConfirming(true)}
               className="rounded-xl border border-line px-4 py-2 text-[13px] text-ink-soft transition-colors hover:bg-ink/[0.06] hover:text-ink"
             >
-              Отключить автопродление
+              {t.autoRenew.disable}
             </button>
           )
         ) : (
@@ -271,7 +252,7 @@ function AutoRenewControls() {
               {busy === "resume" && (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
               )}
-              Включить автопродление
+              {t.autoRenew.enable}
             </button>
           )
         )}
@@ -299,12 +280,12 @@ export function SubscriptionTab() {
   const prices = usePlanPrices();
 
   return (
-    <Section title="Подписка">
+    <Section title={t.title}>
       <div className="rounded-2xl border border-line bg-paper-2/30 p-5">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
-              Текущий план
+              {t.currentPlan}
             </p>
             <p className="mt-1 text-[20px] font-semibold text-ink">{planLabel}</p>
             {periodEnd && (
@@ -314,8 +295,8 @@ export function SubscriptionTab() {
                     отказа от автосписаний это выглядело так, будто отказ не
                     сработал. */}
                 {sub?.auto_renew
-                  ? `Продление ${periodEnd}`
-                  : `Действует до ${periodEnd}`}
+                  ? t.renewsOn(periodEnd)
+                  : t.activeUntil(periodEnd)}
               </p>
             )}
           </div>
@@ -327,7 +308,7 @@ export function SubscriptionTab() {
         {usage && (
           <div className="mt-4 space-y-4 border-t border-line pt-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted">
-              Использование
+              {t.usageTitle}
             </p>
             <ModeUsageBars mode={usage.modes.chat} />
             <ModeUsageBars mode={usage.modes.code} />
@@ -347,8 +328,7 @@ export function SubscriptionTab() {
             className="h-4 w-4 shrink-0 text-[var(--brand-primary)]"
             strokeWidth={1.7}
           />
-          У вас максимальный тариф — доступны все модели, веб-поиск, память и
-          самые высокие лимиты.
+          {t.topPlan}
         </div>
       )}
 
@@ -360,7 +340,7 @@ export function SubscriptionTab() {
               strokeWidth={1.7}
             />
             <p className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]">
-              Mentor {upsell.name}
+              {t.upsellEyebrow(upsell.name)}
             </p>
           </div>
           <p className="mt-2 text-[18px] font-semibold text-ink">
@@ -382,7 +362,7 @@ export function SubscriptionTab() {
               <span className="text-[18px] font-semibold">
                 {priceOf(upsell.id, upsell.price, prices)} ₽
               </span>
-              <span className="text-muted"> / месяц</span>
+              <span className="text-muted">{t.upsellPerMonth}</span>
             </p>
             {/* На страницу тарифов, а не сразу в оплату: сравнить планы — часть
                 решения, и с Plus должен быть виден не только Pro. */}
@@ -390,7 +370,7 @@ export function SubscriptionTab() {
               href="/billing"
               className="rounded-xl bg-[var(--brand-primary)] px-4 py-2 text-[13.5px] font-medium text-white transition-colors hover:bg-[var(--brand-primary-hover)]"
             >
-              Перейти на {upsell.name}
+              {t.upsellCta(upsell.name)}
             </Link>
           </div>
         </div>

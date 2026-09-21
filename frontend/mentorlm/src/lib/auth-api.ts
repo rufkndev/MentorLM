@@ -12,6 +12,7 @@
  */
 
 import { AuthError } from "@/components/auth/AuthProvider";
+import { authContents } from "@/content/auth";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://localhost:8000";
@@ -26,7 +27,7 @@ async function post(path: string, body: Record<string, unknown>): Promise<void> 
       body: JSON.stringify(body),
     });
   } catch {
-    throw new AuthError("Нет связи с сервером. Проверьте интернет.", "offline");
+    throw new AuthError(authContents.errors.offline, "offline");
   }
 
   if (res.ok) return;
@@ -38,7 +39,7 @@ async function post(path: string, body: Record<string, unknown>): Promise<void> 
     if (err instanceof AuthError) throw err;
     // тело не JSON — ниже общий текст
   }
-  throw new AuthError("Не удалось выполнить запрос. Попробуйте ещё раз.");
+  throw new AuthError(authContents.errors.requestFailed);
 }
 
 /**

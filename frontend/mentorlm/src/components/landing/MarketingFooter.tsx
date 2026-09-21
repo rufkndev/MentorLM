@@ -6,7 +6,7 @@
 
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
-import { brand, footer } from "@/lib/landing-contents";
+import { brand, footer } from "@/content/landing";
 
 // Подвал лендинга.
 export function MarketingFooter() {
@@ -60,7 +60,7 @@ export function MarketingFooter() {
       <div className="border-t border-line/70">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-2 px-6 py-6 text-xs text-muted md:flex-row md:items-center">
           <p>
-            © {year} {brand.name}. Все права защищены.
+            {footer.copyright(year)}
           </p>
           <p className="font-mono uppercase tracking-widest">
             quiet intelligence · {year}

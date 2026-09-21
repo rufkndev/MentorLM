@@ -20,17 +20,17 @@ import {
   useSubscription,
   type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
-import { billingPlans } from "@/lib/billing-contents";
-import { priceOf, usePlanPrices } from "@/lib/use-plan-prices";
+import { billingPlans } from "@/content/billing";
+import { priceOf, usePlanPrices } from "@/hooks/usePlanPrices";
 import { cn } from "@/lib/cn";
-import { modes } from "@/lib/mainapp-contents";
+import { modes, sidebarCopy } from "@/content/app";
 
 export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
   return (
     <div className="flex items-center justify-between px-3 pt-3 pb-1">
       <Link
         href="/chat"
-        aria-label="На главную"
+        aria-label={sidebarCopy.homeLabel}
         className="rounded-lg outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-[var(--brand-primary)]"
       >
         <Logo />
@@ -38,8 +38,8 @@ export function SidebarHeader({ onCollapse }: { onCollapse: () => void }) {
       <button
         type="button"
         onClick={onCollapse}
-        aria-label="Свернуть сайдбар"
-        title="Свернуть сайдбар"
+        aria-label={sidebarCopy.collapse}
+        title={sidebarCopy.collapse}
         className="grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       >
         <PanelLeftClose className="h-4 w-4" strokeWidth={1.7} />
@@ -91,7 +91,7 @@ export function NewChatButton() {
       className="group flex h-10 w-full items-center gap-2 rounded-2xl bg-[var(--brand-ink)] px-3 text-[14px] font-medium text-white transition-transform duration-300 ease-out hover:translate-y-[-1px] hover:bg-[var(--brand-ink-soft)]"
     >
       <Plus className="h-[14px] w-[14px]" strokeWidth={2} />
-      Новый чат
+      {sidebarCopy.newChat}
     </Link>
   );
 }
@@ -112,12 +112,17 @@ export function SearchInput({
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Поиск по чатам"
+        placeholder={sidebarCopy.searchPlaceholder}
         className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted"
       />
     </div>
   );
 }
+
+// Подпись окна приходит с бэкенда словами («5 часов»); в узкой колонке она не
+// помещается, поэтому сокращается по словарю из контента.
+const shortWindow = (label: string) =>
+  sidebarCopy.windowShort.reduce((s, [from, to]) => s.replace(from, to), label);
 
 // Одно окно квоты строкой: подпись, тонкая шкала остатка и процент.
 function UsageWindowRow({ window }: { window: UsageWindow }) {
@@ -132,7 +137,7 @@ function UsageWindowRow({ window }: { window: UsageWindow }) {
   return (
     <div className="flex items-center gap-2">
       <span className="w-11 shrink-0 font-mono text-[9.5px] uppercase tracking-wider text-muted">
-        {window.window_label.replace("часов", "ч").replace("дней", "дн")}
+        {shortWindow(window.window_label)}
       </span>
       <div className="h-1 flex-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--brand-ink)_10%,transparent)]">
         <div
@@ -162,7 +167,7 @@ function UsageMeter() {
   return (
     <div className="mb-1 space-y-1.5 px-3 py-2">
       <span className="font-mono text-[10px] uppercase tracking-widest text-muted">
-        {current.label} · осталось
+        {sidebarCopy.usageTitle(current.label)}
       </span>
       <UsageWindowRow window={current.windows.burst} />
       <UsageWindowRow window={current.windows.week} />
@@ -181,7 +186,7 @@ export function SidebarFooter({
   const { plan } = useSubscription();
   const upsellId = plan === "free" ? "plus" : plan === "plus" ? "pro" : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
-  // Цена — с бэкенда: она же спишется. См. lib/use-plan-prices.
+  // Цена — с бэкенда: она же спишется. См. hooks/usePlanPrices.
   const prices = usePlanPrices();
   // Ведём на страницу тарифов, а не сразу в оплату: человек должен сначала
   // сравнить планы. Кнопка называет следующий тариф, а выбор остаётся за ним.
@@ -196,7 +201,7 @@ export function SidebarFooter({
         className="flex h-10 w-full items-center gap-2 rounded-2xl px-3 text-left text-[13.5px] font-medium text-ink-soft transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] hover:text-ink"
       >
         <Settings className="h-[14px] w-[14px]" strokeWidth={1.7} />
-        Настройки
+        {sidebarCopy.settings}
       </button>
       {upsell && (
         <Link
@@ -205,7 +210,7 @@ export function SidebarFooter({
         >
           <span className="flex items-center gap-2">
             <Sparkles className="h-[14px] w-[14px]" strokeWidth={1.7} />
-            Перейти на {upsell.name}
+            {sidebarCopy.upsell(upsell.name)}
           </span>
           <span className="font-mono text-[10px] uppercase tracking-widest text-[var(--brand-primary)]/70">
             {priceOf(upsell.id, upsell.price, prices)}₽

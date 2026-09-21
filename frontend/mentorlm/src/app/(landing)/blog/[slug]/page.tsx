@@ -9,7 +9,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { BlogArticle } from "@/components/landing/BlogArticle";
 import { DocPage } from "@/components/landing/DocPage";
-import { formatPostDate, getPostBySlug, posts } from "@/lib/blog-contents";
+import {
+  blogPageCopy,
+  formatPostDate,
+  getPostBySlug,
+  posts,
+} from "@/content/blog";
 
 // Пропсы страницы: slug статьи из динамического сегмента.
 type Props = { params: Promise<{ slug: string }> };
@@ -23,7 +28,7 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const post = getPostBySlug(slug);
-  if (!post) return { title: "Статья не найдена" };
+  if (!post) return { title: blogPageCopy.notFoundTitle };
   return { title: post.title, description: post.excerpt };
 }
 
@@ -35,7 +40,11 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <DocPage
-      eyebrow={`${post.tag} · ${formatPostDate(post.date)} · ${post.readingMinutes} мин`}
+      eyebrow={blogPageCopy.articleMeta(
+        post.tag,
+        formatPostDate(post.date),
+        post.readingMinutes,
+      )}
       title={post.title}
       description={post.excerpt}
     >
@@ -43,7 +52,7 @@ export default async function BlogPostPage({ params }: Props) {
 
       <hr />
       <p>
-        <Link href="/blog">← Ко всем материалам</Link>
+        <Link href="/blog">{blogPageCopy.backToList}</Link>
       </p>
     </DocPage>
   );

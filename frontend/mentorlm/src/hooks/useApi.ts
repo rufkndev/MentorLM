@@ -11,6 +11,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { apiErrors } from "@/content/site";
 import type { ModeUsage } from "@/components/mainapp/SubscriptionProvider";
 import { useCallback, useMemo } from "react";
 
@@ -79,14 +80,14 @@ async function apiErrorFrom(res: Response): Promise<ApiError> {
   // внутренние пути и куски трейсбека. Человеку это ничего не объясняет, а нам
   // нужно в консоли — поэтому текст остаётся там.
   if (text) console.debug("Ответ сервера не в формате JSON:", text.slice(0, 500));
-  return new ApiError(res.status, res.statusText || "Ошибка сервера.");
+  return new ApiError(res.status, res.statusText || apiErrors.server);
 }
 
 const offlineError = () =>
-  new ApiError(0, "Нет связи с сервером. Проверьте интернет.", "offline");
+  new ApiError(0, apiErrors.offline, "offline");
 
 const expiredError = () =>
-  new ApiError(401, "Сессия истекла — обновите страницу и войдите заново.", "unauthorized");
+  new ApiError(401, apiErrors.sessionExpired, "unauthorized");
 
 // Главный хук доступа к API: собирает запросы с токеном сессии.
 export function useApi() {

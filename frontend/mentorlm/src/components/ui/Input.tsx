@@ -10,6 +10,7 @@
 import { Eye, EyeOff } from "lucide-react";
 import { forwardRef, useId, useState, type InputHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import { uiCopy } from "@/content/site";
 
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -99,7 +100,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, Props>(
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            aria-label={visible ? "Скрыть пароль" : "Показать пароль"}
+            aria-label={visible ? uiCopy.hidePassword : uiCopy.showPassword}
             // tabIndex -1: кнопка не должна вставать между полем пароля и
             // кнопкой отправки при переходе по Tab.
             tabIndex={-1}

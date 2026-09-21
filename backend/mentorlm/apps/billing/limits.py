@@ -1,7 +1,12 @@
-"""Тарифы, цены моделей и лимиты — единственный файл настройки экономики.
+"""Модели, тарифы, цены и лимиты — единственный файл настройки экономики.
 
-Все числа, которые крутят при её настройке, живут здесь; guard и record_usage
-только читают их отсюда.
+Все числа, которые крутят при её настройке, живут здесь: какие модели зовём,
+сколько они стоят, что даёт каждый тариф. guard, record_usage и ai-слой только
+читают их отсюда — id моделей в env больше нет, потому что модель и её цена это
+один факт, а разнесённые по разным местам они расходились молча.
+
+Согласованность каталога (у каждой модели режима есть цена, режимы описаны во
+всех словарях, тиры совпадают с UI) проверяется на старте — `checks.py`.
 
 Единица расхода — МИКРО-ДОЛЛАР ($·1e-6), целыми числами (float копил бы ошибку
 при суммировании ledger'а):
@@ -19,31 +24,115 @@ import calendar
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import NamedTuple
 
 from .models import Plan
 
-# Все продуктовые тиры моделей (см. ai.preferences.MODEL_TIER_CHOICES).
-_ALL_TIERS = {"default", "fast", "quality"}
+
+# ── Каталог моделей ───────────────────────────────────────────────────────────
 
 
-# ── Цены моделей ──────────────────────────────────────────────────────────────
-# Ключ — реальный id модели из env; значение — (вход, выход) в $/1M токенов.
-# Добавить модель = одна строка. ⚠️ Сверять с прайсом провайдеров.
-MODEL_PRICES: dict[str, tuple[float, float]] = {
+class ModelPrice(NamedTuple):
+    """Цена модели в $/1M токенов. NamedTuple — распаковывается как кортеж."""
+
+    input: float
+    output: float
+
+
+# Каждая модель, которую система может вызвать. Добавить модель = одна строка.
+# ⚠️ Сверять с прайсом провайдеров. Модели, которой здесь нет, не может быть в
+# MODES: это ломает старт (checks.py), а не считается молча по DEFAULT_PRICE.
+MODELS: dict[str, ModelPrice] = {
     # OpenAI — режимы «Общий» и «Исследовать» (сверено с прайсом, август 2026)
-    "gpt-5.6-sol": (5.00, 30.00),  # тир «Качество»
-    "gpt-5.6-terra": (2.00, 12.00),  # стандарт
-    "gpt-5.6-luna": (0.20, 1.20),  # тир «Быстро»
-    "gpt-5-nano": (0.05, 0.40),  # деградация + извлечение фактов памяти
+    "gpt-5.6-sol": ModelPrice(5.00, 30.00),
+    "gpt-5.6-terra": ModelPrice(2.00, 12.00),
+    "gpt-5.6-luna": ModelPrice(0.20, 1.20),
+    "gpt-5-nano": ModelPrice(0.05, 0.40),
     # Anthropic — режим «Код»
-    "claude-opus-5": (5.00, 25.00),  # тир «Качество»
-    "claude-sonnet-5": (3.00, 15.00),  # стандарт
-    "claude-haiku-4-5": (1.00, 5.00),  # тир «Быстро» + деградация
+    "claude-opus-5": ModelPrice(5.00, 25.00),
+    "claude-sonnet-5": ModelPrice(3.00, 15.00),
+    "claude-haiku-4-5": ModelPrice(1.00, 5.00),
 }
-# Неизвестная модель считается по самому дорогому тарифу из списка — чтобы не
-# было дыры «нет в списке = даром». Поднимать вместе с потолком MODEL_PRICES.
-DEFAULT_PRICE = (5.00, 30.00)
 
+# Цена для модели, которой в каталоге уже нет: в ledger'е остаются события,
+# записанные до того, как модель убрали. Держать не ниже самой дорогой строки
+# MODELS — иначе «неизвестная модель» окажется выгоднее известных.
+DEFAULT_PRICE = ModelPrice(5.00, 30.00)
+
+# Продуктовые тиры настройки «Модель ИИ»; подписи — ai.preferences.MODEL_TIER_CHOICES.
+TIERS = ("default", "fast", "quality")
+_ALL_TIERS = set(TIERS)
+
+
+@dataclass(frozen=True)
+class ModeModels:
+    """Чем отвечает режим: провайдер, модель на каждый тир и модель деградации."""
+
+    provider: str  # "openai_chat" | "anthropic" | "openai_research"
+    tier_field: str  # поле UserSettings, где лежит выбранный тир
+    default: str  # тир «Стандартная» — он же модель режима по умолчанию
+    fast: str  # тир «Быстрая»
+    quality: str  # тир «Максимальная»
+    degrade: str  # дешёвая модель при исчерпанной квоте (guard → ai.service)
+    web_search: bool = False
+
+    def model(self, tier: str) -> str:
+        """Модель тира; неизвестный тир — стандартная."""
+        return getattr(self, tier, "") if tier in _ALL_TIERS else self.default
+
+
+# Что зовёт каждый режим. Поменять модель режима или тира = одна строка здесь.
+MODES: dict[str, ModeModels] = {
+    "chat": ModeModels(
+        provider="openai_chat",
+        tier_field="chat_model",
+        default="gpt-5.6-terra",
+        fast="gpt-5.6-luna",
+        quality="gpt-5.6-sol",
+        degrade="gpt-5-nano",
+    ),
+    "code": ModeModels(
+        provider="anthropic",
+        tier_field="code_model",
+        default="claude-sonnet-5",
+        fast="claude-haiku-4-5",
+        quality="claude-opus-5",
+        degrade="claude-haiku-4-5",
+    ),
+    "research": ModeModels(
+        provider="openai_research",
+        tier_field="research_model",
+        default="gpt-5.6-terra",
+        fast="gpt-5.6-luna",
+        quality="gpt-5.6-sol",
+        degrade="gpt-5-nano",
+        web_search=True,
+    ),
+}
+
+# Дешёвая модель фонового извлечения фактов памяти (apps.memory.services).
+MEMORY_MODEL = "gpt-5-nano"
+
+
+def mode_models(mode: str) -> ModeModels:
+    """Модели режима; неизвестный режим — консервативно «Общий»."""
+    return MODES.get(mode) or MODES["chat"]
+
+
+def model_for(mode: str, tier: str) -> str:
+    """Реальный id модели по режиму и продуктовому тиру."""
+    return mode_models(mode).model(tier)
+
+
+def referenced_models() -> set[str]:
+    """Все модели, на которые ссылается конфигурация, — вход для checks.py."""
+    used = {MEMORY_MODEL}
+    for cfg in MODES.values():
+        used.update({cfg.default, cfg.fast, cfg.quality, cfg.degrade})
+    return used
+
+
+# ── Стоимость запроса ─────────────────────────────────────────────────────────
 # Плоская плата за вызов веб-поиска ($0.01): цена инструмента, а не токенов.
 WEB_SEARCH_CALL_COST = 10_000
 
@@ -61,7 +150,7 @@ def usage_cost(
     model: str = "",
 ) -> int:
     """Себестоимость запроса в µ$ — единица, в которой считаются квоты."""
-    price_in, price_out = MODEL_PRICES.get(model, DEFAULT_PRICE)
+    price_in, price_out = MODELS.get(model, DEFAULT_PRICE)
     token_cost = tokens_in * price_in + tokens_out * price_out
     return round(token_cost) + web_search_calls * WEB_SEARCH_CALL_COST
 

@@ -6,7 +6,7 @@
 import { GlassCard } from "@/components/ui/GlassCard";
 import { Marquee } from "@/components/ui/Marquee";
 import { Reveal } from "@/components/ui/Reveal";
-import { socialproof } from "@/lib/landing-contents";
+import { socialproof } from "@/content/landing";
 
 // Секция соцдоказательства.
 export function SocialproofSection() {
@@ -18,8 +18,11 @@ export function SocialproofSection() {
           <Reveal>
             <p className="text-eyebrow">{socialproof.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Создано для тех, кто учится{" "}
-              <span className="font-editorial text-gradient">всерьёз</span>.
+              {socialproof.headline.before}
+              <span className="font-editorial text-gradient">
+                {socialproof.headline.accent}
+              </span>
+              {socialproof.headline.after}
             </h2>
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-muted">
               {socialproof.description}

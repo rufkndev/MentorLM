@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
+import { settingsCopy } from "@/content/settings";
 import { cn } from "@/lib/cn";
 import { TABS, type TabId } from "./config";
 
@@ -73,13 +74,13 @@ export function SettingsDialog({ open, onClose, initialTab }: Props) {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Настройки"
+            aria-label={settingsCopy.title}
             className="relative flex h-[620px] w-[860px] max-h-[92vh] max-w-full overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_24px_80px_-24px_rgba(7,27,77,0.4)]"
           >
             <aside className="flex w-[220px] shrink-0 flex-col border-r border-line bg-paper-2/40 p-3">
               {/* Заголовок выровнен по тексту пунктов навигации (те же 10px) */}
               <h2 className="px-2.5 pb-3 pt-1 text-[15px] font-semibold text-ink">
-                Настройки
+                {settingsCopy.title}
               </h2>
               <nav className="flex flex-col gap-0.5">
                 {TABS.map((t) => {
@@ -109,7 +110,7 @@ export function SettingsDialog({ open, onClose, initialTab }: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="Закрыть"
+                aria-label={settingsCopy.close}
                 className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-ink/[0.06] hover:text-ink"
               >
                 <X className="h-4 w-4" strokeWidth={1.7} />

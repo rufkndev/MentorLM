@@ -6,9 +6,10 @@
 import type { Metadata } from "next";
 import { Button } from "@/components/ui/Button";
 import { Mascot } from "@/components/ui/Mascot";
+import { notFoundCopy as t } from "@/content/site";
 
 export const metadata: Metadata = {
-  title: "Страница не найдена",
+  title: t.metaTitle,
 };
 
 export default function NotFound() {
@@ -21,22 +22,21 @@ export default function NotFound() {
         <Mascot size={124} expression="thinking" float="fly" tilt={-4} />
 
         <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.24em] text-muted">
-          ошибка 404
+          {t.eyebrow}
         </p>
         <h1 className="mt-3 text-[clamp(2rem,5vw,3.2rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-ink">
-          Такой страницы нет
+          {t.title}
         </h1>
         <p className="mt-5 max-w-md text-[16px] leading-relaxed text-ink-soft">
-          Возможно, ссылка устарела или страница переехала. Вернитесь на главную
-          и продолжите с рабочего пространства.
+          {t.text}
         </p>
 
         <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
           <Button href="/" size="lg">
-            На главную
+            {t.home}
           </Button>
           <Button href="/chat" variant="glass" size="lg">
-            Открыть Mentor LM
+            {t.app}
           </Button>
         </div>
       </div>

@@ -6,7 +6,7 @@
 "use client";
 
 import { ChatScreen } from "@/components/mainapp/ChatScreen";
-import { codeScenarios, codeDefaultScenarioId } from "@/lib/mainapp-contents";
+import { codeScenarios, codeDefaultScenarioId, modes } from "@/content/app";
 
 // Экран чата со сценариями режима «Код».
 export default function CodePage() {
@@ -14,7 +14,7 @@ export default function CodePage() {
     <ChatScreen
       scenarios={codeScenarios}
       defaultScenarioId={codeDefaultScenarioId}
-      placeholder="Вставьте код или опишите задачу…"
+      placeholder={modes.find((m) => m.id === "code")?.placeholder}
     />
   );
 }

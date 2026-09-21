@@ -21,7 +21,8 @@ import { useEffect, useState } from "react";
 import { Loader2, Receipt } from "lucide-react";
 import { Section } from "../controls";
 import type { PaymentRecord } from "@/components/mainapp/SubscriptionProvider";
-import { useApi } from "@/lib/api";
+import { useApi } from "@/hooks/useApi";
+import { paymentsTabCopy as t } from "@/content/billing";
 import { cn } from "@/lib/cn";
 import { safeExternalUrl } from "@/lib/safe-url";
 
@@ -91,10 +92,10 @@ function PaymentRow({ payment }: { payment: PaymentRecord }) {
               className="mt-1 inline-flex items-center gap-1 text-[12px] text-[var(--brand-primary)] underline-offset-2 hover:underline"
             >
               <Receipt className="h-3 w-3" strokeWidth={1.9} aria-hidden />
-              Чек
+              {t.receipt}
             </a>
           ) : (
-            <p className="mt-1 text-[12px] text-muted">Чек готовится</p>
+            <p className="mt-1 text-[12px] text-muted">{t.receiptPending}</p>
           ))}
       </div>
 
@@ -112,7 +113,7 @@ function PaymentRow({ payment }: { payment: PaymentRecord }) {
         </p>
         {refunded && (
           <p className="mt-0.5 text-[11.5px] text-muted">
-            возвращено {formatAmount(payment.refunded_amount)}
+            {t.refunded(formatAmount(payment.refunded_amount))}
           </p>
         )}
       </div>
@@ -138,21 +139,20 @@ export function PaymentsTab() {
 
   return (
     <Section
-      title="Платежи"
-      description="История операций по подписке. Чек по каждому платежу приходит на вашу почту отдельным письмом."
+      title={t.title}
+      description={t.description}
     >
       <div className="rounded-2xl border border-line bg-paper-2/30 p-5">
         {payments === null && !failed && (
           <p className="flex items-center gap-2 py-4 text-[13px] text-muted">
             <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
-            Загружаем историю…
+            {t.loading}
           </p>
         )}
 
         {failed && (
           <p className="py-4 text-[13px] text-muted">
-            Не удалось загрузить историю платежей. Попробуйте открыть вкладку
-            ещё раз.
+            {t.failed}
           </p>
         )}
 
@@ -163,9 +163,9 @@ export function PaymentsTab() {
               strokeWidth={1.6}
               aria-hidden
             />
-            <p className="mt-2 text-[13px] text-ink-soft">Платежей пока нет</p>
+            <p className="mt-2 text-[13px] text-ink-soft">{t.emptyTitle}</p>
             <p className="mt-1 text-[12.5px] text-muted">
-              Здесь появятся все списания и возвраты по подписке.
+              {t.emptyHint}
             </p>
           </div>
         )}
@@ -180,9 +180,7 @@ export function PaymentsTab() {
       </div>
 
       <p className="text-[12.5px] leading-relaxed text-muted">
-        Возврат оформляется по обращению на почту поддержки — мы вернём деньги
-        тем же способом, которым была произведена оплата, в срок не более
-        10 календарных дней.
+        {t.refundNotice}
       </p>
     </Section>
   );

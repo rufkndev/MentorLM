@@ -9,7 +9,7 @@ import { motion, useScroll, useTransform } from "motion/react";
 import { useRef } from "react";
 import { Reveal } from "@/components/ui/Reveal";
 import { cn } from "@/lib/cn";
-import { workflow } from "@/lib/landing-contents";
+import { workflow } from "@/content/landing";
 
 // Секция «Как это работает».
 export function WorkflowSection() {
@@ -28,9 +28,11 @@ export function WorkflowSection() {
           <Reveal>
             <p className="text-eyebrow">{workflow.eyebrow}</p>
             <h2 className="text-display mt-4 text-[clamp(2rem,4.6vw,3.6rem)] font-semibold text-ink">
-              Три шага до{" "}
-              <span className="font-editorial text-gradient">спокойной</span>{" "}
-              работы.
+              {workflow.headline.before}
+              <span className="font-editorial text-gradient">
+                {workflow.headline.accent}
+              </span>
+              {workflow.headline.after}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
