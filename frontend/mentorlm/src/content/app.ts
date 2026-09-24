@@ -212,6 +212,20 @@ export const chatCopy = {
 export const messageCopy = {
   thinking: "думаю",
   stopped: "ответ остановлен",
+  reasoned: "обдуманный ответ",
+  // Выгрузка ответа файлом.
+  exportTitle: "Скачать ответ",
+  exportDocx: "Word (.docx) по ГОСТ",
+  exportMd: "Markdown (.md)",
+  exportFailed: "Не удалось собрать документ",
+  // Имя файла, если сервер не прислал своё (в дев-режиме заголовок может
+  // не дойти до JS — см. lib/download.ts).
+  exportFallbackName: "Ответ MentorLM",
+  // Панель источников под ответом режима «Исследовать».
+  sourcesTitle: "Источники",
+  sourcesDownload: "Список литературы",
+  sourcesBusy: "Готовим…",
+  sourcesFallbackName: "Список литературы",
   copy: "Скопировать ответ",
   copied: "Скопировано",
   retry: "Повторить",
@@ -226,8 +240,34 @@ export const messageCopy = {
   megabytes: "МБ",
 } as const;
 
+// Тексты блока кода в ответе ИИ (CodeBlock.tsx).
+export const codeBlockCopy = {
+  copy: "Скопировать код",
+  copied: "Скопировано",
+  // Подпись блока, когда модель не указала ни язык, ни имя файла.
+  plain: "код",
+  collapse: "Свернуть",
+  expand: (lines: number) => `Показать все ${lines} строк`,
+  // Цитирование выделенных строк в композер.
+  quoteAsk: "Спросить",
+  quoteFix: "Исправить",
+  quoteLine: (n: number) => `строка ${n}`,
+  quoteRange: (from: number, to: number) => `строки ${from}–${to}`,
+  quoteHeader: (where: string, span: string) => `Фрагмент (${where}, ${span}):`,
+  // Хвост цитаты: после него пользователь дописывает свой текст.
+  quoteAskSuffix: "Вопрос: ",
+  quoteFixSuffix: "Исправь этот фрагмент: ",
+} as const;
+
 // Тексты композера — поля ввода и вложений.
 export const composerCopy = {
+  // Переключатель «обдумать ответ» рядом с кнопкой отправки.
+  thinking: "Обдумать",
+  thinkingOn: "Попросить обдумать ответ — дольше, но тщательнее",
+  thinkingOff: "Отвечать сразу, без обдумывания",
+  thinkingLockedTitle: "Обдумывание доступно на платных тарифах",
+  thinkingLocked: "Обдумывание ответа доступно на платных тарифах.",
+  thinkingLockedCta: "Посмотреть тарифы",
   attach: "Прикрепить файл",
   send: "Отправить",
   stop: "Остановить ответ",

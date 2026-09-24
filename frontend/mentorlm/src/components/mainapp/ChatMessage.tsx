@@ -6,19 +6,28 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
   AlertTriangle,
+  Brain,
   Check,
   Copy,
+  Download,
+  FileText,
+  FileType,
+  Library,
+  Loader2,
   Paperclip,
   RotateCw,
   Sparkles,
   X,
 } from "lucide-react";
 import { messageCopy } from "@/content/app";
+import { useApi } from "@/hooks/useApi";
+import { saveBlob } from "@/lib/download";
+import { safeExternalUrl } from "@/lib/safe-url";
 import { cn } from "@/lib/cn";
 import { Markdown } from "@/components/mainapp/Markdown";
 
@@ -30,6 +39,9 @@ export type MessageAttachment = {
   content_type?: string;
 };
 
+// Источник веб-поиска, на который опирался ответ.
+export type MessageSource = { url: string; title: string };
+
 // Модель одного сообщения в чате.
 export type Message = {
   id: string;
@@ -40,6 +52,9 @@ export type Message = {
   degraded?: boolean; // ответ на упрощённой модели (квота исчерпана)
   canUpgrade?: boolean; // показывать ли апселл в плашке деградации
   stopped?: boolean; // генерацию остановил пользователь — ответ неполный
+  reasoned?: boolean; // ответ считался с обдумыванием (переключатель в композере)
+  /** Источники веб-поиска («Исследовать»): показываются панелью под ответом. */
+  sources?: MessageSource[];
   /** Сбой ответа. Показывается ПОД уже написанным текстом — написанное не
    *  затираем: часть ответа обычно полезна и сохранена на бэке. */
   error?: string;
@@ -52,9 +67,12 @@ export type Message = {
 // Пузырёк сообщения (пользователь или ассистент).
 export function ChatMessage({
   message,
+  conversationId,
   onRetry,
 }: {
   message: Message;
+  /** id диалога; без него выгрузку показать не можем — адрес неполный. */
+  conversationId?: string | null;
   onRetry?: () => void;
 }) {
   const isUser = message.role === "user";
@@ -104,7 +122,15 @@ export function ChatMessage({
             {message.degraded && (
               <DegradedNotice canUpgrade={message.canUpgrade} />
             )}
+            {message.reasoned && <ReasonedBadge />}
             <Markdown content={message.content} />
+            {message.sources && message.sources.length > 0 && (
+              <SourcesPanel
+                sources={message.sources}
+                messageId={message.id}
+                conversationId={conversationId}
+              />
+            )}
             {message.stopped && (
               <p className="mt-1.5 font-mono text-[11px] uppercase tracking-widest text-muted">
                 {messageCopy.stopped}
@@ -117,7 +143,13 @@ export function ChatMessage({
               />
             )}
             {/* Действия над готовым ответом — появляются при наведении */}
-            {message.content && <MessageActions text={message.content} />}
+            {message.content && (
+              <MessageActions
+                text={message.content}
+                messageId={message.id}
+                conversationId={conversationId}
+              />
+            )}
           </>
         )}
       </div>
@@ -127,7 +159,15 @@ export function ChatMessage({
 
 // Панель действий под ответом ИИ. Пока одно действие — копирование: чаще всего
 // ответ нужен именно целиком, а выделять его мышью в длинном тексте неудобно.
-function MessageActions({ text }: { text: string }) {
+function MessageActions({
+  text,
+  messageId,
+  conversationId,
+}: {
+  text: string;
+  messageId: string;
+  conversationId?: string | null;
+}) {
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -155,7 +195,211 @@ function MessageActions({ text }: { text: string }) {
           <Copy className="h-[15px] w-[15px]" strokeWidth={1.7} />
         )}
       </button>
+
+      {/* Выгружать можно только сохранённый на бэке ответ: у живого id ещё
+          локальный (uuid), и адрес выгрузки собрать не из чего. */}
+      {conversationId && /^\d+$/.test(messageId) && (
+        <ExportMenu conversationId={conversationId} messageId={messageId} />
+      )}
     </div>
+  );
+}
+
+// Панель источников под ответом режима «Исследовать».
+//
+// ⚠️ Заголовки и адреса пишет не наш сервер — это страницы, найденные в
+// интернете. Поэтому они рендерятся как обычный текст и href (не через
+// Markdown), а адрес проходит safeExternalUrl: только https, никаких
+// javascript: и data:.
+function SourcesPanel({
+  sources,
+  messageId,
+  conversationId,
+}: {
+  sources: MessageSource[];
+  messageId: string;
+  conversationId?: string | null;
+}) {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+
+  const downloadList = async () => {
+    setBusy(true);
+    try {
+      const { blob, filename } = await api.download(
+        `/api/conversations/${conversationId}/messages/${messageId}/export/sources/`,
+        `${messageCopy.sourcesFallbackName}.docx`,
+      );
+      saveBlob(blob, filename);
+    } catch {
+      // Молча: список источников уже виден, а причина сбоя пользователю
+      // ничего не даёт.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-2xl border border-line bg-paper-2/40 px-3.5 py-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Library className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={1.8} />
+        <p className="font-mono text-[11px] uppercase tracking-widest text-muted">
+          {messageCopy.sourcesTitle} · {sources.length}
+        </p>
+        {conversationId && /^\d+$/.test(messageId) && (
+          <button
+            type="button"
+            onClick={downloadList}
+            disabled={busy}
+            className="ml-auto text-[12px] text-[var(--brand-primary)] underline underline-offset-2 transition-opacity hover:opacity-80 disabled:opacity-50"
+          >
+            {busy ? messageCopy.sourcesBusy : messageCopy.sourcesDownload}
+          </button>
+        )}
+      </div>
+
+      <ol className="flex flex-col gap-1.5">
+        {sources.map((source, i) => {
+          const href = safeExternalUrl(source.url);
+          let domain = "";
+          try {
+            domain = new URL(source.url).hostname.replace(/^www\./, "");
+          } catch {
+            domain = "";
+          }
+          return (
+            <li key={source.url} className="flex items-start gap-2">
+              <span className="mt-[3px] grid h-4 w-4 shrink-0 place-items-center rounded-[5px] bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)] font-mono text-[10px] text-muted">
+                {i + 1}
+              </span>
+              <span className="min-w-0 flex-1 text-[13px] leading-snug">
+                {href ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-ink underline decoration-line underline-offset-2 hover:decoration-[var(--brand-primary)]"
+                  >
+                    {source.title || domain || source.url}
+                  </a>
+                ) : (
+                  <span className="text-ink">{source.title || source.url}</span>
+                )}
+                {domain && (
+                  <span className="ml-1.5 text-[12px] text-muted">{domain}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+// Выгрузка ответа файлом: .docx с оформлением по ГОСТ или .md как есть.
+// Меню, а не две кнопки: два одинаковых значка рядом ничего не говорят.
+function ExportMenu({
+  conversationId,
+  messageId,
+}: {
+  conversationId: string;
+  messageId: string;
+}) {
+  const api = useApi();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Закрытие по клику вне и по Escape — тем же приёмом, что меню аккаунта.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const run = async (fmt: "docx" | "md") => {
+    setBusy(fmt);
+    setFailed(false);
+    try {
+      const { blob, filename } = await api.download(
+        `/api/conversations/${conversationId}/messages/${messageId}/export/${fmt}/`,
+        `${messageCopy.exportFallbackName}.${fmt}`,
+      );
+      saveBlob(blob, filename);
+      setOpen(false);
+    } catch {
+      // Текст ошибки бэка тут не показываем: строка узкая, а причина почти
+      // всегда одна — документ не собрался. Подробности уже в логах сервера.
+      setFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={messageCopy.exportTitle}
+        title={failed ? messageCopy.exportFailed : messageCopy.exportTitle}
+        className={cn(
+          "grid h-7 w-7 place-items-center rounded-lg transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_7%,transparent)] hover:text-ink",
+          failed ? "text-red-600 dark:text-red-400" : "text-muted",
+        )}
+      >
+        {busy ? (
+          <Loader2 className="h-[15px] w-[15px] animate-spin" strokeWidth={1.9} />
+        ) : (
+          <Download className="h-[15px] w-[15px]" strokeWidth={1.7} />
+        )}
+      </button>
+
+      {open && (
+        <div className="glass-strong absolute bottom-9 left-0 z-50 w-[210px] rounded-xl p-1">
+          <button
+            type="button"
+            onClick={() => run("docx")}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_7%,transparent)]"
+          >
+            <FileText className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+            {messageCopy.exportDocx}
+          </button>
+          <button
+            type="button"
+            onClick={() => run("md")}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-ink transition-colors hover:bg-[color-mix(in_srgb,var(--brand-ink)_7%,transparent)]"
+          >
+            <FileType className="h-4 w-4 shrink-0 text-muted" strokeWidth={1.7} />
+            {messageCopy.exportMd}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Пометка «ответ обдуман»: тихая строка над текстом. Нужна, чтобы при
+// возврате в диалог было видно, какие ответы стоили дороже и почему они
+// подробнее остальных.
+function ReasonedBadge() {
+  return (
+    <p className="mb-1.5 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted">
+      <Brain className="h-3 w-3" strokeWidth={1.8} />
+      {messageCopy.reasoned}
+    </p>
   );
 }
 

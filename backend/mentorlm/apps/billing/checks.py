@@ -199,6 +199,23 @@ def _check_plans() -> list[Error | Warning]:
             )
         )
 
+    # Флаги возможностей читаются по ключу, и забытый ключ уронил бы ответ уже
+    # во время генерации — то есть у пользователя, а не на старте.
+    for flag, check_id in (("allow_thinking", "billing.E009"),):
+        if missing := sorted(
+            plan for plan, lim in limits.PLAN_LIMITS.items() if flag not in lim
+        ):
+            out.append(
+                Error(
+                    f"В PLAN_LIMITS нет флага {flag} у тарифов: "
+                    + ", ".join(missing),
+                    hint="Флаг читается при сборке ответа — отсутствие ключа "
+                    "даст KeyError в середине запроса.",
+                    obj="apps.billing.limits.PLAN_LIMITS",
+                    id=check_id,
+                )
+            )
+
     # Веб-поиск живёт в «Исследовать»: обещать его при нулевой квоте режима —
     # продать функцию, которой нельзя воспользоваться.
     for plan, plan_limits in limits.PLAN_LIMITS.items():

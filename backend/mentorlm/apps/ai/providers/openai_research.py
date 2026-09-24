@@ -2,6 +2,11 @@
 
 Модель сама решает, когда искать в интернете; system идёт как instructions,
 история — как input. Вызовы поиска считаем: они платные.
+
+Источники собираем из аннотаций `url_citation`: они приходят прямо в стриме,
+вперемешку с текстом, поэтому копим их по ходу (при обрыве финального ответа
+уже не будет) и дособираем из `final.output`, который авторитетнее. Наверх
+отдаём через `usage` — это единственный канал помимо текста.
 """
 
 from __future__ import annotations
@@ -14,6 +19,7 @@ from apps.billing.limits import WEB_SEARCH_CALLS_PER_ANSWER
 
 from ..context import count_tokens
 from ._clients import openai_client
+from ._openai import effort_for
 from .base import GenParams
 
 logger = logging.getLogger(__name__)
@@ -41,6 +47,42 @@ def _split_visible(buffer: str) -> tuple[str, str]:
         or (tail.startswith(_TOOL_TAG_START) and ">" not in tail)  # тег без «>»
     )
     return (buffer[:start], buffer[start:]) if unfinished_tag else (buffer, "")
+
+
+# Потолки на список источников: он уезжает в Message.meta и на фронт, а его
+# содержимое пишет не наш сервер — это заголовки и адреса найденных страниц.
+MAX_SOURCES = 20
+MAX_SOURCE_TITLE = 300
+MAX_SOURCE_URL = 1000
+
+_SAFE_SCHEMES = ("http://", "https://")
+
+
+def _add_source(seen: dict, url, title) -> None:
+    """Положить источник в накопитель, отсеяв мусор и дубли.
+
+    Адрес и заголовок пришли из интернета, поэтому здесь же режем длину и
+    схему: дальше они попадут и в БД, и в интерфейс.
+    """
+    url = (url or "").strip()[:MAX_SOURCE_URL]
+    if not url.lower().startswith(_SAFE_SCHEMES) or len(seen) >= MAX_SOURCES:
+        return
+    title = (title or "").strip()[:MAX_SOURCE_TITLE]
+    # Первое упоминание задаёт порядок; заголовок дополняем, если он был пуст.
+    if url in seen:
+        if title and not seen[url]["title"]:
+            seen[url]["title"] = title
+        return
+    seen[url] = {"url": url, "title": title}
+
+
+def _collect_from_final(final, seen: dict) -> None:
+    """Дособрать цитаты из финального ответа — он авторитетнее стрима."""
+    for item in getattr(final, "output", None) or []:
+        for block in getattr(item, "content", None) or []:
+            for ann in getattr(block, "annotations", None) or []:
+                if getattr(ann, "type", "") == "url_citation":
+                    _add_source(seen, getattr(ann, "url", ""), getattr(ann, "title", ""))
 
 
 class OpenAIResearchProvider:
@@ -76,7 +118,7 @@ class OpenAIResearchProvider:
         # __enter__ контекст-менеджера, поэтому цикл здесь свой.
         optional = {}
         if params.reasoning_effort:
-            optional["reasoning"] = {"effort": params.reasoning_effort}
+            optional["reasoning"] = {"effort": effort_for(params)}
         if searching:
             optional["max_tool_calls"] = WEB_SEARCH_CALLS_PER_ANSWER
 
@@ -104,6 +146,9 @@ class OpenAIResearchProvider:
         final = None
         # Считаем поиски по ходу стрима — устойчиво к обрыву; ниже уточним по final.
         usage["web_search_calls"] = 0
+        # Источники копим по ходу: аннотации приходят вперемешку с текстом,
+        # и при обрыве финального ответа уже не будет.
+        sources: dict = {}
         try:
             for event in stream:
                 if event.type == "response.output_text.delta":
@@ -111,6 +156,22 @@ class OpenAIResearchProvider:
                     if visible:
                         completion += visible
                         yield visible
+                elif event.type == "response.output_text.annotation.added":
+                    ann = getattr(event, "annotation", None)
+                    # У SDK аннотация приходит то объектом, то словарём —
+                    # зависит от версии, поэтому читаем оба варианта.
+                    if isinstance(ann, dict):
+                        kind, url, title = (
+                            ann.get("type"),
+                            ann.get("url"),
+                            ann.get("title"),
+                        )
+                    else:
+                        kind = getattr(ann, "type", "")
+                        url = getattr(ann, "url", "")
+                        title = getattr(ann, "title", "")
+                    if kind == "url_citation":
+                        _add_source(sources, url, title)
                 elif event.type == "response.output_item.done" and (
                     getattr(event.item, "type", "") == "web_search_call"
                 ):
@@ -132,6 +193,8 @@ class OpenAIResearchProvider:
                 final = stream.get_final_response()
         finally:
             manager.__exit__(None, None, None)
+
+        usage["sources"] = list(sources.values())
 
         if final is None:
             # Оборвали сами на потолке поисков — расход считаем своими числами.
@@ -156,8 +219,8 @@ class OpenAIResearchProvider:
                 usage["web_search_calls"],
             )
 
-        # TODO: доставать url_citation annotations из final.output и отдавать
-        # источники на фронт отдельным полем SSE — пока только текст.
+        _collect_from_final(final, sources)
+        usage["sources"] = list(sources.values())
         usage["web_search_calls"] = sum(
             1
             for item in (final.output or [])
@@ -166,6 +229,13 @@ class OpenAIResearchProvider:
         if final.usage is not None:
             usage["prompt_tokens"] = final.usage.input_tokens
             usage["completion_tokens"] = final.usage.output_tokens
+            # Токены рассуждения уже входят в output_tokens — это разбивка
+            # для аналитики, а не отдельная статья расхода.
+            details = getattr(final.usage, "output_tokens_details", None)
+            if details is not None:
+                usage["thinking_tokens"] = (
+                    getattr(details, "reasoning_tokens", 0) or 0
+                )
         else:  # pragma: no cover
             usage["prompt_tokens"] = count_tokens(system, params.model)
             usage["completion_tokens"] = count_tokens(completion, params.model)

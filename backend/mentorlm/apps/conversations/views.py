@@ -217,6 +217,13 @@ class MessageCreateView(APIView):
         # «Повторить» после сбоя: отвечаем на последний вопрос, не копируя его, и
         # убираем неудачный хвост — иначе в диалоге копился бы мусор от попыток.
         retry = bool(request.data.get("retry"))
+        # Размышление: из multipart приходит строкой, из JSON — булевым.
+        # Доступность по тарифу проверяет preflight, здесь только разбор.
+        thinking = str(request.data.get("thinking", "")).lower() in (
+            "1",
+            "true",
+            "on",
+        )
 
         if retry:
             last_user = (
@@ -289,6 +296,7 @@ class MessageCreateView(APIView):
                     mode=conversation.mode,
                     scenario=scenario_id,
                     input_text=preflight_text,
+                    thinking=thinking,
                 )
             except LimitExceeded as exc:
                 release_generation_lock(user)
@@ -324,7 +332,10 @@ class MessageCreateView(APIView):
                 )
             # Квота исчерпана, но grace-запросы остались: отвечаем на дешёвой
             # модели и подсвечиваем это плашкой на фронте.
-            degraded = decision == "degrade"
+            degraded = decision.degrade
+            # guard мог снять размышление сам — на деградации или когда от
+            # окна квоты остались последние проценты.
+            thinking = decision.thinking
             can_upgrade = effective_plan(user) != Plan.PRO
 
             # Вопрос сохраняем только после успешного preflight. При «повторить»
@@ -340,7 +351,11 @@ class MessageCreateView(APIView):
 
             # Выбор провайдера, промпта и контекста — целиком в ai.service.
             ai = ai_service.run_conversation_stream(
-                conversation, scenario_id, user, degrade=degraded
+                conversation,
+                scenario_id,
+                user,
+                degrade=degraded,
+                thinking=thinking,
             )
             model = ai.model
         except Exception:
@@ -419,6 +434,9 @@ class MessageCreateView(APIView):
                 cancel.set()
                 try:
                     message_id = None
+                    # usage провайдер дозаполняет по ходу стрима — читать
+                    # можно только здесь, после полного дренажа.
+                    sources = usage.get("sources") or []
                     if assistant_content:
                         msg = Message.objects.create(
                             conversation=conversation,
@@ -434,6 +452,21 @@ class MessageCreateView(APIView):
                                     else {}
                                 ),
                                 **({"stopped": True} if stopped else {}),
+                                **({"thinking": True} if thinking else {}),
+                                # Источники веб-поиска: показываем панелью
+                                # под ответом. Дату обращения фиксируем
+                                # здесь — для списка литературы по ГОСТ она
+                                # должна быть днём чтения, а не выгрузки.
+                                **(
+                                    {
+                                        "sources": sources,
+                                        "accessed_at": timezone.now()
+                                        .date()
+                                        .isoformat(),
+                                    }
+                                    if sources
+                                    else {}
+                                ),
                             },
                         )
                         message_id = msg.id
@@ -470,6 +503,8 @@ class MessageCreateView(APIView):
                         tokens_out=tokens_out,
                         web_search_calls=usage.get("web_search_calls", 0),
                         degraded=degraded,
+                        thinking=thinking,
+                        thinking_tokens=usage.get("thinking_tokens", 0),
                     )
                     if not client_gone:
                         # Расход отдаём прямо здесь: он уже списан, и сайдбар
@@ -481,6 +516,7 @@ class MessageCreateView(APIView):
                                 "stopped": stopped,
                                 "error": error_text,
                                 "usage": mode_usage_report(user, conversation.mode),
+                                "sources": sources,
                             }
                         )
                 finally:

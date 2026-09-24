@@ -79,6 +79,11 @@ class UsageEvent(models.Model):
     billable_tokens = models.PositiveIntegerField(default=0)
     # Ответ выдан на дешёвой модели, потому что квота была исчерпана.
     degraded = models.BooleanField(default=False)
+    # Ответ считался с размышлением. Токены размышления провайдеры включают в
+    # tokens_out, поэтому на стоимость эти два поля не влияют — они нужны, чтобы
+    # видеть, сколько режим реально стоит, когда его включают.
+    thinking = models.BooleanField(default=False)
+    thinking_tokens = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

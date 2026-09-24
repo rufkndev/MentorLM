@@ -31,8 +31,10 @@ import { ApiError, useApi } from "@/hooks/useApi";
 import {
   loadMessages,
   loadScenario,
+  loadThinking,
   saveMessages,
   saveScenario,
+  saveThinking,
 } from "@/lib/chat-cache";
 import {
   appendDelta,
@@ -64,6 +66,8 @@ type ApiMessage = {
     can_upgrade?: boolean;
     degraded?: boolean;
     stopped?: boolean;
+    thinking?: boolean;
+    sources?: { url: string; title: string }[];
   };
   attachments?: MessageAttachment[];
 };
@@ -96,6 +100,8 @@ function toMessage(m: ApiMessage): Message {
     degraded: meta.degraded || undefined,
     canUpgrade: meta.can_upgrade || undefined,
     stopped: meta.stopped || undefined,
+    reasoned: meta.thinking || undefined,
+    sources: meta.sources?.length ? meta.sources : undefined,
   };
 }
 
@@ -115,6 +121,9 @@ export function useChatSession(
   // Выбранный сценарий держим здесь (а не в композере), чтобы он сохранялся на
   // весь диалог и не сбрасывался при переходе hero→dock композера.
   const [scenarioId, setScenario] = useState(defaultScenarioId);
+  // Размышление — такое же свойство диалога, как сценарий: включил для
+  // сложной задачи и оно держится, пока сам не выключишь.
+  const [thinking, setThinkingState] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // id диалога из URL — источник правды о том, какой чат сейчас на экране.
@@ -139,6 +148,7 @@ export function useChatSession(
     const next =
       saved && scenarios.some((s) => s.id === saved) ? saved : defaultScenarioId;
     setScenario((prev) => (prev === next ? prev : next));
+    setThinkingState(loadThinking(urlConvId));
   }, [urlConvId, scenarios, defaultScenarioId]);
 
   // Смена сценария пользователем — запоминаем её за этим чатом. У ещё не
@@ -147,6 +157,14 @@ export function useChatSession(
     setScenario(id);
     const current = convIdRef.current;
     if (current) saveScenario(current, id);
+  }, []);
+
+  // Переключение размышления — запоминаем за этим чатом; у ещё не созданного
+  // диалога id нет, его значение сохранится сразу после создания.
+  const setThinking = useCallback((on: boolean) => {
+    setThinkingState(on);
+    const current = convIdRef.current;
+    if (current) saveThinking(current, on);
   }, []);
 
   // Идущий (или только что дописанный) ответ этого диалога из реестра. При
@@ -362,6 +380,9 @@ export function useChatSession(
           patchReply(id, { degraded: true, canUpgrade: result.canUpgrade });
         }
         if (result.stopped) patchReply(id, { stopped: true });
+        // Источники приходят в конце ответа — показываем панель сразу, не
+        // дожидаясь, пока историю подтянет запрос за ней.
+        if (result.sources.length) patchReply(id, { sources: result.sources });
         const empty = !getReply(id)?.message.content;
         // Остановили до первого слова — сохранять и показывать нечего.
         if (result.stopped && empty) {
@@ -442,7 +463,7 @@ export function useChatSession(
   );
 
   const handleSubmit = useCallback(
-    async ({ text, scenarioId, files }: ComposerSubmit) => {
+    async ({ text, scenarioId, thinking, files }: ComposerSubmit) => {
       if (sending || liveStreaming) return;
 
       setSending(true);
@@ -486,6 +507,7 @@ export function useChatSession(
         creatingRef.current = true; // до применения ?c=<id> URL законно отстаёт
         // Сценарий, выбранный до первой отправки, закрепляем за новым чатом.
         saveScenario(id, scenarioId);
+        saveThinking(id, thinking);
         router.replace(`/${mode}?c=${id}`);
       }
 
@@ -496,10 +518,11 @@ export function useChatSession(
         const fd = new FormData();
         fd.append("content", text);
         fd.append("scenario_id", scenarioId);
+        if (thinking) fd.append("thinking", "1");
         for (const f of files) fd.append("files", f);
         body = fd;
       } else {
-        body = { content: text, scenario_id: scenarioId };
+        body = { content: text, scenario_id: scenarioId, thinking };
       }
       await runStream(id, body);
     },
@@ -513,8 +536,8 @@ export function useChatSession(
     if (!id || sending || liveStreaming) return;
     setSending(true);
     dropReply(id); // старое сообщение с ошибкой убираем — его заменит новый ответ
-    runStream(id, { retry: true, scenario_id: scenarioId });
-  }, [liveStreaming, runStream, scenarioId, sending]);
+    runStream(id, { retry: true, scenario_id: scenarioId, thinking });
+  }, [liveStreaming, runStream, scenarioId, sending, thinking]);
 
   // Остановить генерацию (кнопка «Стоп» на месте отправки). Если стрим начал
   // не этот экран (страницу перезагрузили) — просто просим бэк остановиться,
@@ -565,8 +588,12 @@ export function useChatSession(
     // композер показывает «Стоп», отправка заблокирована. В кадр рассинхрона с
     // URL состояние прошлого чата не учитываем — оно уже не про этот экран.
     sending: !stale && (sending || liveStreaming || (generating && !live)),
+    /** id текущего диалога — нужен для выгрузки ответа файлом. */
+    conversationId: convId,
     scenarioId,
     setScenarioId,
+    thinking,
+    setThinking,
     threadRef,
     handleSubmit,
     stop,

@@ -17,10 +17,19 @@ MAX_FILES_HARD = 10  # абсолютный потолок файлов на с�
 MAX_TEXT_CHARS = 20_000  # потолок извлечённого текста на файл
 MAX_TEXT_LINES = 2000  # потолок строк на файл: 20k символов «столбиком» тоже мусор
 
-# Белый список по расширению: только документы, из которых извлекаем текст.
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".markdown"}
+# Файлы кода и данных — обычный текст, читаются прямым декодированием.
+# Список обязан совпадать с ACCEPT_ATTACHMENTS в ChatComposer.tsx: композер
+# предлагает выбрать эти форматы, и отказ бэка выглядел бы поломкой.
+_CODE_EXTENSIONS = {
+    ".py", ".js", ".mjs", ".ts", ".tsx", ".jsx", ".java", ".c", ".h", ".cpp",
+    ".cs", ".go", ".rs", ".rb", ".php", ".swift", ".kt", ".sql", ".sh",
+    ".css", ".scss", ".json", ".yaml", ".yml", ".xml", ".html", ".csv", ".tsv",
+}
+
+# Белый список по расширению: только то, из чего извлекаем текст.
+ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt", ".md", ".markdown"} | _CODE_EXTENSIONS
 # Из этих текст достаём прямым декодированием.
-_TEXT_EXTENSIONS = {".txt", ".md", ".markdown"}
+_TEXT_EXTENSIONS = {".txt", ".md", ".markdown"} | _CODE_EXTENSIONS
 
 
 def _ext(filename: str) -> str:
@@ -53,7 +62,7 @@ def attachment_error(files, max_attachments: int):
             return (
                 "unsupported_format",
                 f"Формат файла «{f.name}» не поддерживается. "
-                "Разрешены: PDF, DOCX, TXT, MD.",
+                "Разрешены: PDF, DOCX, TXT, MD и файлы кода.",
                 415,
             )
     return None
@@ -122,6 +131,18 @@ def extract_text(filename: str, data: bytes) -> str:
     return f"[формат файла {ext or '?'} не поддерживается для извлечения текста]"
 
 
+def _numbered(text: str) -> str:
+    """Пронумеровать строки: «12| код».
+
+    Нужна, чтобы модель могла сослаться на конкретную строку («в строке 42…»),
+    а интерфейс — показать её. Без номеров такая ссылка невозможна в принципе:
+    модель видит сплошной текст.
+    """
+    lines = text.split("\n")
+    width = len(str(len(lines)))
+    return "\n".join(f"{i:>{width}}| {line}" for i, line in enumerate(lines, 1))
+
+
 def render_attachments_block(attachments) -> str:
     """Собрать текст вложений в блок для промпта; без текста — пустая строка.
 
@@ -137,6 +158,10 @@ def render_attachments_block(attachments) -> str:
         )
         if not text:
             continue
+        # Нумеруем ПОСЛЕ очистки и обрезки: иначе номера разъедутся с тем,
+        # что модель реально увидит.
+        if _ext(att.filename or "") in _CODE_EXTENSIONS:
+            text = _numbered(text)
         name = clean_prompt_text(att.filename or "файл", limit=120, max_lines=1)
         parts.append(wrap_untrusted("file", text, name=name))
     if not parts:

@@ -246,6 +246,7 @@ PLAN_LIMITS = {
         "allowed_tiers": {"default", "fast"},
         "allow_web_search": False,
         "allow_memory": False,
+        "allow_thinking": False,  # режим размышления — только на платных
         "context_messages": 0,  # без предыстории — каждый вопрос с чистого листа
         "max_attachments": 0,  # вложения недоступны
         "quotas": _plan_quotas(1.6),  # $1.6 / мес — узкий триал «попробовать»
@@ -255,6 +256,7 @@ PLAN_LIMITS = {
         "allowed_tiers": _ALL_TIERS,
         "allow_web_search": True,
         "allow_memory": True,
+        "allow_thinking": True,
         "context_messages": 10,
         "max_attachments": 5,
         "quotas": _plan_quotas(15.0),  # $15 / мес при цене 1499 ₽
@@ -264,6 +266,7 @@ PLAN_LIMITS = {
         "allowed_tiers": _ALL_TIERS,
         "allow_web_search": True,
         "allow_memory": True,
+        "allow_thinking": True,
         "context_messages": 20,
         "max_attachments": 10,
         "quotas": _plan_quotas(27.0),  # $27 / мес при цене 2499 ₽

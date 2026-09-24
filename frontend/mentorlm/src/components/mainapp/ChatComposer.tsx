@@ -13,11 +13,13 @@ import {
   type ChangeEvent,
   type KeyboardEvent,
 } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import {
   ArrowUp,
   BadgeCheck,
   BookOpenText,
+  Brain,
   ClipboardList,
   Code2,
   FlaskConical,
@@ -35,7 +37,9 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import { cn } from "@/lib/cn";
+import { subscribeQuote } from "@/lib/composer-quote";
 import { takeDraft } from "@/lib/draft";
 import { composerCopy, modes } from "@/content/app";
 import { MAX_FILES, MAX_FILE_MB, MAX_MESSAGE_CHARS } from "@/lib/limits";
@@ -44,6 +48,7 @@ import type { Scenario, ScenarioIconId } from "@/types/app";
 export type ComposerSubmit = {
   text: string;
   scenarioId: string;
+  thinking: boolean;
   files: File[];
 };
 
@@ -54,6 +59,10 @@ type Props = {
    *  на весь диалог, а не сбрасывался при смене hero↔dock композера. */
   scenarioId: string;
   onScenarioChange: (id: string) => void;
+  /** Просить модель обдумать ответ. Управляется снаружи, как и сценарий:
+   *  это свойство диалога, а не состояние поля ввода. */
+  thinking: boolean;
+  onThinkingChange: (on: boolean) => void;
   /** "hero" — большой по центру (empty state); "dock" — снизу в трэде. */
   variant?: "hero" | "dock";
   /** Отправка недоступна (идёт ответ). Поле ввода при этом остаётся активным:
@@ -101,6 +110,8 @@ export function ChatComposer({
   scenarios,
   scenarioId,
   onScenarioChange,
+  thinking,
+  onThinkingChange,
   variant = "dock",
   disabled,
   streaming = false,
@@ -112,8 +123,34 @@ export function ChatComposer({
   const [text, setText] = useState(() => (seedDraft ? takeDraft() : ""));
   const [files, setFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState<string | null>(null);
+  // Показали подсказку «размышление на платных тарифах» после клика по
+  // заблокированной кнопке. Живёт до перезагрузки композера — как и ошибка
+  // вложения, это разовая реакция на действие, а не состояние диалога.
+  const [thinkingLocked, setThinkingLocked] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { isPaid, plan } = useSubscription();
+  // Блокируем только когда тариф точно известен и он бесплатный.
+  const thinkingAvailable = plan === null || isPaid;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Цитата из блока кода: дописываем её в конец вопроса и ставим курсор
+  // после неё, чтобы можно было сразу продолжать печатать.
+  useEffect(
+    () =>
+      subscribeQuote((quote) => {
+        setText((prev) => (prev ? `${prev}\n\n${quote}` : quote));
+        const ta = textareaRef.current;
+        if (!ta) return;
+        // Ждём кадр: высота и позиция курсора считаются уже по новому тексту.
+        requestAnimationFrame(() => {
+          ta.focus();
+          ta.setSelectionRange(ta.value.length, ta.value.length);
+          ta.style.height = "auto";
+          ta.style.height = `${Math.min(ta.scrollHeight, 240)}px`;
+        });
+      }),
+    [],
+  );
 
   // Отправить можно, если есть текст ИЛИ хотя бы одно вложение.
   const canSend = !disabled && (text.trim().length > 0 || files.length > 0);
@@ -133,7 +170,7 @@ export function ChatComposer({
   // Отправка сообщения наверх + сброс поля и вложений.
   const handleSubmit = () => {
     if (!canSend) return;
-    onSubmit({ text: text.trim(), scenarioId, files });
+    onSubmit({ text: text.trim(), scenarioId, thinking, files });
     setText("");
     setFiles([]);
     setFileError(null);
@@ -230,6 +267,19 @@ export function ChatComposer({
           </p>
         )}
 
+        {/* Размышление недоступно на бесплатном тарифе */}
+        {thinkingLocked && (
+          <p className="px-2.5 pb-1.5 text-[12px] text-ink-soft">
+            {composerCopy.thinkingLocked}{" "}
+            <Link
+              href="/billing"
+              className="font-medium text-[var(--brand-primary)] underline underline-offset-2"
+            >
+              {composerCopy.thinkingLockedCta}
+            </Link>
+          </p>
+        )}
+
         {/* Поле ввода сообщения */}
         <textarea
           ref={textareaRef}
@@ -261,6 +311,13 @@ export function ChatComposer({
           >
             <Paperclip className="h-[18px] w-[18px]" strokeWidth={1.7} />
           </ToolButton>
+
+          <ThinkingButton
+            active={thinking}
+            onToggle={onThinkingChange}
+            locked={!thinkingAvailable}
+            onLocked={() => setThinkingLocked(true)}
+          />
 
           <div className="ml-auto flex items-center gap-1.5">
             {/* Во время ответа та же кнопка останавливает генерацию (как в Claude) */}
@@ -328,6 +385,47 @@ function ScenarioRow({
         );
       })}
     </div>
+  );
+}
+
+// Переключатель «обдумать ответ». Не прячем его на бесплатном тарифе: человек
+// должен видеть, что возможность есть, — поэтому клик по заблокированной кнопке
+// показывает подсказку с переходом на тарифы, а не молча ничего не делает.
+function ThinkingButton({
+  active,
+  onToggle,
+  locked,
+  onLocked,
+}: {
+  active: boolean;
+  onToggle: (on: boolean) => void;
+  locked: boolean;
+  onLocked: () => void;
+}) {
+  const label = locked
+    ? composerCopy.thinkingLockedTitle
+    : active
+      ? composerCopy.thinkingOff
+      : composerCopy.thinkingOn;
+
+  return (
+    <button
+      type="button"
+      onClick={() => (locked ? onLocked() : onToggle(!active))}
+      aria-pressed={active}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] transition-colors",
+        active
+          ? "bg-[var(--brand-primary-soft)] text-[var(--brand-primary)]"
+          : "text-ink-soft hover:bg-[color-mix(in_srgb,var(--brand-ink)_8%,transparent)]",
+        locked && "opacity-55",
+      )}
+    >
+      <Brain className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
+      <span className="hidden sm:inline">{composerCopy.thinking}</span>
+    </button>
   );
 }
 

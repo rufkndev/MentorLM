@@ -35,24 +35,58 @@ const idxKey = (uid: string) => `mlm.${VERSION}.${uid}.msgidx`;
 // контролем; id диалогов уникальны глобально, поэтому userId в ключе не нужен.
 
 const scenariosKey = `mlm.${VERSION}.scenarios`;
-const MAX_CACHED_SCENARIOS = 200;
+const thinkingKey = `mlm.${VERSION}.thinking`;
+const MAX_CACHED_PREFS = 200;
 
-// Читает карту «id диалога → id сценария» (или пустую при любой проблеме).
-function readScenarios(): Record<string, string> {
+// Читает карту «id диалога → значение» (или пустую при любой проблеме).
+function readMap(key: string): Record<string, string> {
   const s = ls();
   if (!s) return {};
   try {
-    const raw = s.getItem(scenariosKey);
+    const raw = s.getItem(key);
     return raw ? (JSON.parse(raw) as Record<string, string>) : {};
   } catch {
     return {};
   }
 }
 
+// Запоминает значение для диалога, вытесняя самые старые записи.
+function writeMap(key: string, conversationId: string, value: string): void {
+  const s = ls();
+  if (!s) return;
+  try {
+    const map = readMap(key);
+    if (map[conversationId] === value) return;
+    delete map[conversationId]; // переносим в конец: свежие записи — последние
+    map[conversationId] = value;
+    const ids = Object.keys(map);
+    for (const stale of ids.slice(0, Math.max(0, ids.length - MAX_CACHED_PREFS))) {
+      delete map[stale];
+    }
+    s.setItem(key, JSON.stringify(map));
+  } catch {
+    // localStorage недоступен — настройка просто не переживёт перезагрузку
+  }
+}
+
+// Забывает значение удалённого диалога.
+function dropFromMap(key: string, conversationId: string): void {
+  const s = ls();
+  if (!s) return;
+  try {
+    const map = readMap(key);
+    if (!(conversationId in map)) return;
+    delete map[conversationId];
+    s.setItem(key, JSON.stringify(map));
+  } catch {
+    // ignore
+  }
+}
+
 // Сценарий конкретного диалога (или null, если пользователь его не выбирал).
 export function loadScenario(conversationId: string | null): string | null {
   if (!conversationId) return null;
-  return readScenarios()[conversationId] ?? null;
+  return readMap(scenariosKey)[conversationId] ?? null;
 }
 
 // Запоминает сценарий диалога — он держится, пока пользователь сам его не сменит.
@@ -60,35 +94,28 @@ export function saveScenario(
   conversationId: string,
   scenarioId: string,
 ): void {
-  const s = ls();
-  if (!s) return;
-  try {
-    const map = readScenarios();
-    if (map[conversationId] === scenarioId) return;
-    delete map[conversationId]; // переносим в конец: свежие записи — последние
-    map[conversationId] = scenarioId;
-    const ids = Object.keys(map);
-    for (const stale of ids.slice(0, Math.max(0, ids.length - MAX_CACHED_SCENARIOS))) {
-      delete map[stale];
-    }
-    s.setItem(scenariosKey, JSON.stringify(map));
-  } catch {
-    // localStorage недоступен — сценарий просто не переживёт перезагрузку
-  }
+  writeMap(scenariosKey, conversationId, scenarioId);
 }
 
 // Забывает сценарий удалённого диалога.
 export function dropScenario(conversationId: string): void {
-  const s = ls();
-  if (!s) return;
-  try {
-    const map = readScenarios();
-    if (!(conversationId in map)) return;
-    delete map[conversationId];
-    s.setItem(scenariosKey, JSON.stringify(map));
-  } catch {
-    // ignore
-  }
+  dropFromMap(scenariosKey, conversationId);
+}
+
+// Размышление — тоже свойство конкретного диалога: включив его для сложной
+// задачи, пользователь не должен переключать его заново на каждый вопрос.
+// Дефолт — выключено: ответ с размышлением дольше и дороже по квоте.
+export function loadThinking(conversationId: string | null): boolean {
+  if (!conversationId) return false;
+  return readMap(thinkingKey)[conversationId] === "1";
+}
+
+export function saveThinking(conversationId: string, on: boolean): void {
+  writeMap(thinkingKey, conversationId, on ? "1" : "0");
+}
+
+export function dropThinking(conversationId: string): void {
+  dropFromMap(thinkingKey, conversationId);
 }
 
 // ── Список диалогов ─────────────────────────────────────────────────────────

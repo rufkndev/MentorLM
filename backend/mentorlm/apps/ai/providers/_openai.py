@@ -17,6 +17,19 @@ from typing import Any, Callable
 _unsupported: dict[str, set[str]] = {}
 _lock = threading.Lock()
 
+# Отдельного «режима размышления» у OpenAI нет — его роль играет усилие
+# рассуждения, поэтому при включённом переключателе поднимаем его на ступень.
+# Выше "high" не идём: следующие ступени приняты не всеми моделями, а лишний
+# 400 на каждую новую модель мы бы оплачивали походом к провайдеру.
+_EFFORT_THINKING = {"low": "medium", "medium": "high", "high": "high"}
+
+
+def effort_for(params) -> str:
+    """Усилие рассуждения с поправкой на переключатель размышления."""
+    if not params.thinking:
+        return params.reasoning_effort
+    return _EFFORT_THINKING.get(params.reasoning_effort, "high")
+
 
 def create_with_optional(
     create: Callable[..., Any],

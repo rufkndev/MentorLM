@@ -10,7 +10,7 @@ from typing import Iterator
 
 from ..context import count_tokens
 from ._clients import openai_client
-from ._openai import create_with_optional
+from ._openai import create_with_optional, effort_for
 from .base import GenParams
 
 
@@ -46,7 +46,7 @@ class OpenAIChatProvider:
             base_kwargs,
             {
                 "temperature": params.temperature,
-                "reasoning_effort": params.reasoning_effort,
+                "reasoning_effort": effort_for(params),
             },
             BadRequestError,
         )
@@ -55,6 +55,13 @@ class OpenAIChatProvider:
             if chunk.usage is not None:
                 usage["prompt_tokens"] = chunk.usage.prompt_tokens
                 usage["completion_tokens"] = chunk.usage.completion_tokens
+                # Токены рассуждения уже входят в completion_tokens — это
+                # разбивка для аналитики, а не отдельная статья расхода.
+                details = getattr(chunk.usage, "completion_tokens_details", None)
+                if details is not None:
+                    usage["thinking_tokens"] = (
+                        getattr(details, "reasoning_tokens", 0) or 0
+                    )
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta.content

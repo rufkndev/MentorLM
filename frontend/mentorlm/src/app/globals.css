@@ -279,7 +279,11 @@ html[data-theme="dark"] {
   padding: 0.12em 0.36em;
   border-radius: 6px;
 }
-.md pre {
+/* :not(.cb-pre) — блок кода рисует CodeBlock утилитами Tailwind, а у этого
+   правила специфичность выше одиночного класса, и без исключения оно
+   перебивало бы его фон, отступы и скругление. Само правило остаётся
+   запасным вариантом для Markdown, отрендеренного без компонента. */
+.md pre:not(.cb-pre) {
   margin: 0.6em 0;
   padding: 0.85em 1em;
   border-radius: 14px;
@@ -288,12 +292,46 @@ html[data-theme="dark"] {
   box-shadow: inset 0 0 0 1px var(--brand-line);
   scrollbar-width: thin;
 }
-.md pre code {
+.md pre:not(.cb-pre) code {
   background: none;
   padding: 0;
   font-size: 0.86em;
   line-height: 1.5;
 }
+
+/* ── Блок кода (CodeBlock.tsx) ──────────────────────────────────────────────
+   Вся вёрстка блока — утилитами Tailwind в самом компоненте, как и у остальных
+   компонентов mainapp/. Здесь остаётся единственное, что утилитой не
+   выражается: цвет токена подсветки. Shiki кладёт в каждый токен обе темы
+   сразу (--shiki-light / --shiki-dark, см. lib/highlighter.ts), а выбрать
+   между ними может только CSS.
+
+   prefers-color-scheme тут не нужен: анти-FOUC-скрипт в layout.tsx разрешает
+   «системную» тему в конкретный data-theme ещё до первой отрисовки, и
+   медиазапрос мог бы разойтись с явным выбором пользователя. */
+.md .cb-code span {
+  color: var(--shiki-light);
+}
+:root[data-theme="dark"] .md .cb-code span {
+  color: var(--shiki-dark);
+}
+
+/* ── Формулы (remark-math + rehype-katex) ───────────────────────────────────
+   KaTeX наследует цвет текста, поэтому тёмная тема работает сама. Правим два
+   места: размер (по умолчанию формула крупнее текста и выбивается из строки) и
+   прокрутку выключных формул — длинная формула иначе растягивает всю страницу
+   вбок, как это было бы с широкой таблицей. */
+.md .katex {
+  font-size: 1.05em;
+}
+.md .katex-display {
+  margin: 0.8em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+  scrollbar-width: thin;
+}
+
 .md table {
   border-collapse: collapse;
   margin: 0.6em 0;

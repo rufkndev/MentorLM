@@ -30,4 +30,9 @@ redis==8.1.0
 
 # извлечение текста из прикреплённых файлов (apps/conversations/attachments.py)
 pypdf==6.1.1
+# python-docx: и чтение вложений, и сборка .docx на экспорт (apps/conversations/export)
 python-docx==1.2.0
+# разбор Markdown при экспорте ответа в .docx. Приезжает и транзитивно (через
+# rich из langchain-стека), но полагаться на это нельзя: уйдёт rich — упадёт
+# импорт в проде, уже после деплоя.
+markdown-it-py==4.2.0

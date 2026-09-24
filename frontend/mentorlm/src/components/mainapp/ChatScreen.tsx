@@ -50,7 +50,10 @@ function ChatScreenInner({
   const {
     messages,
     sending,
+    conversationId,
     scenarioId,
+    thinking,
+    setThinking,
     setScenarioId,
     threadRef,
     handleSubmit,
@@ -82,6 +85,8 @@ function ChatScreenInner({
                 scenarios={scenarios}
                 scenarioId={scenarioId}
                 onScenarioChange={setScenarioId}
+                thinking={thinking}
+                onThinkingChange={setThinking}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}
@@ -107,7 +112,12 @@ function ChatScreenInner({
             >
               <div className="mx-auto flex max-w-5xl flex-col gap-5 py-6">
                 {messages.map((m) => (
-                  <ChatMessage key={m.id} message={m} onRetry={retry} />
+                  <ChatMessage
+                    key={m.id}
+                    message={m}
+                    conversationId={conversationId}
+                    onRetry={retry}
+                  />
                 ))}
               </div>
             </div>
@@ -119,6 +129,8 @@ function ChatScreenInner({
                 scenarios={scenarios}
                 scenarioId={scenarioId}
                 onScenarioChange={setScenarioId}
+                thinking={thinking}
+                onThinkingChange={setThinking}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}

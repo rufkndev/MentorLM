@@ -22,6 +22,7 @@ import { useApi } from "@/hooks/useApi";
 import {
   dropMessages,
   dropScenario,
+  dropThinking,
   loadConversationList,
   saveConversationList,
 } from "@/lib/chat-cache";
@@ -141,6 +142,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       setConversations((prev) => prev.filter((c) => c.id !== id));
       dropMessages(userId, id); // чистим кэш сообщений удалённого чата
       dropScenario(id); // и его сценарий — чат больше не откроют
+      dropThinking(id);
       api.delete(`/api/conversations/${id}/`).catch(() => refresh());
     },
     [api, refresh, userId],

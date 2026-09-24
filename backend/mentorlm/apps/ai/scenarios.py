@@ -22,6 +22,12 @@ ReasoningEffort = str  # "low" | "medium" | "high"
 Tool = str  # "web_search"
 QualityCheck = str  # "edge_cases" | "sources" | "limitations" | "tests" | "security" | "clarity"
 
+# Поля ниже относятся к режиму «Код». У них безопасные дефолты, поэтому в
+# сценариях «Общего» и «Исследовать» их можно не указывать вовсе.
+CodePrinciple = str  # "simplicity" | "yagni" | "explicit" | "single_purpose" | "fail_fast"
+CommentStyle = str  # "minimal" | "teaching" | "docstring" | "none"
+CodeOutput = str  # "full" | "changed_parts" | "diff"
+
 
 @dataclass(frozen=True)
 class ScenarioConfig:
@@ -46,6 +52,15 @@ class ScenarioConfig:
     interaction_style: InteractionStyle = "direct"
     reasoning_effort: ReasoningEffort = "medium"
     quality_checks: tuple[QualityCheck, ...] = ()
+
+    # ── Поля режима «Код» ─────────────────────────────────────────────────
+    # Дефолты подобраны так, чтобы ничего не добавлять в промпт: у сценариев
+    # других режимов эти поля не задаются и директив не порождают.
+    code_principles: tuple[CodePrinciple, ...] = ()
+    comment_style: CommentStyle = ""
+    code_output: CodeOutput = ""
+    # Язык, на котором писать, если пользователь не назвал свой.
+    default_language: str = ""
 
 
 def _s(id: str, system_prompt: str, **params) -> ScenarioConfig:
@@ -138,6 +153,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="direct",
             reasoning_effort="high",
             quality_checks=("edge_cases", "limitations"),
+            code_principles=("simplicity", "yagni", "explicit"),
+            comment_style="minimal",
+            code_output="full",
+            default_language="python",
         ),
         "refactor": _s(
             "refactor",
@@ -154,6 +173,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="direct",
             reasoning_effort="high",
             quality_checks=("edge_cases", "tests"),
+            code_principles=("simplicity", "single_purpose", "explicit"),
+            comment_style="minimal",
+            code_output="changed_parts",
+            default_language="python",
         ),
         "explain": _s(
             "explain",
@@ -170,6 +193,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="friendly",
             reasoning_effort="medium",
             quality_checks=("clarity",),
+            code_principles=(),
+            comment_style="teaching",
+            code_output="full",
+            default_language="python",
         ),
         "review": _s(
             "review",
@@ -187,6 +214,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="strict_review",
             reasoning_effort="high",
             quality_checks=("edge_cases", "security", "tests"),
+            code_principles=("simplicity", "yagni", "fail_fast"),
+            comment_style="minimal",
+            code_output="diff",
+            default_language="python",
         ),
         "teach": _s(
             "teach",
@@ -203,6 +234,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="friendly",
             reasoning_effort="medium",
             quality_checks=("clarity",),
+            code_principles=("simplicity",),
+            comment_style="teaching",
+            code_output="full",
+            default_language="python",
         ),
         "tests": _s(
             "tests",
@@ -219,6 +254,10 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             interaction_style="direct",
             reasoning_effort="high",
             quality_checks=("edge_cases", "tests"),
+            code_principles=("explicit", "single_purpose"),
+            comment_style="docstring",
+            code_output="full",
+            default_language="python",
         ),
     },
     "research": {
@@ -260,15 +299,23 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             "overview",
             "Дай быстрый обзор темы: в чём суть, основные понятия и ключевые "
             "факты. Коротко и понятно, без лишних деталей и воды. Помоги "
-            "студенту составить общую картину и понять, куда копать дальше.",
+            "студенту составить общую картину и понять, куда копать дальше. "
+            "Поиском пользуйся экономно: обзор — это не разыскание, хватает "
+            "одной-двух проверок ключевых фактов и свежих цифр.",
             temperature=0.35,
             response_length="balanced",
             context_messages=18,
+            # Поиск включён во ВСЕХ сценариях режима: «Исследовать» — это про
+            # опору на источники, и ответ без списка литературы здесь выглядит
+            # как недоработавший режим. Цену это поднимает (WEB_SEARCH_CALL_COST
+            # за вызов), поэтому промпт выше просит искать экономно.
+            tools=("web_search",),
+            require_citations=True,
             answer_format="topic_overview",
             audience_level="student",
             interaction_style="friendly",
             reasoning_effort="medium",
-            quality_checks=("clarity",),
+            quality_checks=("clarity", "sources"),
         ),
         "compare": _s(
             "compare",

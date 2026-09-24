@@ -2,6 +2,7 @@
 
 from django.urls import path
 
+from .export_views import MessageExportView
 from .views import (
     ConversationDetailView,
     ConversationListCreateView,
@@ -15,4 +16,8 @@ urlpatterns = [
     path("conversations/stop/", GenerationStopView.as_view()),
     path("conversations/<int:pk>/", ConversationDetailView.as_view()),
     path("conversations/<int:pk>/messages/", MessageCreateView.as_view()),
+    path(
+        "conversations/<int:pk>/messages/<int:mid>/export/<str:fmt>/",
+        MessageExportView.as_view(),
+    ),
 ]

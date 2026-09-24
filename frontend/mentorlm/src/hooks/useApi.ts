@@ -11,6 +11,7 @@
 "use client";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { filenameFromDisposition } from "@/lib/download";
 import { apiErrors } from "@/content/site";
 import type { ModeUsage } from "@/components/mainapp/SubscriptionProvider";
 import { useCallback, useMemo } from "react";
@@ -45,6 +46,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ответа уже написана и сохранена на бэке — её нужно показать вместе с
 // пояснением, а не потерять. Бросаются только отказы до начала стрима (лимиты,
 // сеть, 401), где показывать нечего.
+/** Источник веб-поиска, на который опирался ответ (режим «Исследовать»). */
+export type StreamSource = { url: string; title: string };
+
 export type StreamResult = {
   /** id сохранённого ответа в БД; null — сохранять было нечего. */
   messageId: number | null;
@@ -58,6 +62,7 @@ export type StreamResult = {
   error: string | null;
   /** Свежий расход режима сразу после списания (см. mode_usage_report). */
   usage: ModeUsage | null;
+  sources: StreamSource[];
 };
 
 // Потолок незавершённого SSE-события: одна дельта — это несколько слов, так что
@@ -213,6 +218,7 @@ export function useApi() {
       let stopped = false; // ответ остановлен пользователем
       let error: string | null = null;
       let usage: ModeUsage | null = null;
+      let sources: StreamSource[] = [];
 
       // SSE: события разделены пустой строкой, данные — в строках `data: {...}`.
       for (;;) {
@@ -250,6 +256,7 @@ export function useApi() {
               degraded?: boolean;
               can_upgrade?: boolean;
               usage?: ModeUsage | null;
+              sources?: StreamSource[];
             };
             try {
               payload = JSON.parse(json);
@@ -266,12 +273,39 @@ export function useApi() {
               messageId = payload.message_id ?? null;
               stopped = !!payload.stopped;
               usage = payload.usage ?? null;
+              // Источники приходят только у «Исследовать»; у остальных
+              // режимов ключа просто нет.
+              sources = payload.sources ?? [];
             }
           }
         }
       }
 
-      return { messageId, degraded, canUpgrade, stopped, error, usage };
+      return { messageId, degraded, canUpgrade, stopped, error, usage, sources };
+    },
+    [fetchResilient],
+  );
+
+  /** Скачать бинарный ответ (выгрузка .docx/.md).
+   *
+   * Отдельно от request(): тот разбирает JSON, а здесь тело — файл. Заголовок
+   * Accept намеренно не ставим по той же причине, что и в stream(): у DRF
+   * только JSON-рендерер, и явный Accept дал бы 406 ещё до обработчика.
+   */
+  const download = useCallback(
+    async (
+      path: string,
+      fallbackName: string,
+    ): Promise<{ blob: Blob; filename: string }> => {
+      const res = await fetchResilient(path, { method: "GET" });
+      // Ошибки бэк отдаёт JSON-ом — разбираем их обычным путём.
+      if (!res.ok) throw await apiErrorFrom(res);
+      return {
+        blob: await res.blob(),
+        filename:
+          filenameFromDisposition(res.headers.get("Content-Disposition")) ??
+          fallbackName,
+      };
     },
     [fetchResilient],
   );
@@ -287,7 +321,8 @@ export function useApi() {
       delete: <T = unknown>(path: string) =>
         request<T>(path, { method: "DELETE" }),
       stream,
+      download,
     }),
-    [request, stream],
+    [request, stream, download],
   );
 }

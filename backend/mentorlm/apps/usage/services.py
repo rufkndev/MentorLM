@@ -25,13 +25,16 @@ def record_usage(
     conversation=None,
     count_as_request: bool = True,
     degraded: bool = False,
+    thinking: bool = False,
+    thinking_tokens: int = 0,
 ) -> int:
     """Списать фактический расход после успешного ответа; вернуть стоимость в µ$.
 
     Квоты читают только `UsageEvent`, дневная строка — для админки, поэтому её
     инкрементируем атомарно через F(). `count_as_request=False` — для служебных
     вызовов (фоновая память): деньги списываем, но запросом пользователя это не
-    считаем.
+    считаем. `thinking_tokens` на стоимость не влияет: провайдеры уже включили
+    их в `tokens_out`, и это разбивка для аналитики.
     """
     if not (tokens_in or tokens_out or web_search_calls):
         return 0
@@ -49,6 +52,8 @@ def record_usage(
         web_search_calls=web_search_calls,
         billable_tokens=billable,
         degraded=degraded,
+        thinking=thinking,
+        thinking_tokens=thinking_tokens,
     )
 
     usage, _ = Usage.objects.get_or_create(

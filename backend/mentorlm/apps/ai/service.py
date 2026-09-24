@@ -35,12 +35,19 @@ class AIStream:
 
 
 def run_conversation_stream(
-    conversation, scenario_id, user, *, degrade: bool = False
+    conversation,
+    scenario_id,
+    user,
+    *,
+    degrade: bool = False,
+    thinking: bool = False,
 ) -> AIStream:
     """Подготовить и запустить потоковую генерацию ответа для диалога.
 
     `degrade=True` — квота режима исчерпана (billing.guard): отвечаем на дешёвой
     модели и без веб-поиска, чтобы дать несколько запросов вместо жёсткого блока.
+    `thinking=True` — пользователь попросил обдумать ответ; доступность по тарифу
+    и остатку квоты уже проверил guard, здесь значение только передаётся дальше.
     `usage` провайдер заполняет по ходу стрима — читать ПОСЛЕ того, как поток
     deltas полностью исчерпан.
     """
@@ -83,6 +90,7 @@ def run_conversation_stream(
         tools=tools,
         # Усилие рассуждения OpenAI-провайдеры передают в API нативно.
         reasoning_effort=prefs.reasoning_effort,
+        thinking=thinking,
         # Потолок длины ответа — глобальный runaway-предохранитель.
         max_output_tokens=MAX_OUTPUT_TOKENS,
     )

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 
 from django.core.cache import cache
 from django.db.models import Min, Q, Sum
@@ -220,12 +221,38 @@ def mode_usage_report(user, mode: str, *, plan: str | None = None, now=None) -> 
     }
 
 
-def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
+# Ниже какого остатка квоты размышление снимается. Оно легко утраивает объём
+# ответа, и дать ему выесть последние проценты окна — значит оставить человека
+# без режима до конца суток ради одного ответа.
+THINKING_MIN_REMAINING = 0.10
+
+
+@dataclass(frozen=True)
+class Decision:
+    """Что решил preflight: чем отвечать и с размышлением ли.
+
+    `thinking` — уже согласованное значение: тариф разрешает, квота позволяет и
+    это не деградация. Вьюхе остаётся просто передать его дальше.
+    """
+
+    degrade: bool
+    thinking: bool
+
+
+def preflight(
+    user,
+    *,
+    mode: str,
+    scenario: str | None,
+    input_text: str,
+    thinking: bool = False,
+) -> Decision:
     """Проверить лимиты перед запросом и вернуть решение.
 
-    "allow" — обычный путь; "degrade" — квота исчерпана, но остались grace-
-    запросы, отвечаем на дешёвой модели. Жёсткий провал (недоступный тир,
-    rate limit, длинный ввод, исчерпанные квота и grace) — LimitExceeded.
+    `degrade` — квота исчерпана, но остались grace-запросы: отвечаем на дешёвой
+    модели. Жёсткий провал (недоступный тир, запрошенное размышление на
+    бесплатном тарифе, rate limit, длинный ввод, исчерпанные квота и grace) —
+    LimitExceeded.
     """
     plan = effective_plan(user)
     limits = limits_for(plan)
@@ -240,6 +267,17 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
             "Выберите стандартную модель в настройках или перейдите на тариф выше.",
             status=402,
             tier=chosen_tier,
+        )
+
+    # Размышление — платная возможность. Проверяем здесь, а не на клиенте:
+    # кнопку можно и не нажимать, а поле в запросе подделать ничего не стоит.
+    if thinking and not limits["allow_thinking"]:
+        raise LimitExceeded(
+            "feature_locked",
+            "Режим размышления доступен на платных тарифах. "
+            "Перейдите на тариф выше, чтобы включить его.",
+            status=402,
+            feature="thinking",
         )
 
     # Анти-спам: фиксированное окно в минуту, единое для всех тарифов. Как и лок
@@ -299,4 +337,16 @@ def preflight(user, *, mode: str, scenario: str | None, input_text: str) -> str:
                 resets_at=resets_at.isoformat(),
             )
         decision = "degrade"
-    return decision
+
+    # Размышление снимаем молча, а не отказом: пользователь получит ответ, он
+    # просто будет обычным. На деградации его нет по определению — там дешёвая
+    # модель, которую мы включаем как раз чтобы дотянуть до конца окна.
+    allow_thinking = thinking and decision == "allow"
+    if allow_thinking:
+        for window in QUOTA_WINDOWS:
+            limit = quota.limit(window)
+            if limit and used[window] > limit * (1 - THINKING_MIN_REMAINING):
+                allow_thinking = False
+                break
+
+    return Decision(degrade=decision == "degrade", thinking=allow_thinking)
