@@ -27,12 +27,13 @@ from django.db import connection
 from django.utils import timezone
 
 from apps.billing.limits import (
+    NPD_RECEIPT_REMIND_DAYS,
     NPD_RECEIPT_WARN_DAYS,
     RENEWAL_NOTICE_HOURS,
     limits_for,
     plan_price,
 )
-from apps.billing.models import BillingEvent, Payment, Subscription, log_event
+from apps.billing.models import BillingEvent, Payment, Plan, Subscription, log_event
 from apps.billing.payments import (
     PaymentError,
     billing_url,
@@ -68,7 +69,16 @@ _STALE_PAYMENT_AGE = timedelta(hours=1)
 # поэтому переживает перезапуск контейнера — иначе рестарт сбрасывал бы
 # ограничение и письма шли бы пачками.
 _RECEIPTS_MAIL_KEY = "billing:npd-receipts-mail"
-_RECEIPTS_MAIL_TTL = 60 * 60 * 20  # 20 ч: чуть меньше суток, чтобы не «уползать»
+# Период из limits минус 4 часа: такт идёт раз в десять минут, и ровно равный
+# TTL сдвигал бы каждое следующее письмо на более поздний час — за месяц
+# напоминание уехало бы с утра в ночь.
+_RECEIPTS_MAIL_TTL = NPD_RECEIPT_REMIND_DAYS * 24 * 60 * 60 - 4 * 60 * 60
+
+# Тарифы, у которых есть цена. Только их касаются письма о продлении и об
+# окончании: на бесплатном нечего списывать и нечего терять — доступ после
+# «окончания» остаётся ровно тем же. Считаем из прайса, а не перечисляем
+# руками, чтобы новый тариф за 0 ₽ не начал рассылать письма о нуле рублей.
+_PAID_PLANS = [plan for plan in Plan.values if plan_price(plan) > 0]
 
 
 @contextmanager
@@ -139,6 +149,7 @@ class Command(BaseCommand):
             auto_renew=True,
             canceled_at__isnull=True,
             renewal_notified_at__isnull=True,
+            plan__in=_PAID_PLANS,
             status=Subscription.Status.ACTIVE,
             current_period_end__gte=now + _NOTICE_WINDOW_START,
             current_period_end__lte=now + _NOTICE_WINDOW_END,
@@ -194,6 +205,10 @@ class Command(BaseCommand):
         и человек ни при каком раскладе не узнаёт об окончании доступа задним
         числом.
 
+        Бесплатные подписки сюда не попадают: окончание такой подписки ничего
+        не меняет — человек остаётся ровно на том же бесплатном доступе, и
+        письмо «подписка заканчивается, продлите за 0 ₽» только пугает.
+
         Отдельный смысл у случая `auto_renew_requested and not auto_renew`:
         человек ПРОСИЛ автопродление, но привязать платёжное средство не
         удалось (у нас автосписания работают только с банковской карты). Такой
@@ -204,6 +219,7 @@ class Command(BaseCommand):
         due = Subscription.objects.filter(
             auto_renew=False,
             expiry_notified_at__isnull=True,
+            plan__in=_PAID_PLANS,
             status=Subscription.Status.ACTIVE,
             current_period_end__gte=now + _NOTICE_WINDOW_START,
             current_period_end__lte=now + _NOTICE_WINDOW_END,
@@ -326,8 +342,10 @@ class Command(BaseCommand):
 
         Письмо, а не только лог: срок из закона — это дата, за которой должен
         следить человек. Читать `docker logs` ежедневно никто не будет, а
-        пропущенный чек — штраф. Отправка не чаще раза в сутки: такт идёт раз в
-        десять минут, и без ограничения это был бы спам на 144 письма в день.
+        пропущенный чек — штраф. Повторяем не чаще, чем раз в
+        `NPD_RECEIPT_REMIND_DAYS` суток: такт идёт раз в десять минут, и без
+        ограничения это был бы спам на 144 письма в день, а ежедневное
+        напоминание об одном и том же платеже читать перестают.
         """
         pending = list(payments_awaiting_npd_receipt()[:200])
         if not pending:

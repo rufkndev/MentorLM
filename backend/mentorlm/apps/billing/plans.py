@@ -17,25 +17,29 @@ from .models import Plan, Subscription
 PAST_DUE_GRACE = timedelta(days=3)
 
 
-def active_subscription(user) -> Subscription | None:
-    """Действующая подписка пользователя (свежайшая из подходящих) или None.
+def alive_subscriptions(now=None):
+    """Все подписки, которые действуют прямо сейчас.
+
+    Определение «действует» живёт здесь одной строкой, а не повторяется у
+    каждого, кому нужно посчитать подписки: тариф пользователя и сводка в
+    админке обязаны считать живыми одни и те же записи.
 
     Действующая — active с неистёкшим сроком (или вовсе без срока), а также
     past_due внутри грейс-периода.
     """
-    now = timezone.now()
+    now = now or timezone.now()
     alive = Q(status=Subscription.Status.ACTIVE) & (
         Q(current_period_end__isnull=True) | Q(current_period_end__gt=now)
     )
     grace = Q(status=Subscription.Status.PAST_DUE) & Q(
         current_period_end__gt=now - PAST_DUE_GRACE
     )
-    return (
-        Subscription.objects.filter(user=user)
-        .filter(alive | grace)
-        .order_by("-created_at")
-        .first()
-    )
+    return Subscription.objects.filter(alive | grace)
+
+
+def active_subscription(user) -> Subscription | None:
+    """Действующая подписка пользователя (свежайшая из подходящих) или None."""
+    return alive_subscriptions().filter(user=user).order_by("-created_at").first()
 
 
 def effective_plan(user) -> str:

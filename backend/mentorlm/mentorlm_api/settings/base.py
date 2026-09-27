@@ -38,7 +38,9 @@ def env_list(name: str, default: str = '') -> list[str]:
 
 INSTALLED_APPS = [
     # Django
-    'django.contrib.admin',
+    # Вместо 'django.contrib.admin': то же приложение, но со своим AdminSite —
+    # ради сводки на главной (apps/core/admin_site.py). Штатный способ замены.
+    'apps.core.admin_config.MentorLMAdminConfig',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
