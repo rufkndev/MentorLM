@@ -63,6 +63,10 @@ type Props = {
    *  это свойство диалога, а не состояние поля ввода. */
   thinking: boolean;
   onThinkingChange: (on: boolean) => void;
+  /** Глубина проработки ("low" | "medium" | "high") — свойство диалога, как и
+   *  сценарий. Значение по умолчанию приходит из настроек пользователя. */
+  effort: string;
+  onEffortChange: (value: string) => void;
   /** "hero" — большой по центру (empty state); "dock" — снизу в трэде. */
   variant?: "hero" | "dock";
   /** Отправка недоступна (идёт ответ). Поле ввода при этом остаётся активным:
@@ -112,6 +116,8 @@ export function ChatComposer({
   onScenarioChange,
   thinking,
   onThinkingChange,
+  effort,
+  onEffortChange,
   variant = "dock",
   disabled,
   streaming = false,
@@ -128,9 +134,12 @@ export function ChatComposer({
   // вложения, это разовая реакция на действие, а не состояние диалога.
   const [thinkingLocked, setThinkingLocked] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { isPaid, plan } = useSubscription();
-  // Блокируем только когда тариф точно известен и он бесплатный.
-  const thinkingAvailable = plan === null || isPaid;
+  const { sub, plan } = useSubscription();
+  // Доступность спрашиваем у бэкенда (флаг тарифа), а не выводим из названия
+  // плана: иначе каждый новый тариф — например пробный — пришлось бы дописывать
+  // здесь руками, и он бы молча разошёлся с тем, что реально разрешает guard.
+  // Блокируем только когда тариф точно известен.
+  const thinkingAvailable = plan === null || (sub?.allow_thinking ?? false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Цитата из блока кода: дописываем её в конец вопроса и ставим курсор
@@ -319,6 +328,8 @@ export function ChatComposer({
             onLocked={() => setThinkingLocked(true)}
           />
 
+          <EffortSwitch value={effort} onChange={onEffortChange} />
+
           <div className="ml-auto flex items-center gap-1.5">
             {/* Во время ответа та же кнопка останавливает генерацию (как в Claude) */}
             {streaming ? (
@@ -426,6 +437,49 @@ function ThinkingButton({
       <Brain className="h-[17px] w-[17px] shrink-0" strokeWidth={1.7} />
       <span className="hidden sm:inline">{composerCopy.thinking}</span>
     </button>
+  );
+}
+
+// Глубина проработки: три деления в «утопленном» жёлобе, как переключатель
+// режимов в сайдбаре. Не кнопка-тумблер, потому что значений три и человек
+// должен видеть, где он сейчас, не открывая ничего. Гейта по тарифу нет: на
+// быстрой модели даже «Глубже» стоит копейки, и ограничивать выбор нечем —
+// расход и так считает квота.
+function EffortSwitch({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div
+      className="inset-well flex h-9 items-center gap-0.5 rounded-full p-0.5"
+      role="group"
+      aria-label={composerCopy.effortLabel}
+      title={composerCopy.effortHint}
+    >
+      {composerCopy.effortOptions.map((option) => {
+        const active = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            aria-pressed={active}
+            title={option.title}
+            className={cn(
+              "h-8 rounded-full px-2.5 text-[12px] transition-colors",
+              active
+                ? "bg-surface font-medium text-ink shadow-[0_1px_2px_rgba(16,24,40,0.08)]"
+                : "text-ink-soft hover:text-ink",
+            )}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

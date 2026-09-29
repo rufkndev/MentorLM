@@ -26,12 +26,15 @@ import type {
   MessageAttachment,
 } from "@/components/mainapp/ChatMessage";
 import { useConversations } from "@/components/mainapp/ConversationsProvider";
+import { useSettings } from "@/components/mainapp/SettingsProvider";
 import { useSubscription } from "@/components/mainapp/SubscriptionProvider";
 import { ApiError, useApi } from "@/hooks/useApi";
 import {
+  loadEffort,
   loadMessages,
   loadScenario,
   loadThinking,
+  saveEffort,
   saveMessages,
   saveScenario,
   saveThinking,
@@ -47,6 +50,14 @@ import {
 } from "@/lib/chat-stream";
 import { chatErrors } from "@/content/app";
 import type { Scenario } from "@/types/app";
+
+// Настройка «Глубина проработки» → шкала усилия рассуждения, которую понимает
+// бэкенд. База всех сценариев — "medium", поэтому значения совпадают один-в-один.
+const EFFORT_BY_DEPTH: Record<string, string> = {
+  fast: "low",
+  auto: "medium",
+  deep: "high",
+};
 
 /** Ответ бэка на GET /api/conversations/{id}/ (см. ConversationDetailSerializer). */
 type ApiConversationDetail = {
@@ -115,6 +126,7 @@ export function useChatSession(
   const searchParams = useSearchParams();
   const { mode, create, refresh } = useConversations();
   const { refreshUsage, applyModeUsage } = useSubscription();
+  const { settings } = useSettings();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
@@ -124,6 +136,9 @@ export function useChatSession(
   // Размышление — такое же свойство диалога, как сценарий: включил для
   // сложной задачи и оно держится, пока сам не выключишь.
   const [thinking, setThinkingState] = useState(false);
+  // Глубина проработки. null — «для этого диалога не выбирали», тогда берём
+  // значение из настройки «Глубина проработки»: она и есть дефолт.
+  const [effortChoice, setEffortChoice] = useState<string | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
 
   // id диалога из URL — источник правды о том, какой чат сейчас на экране.
@@ -149,6 +164,7 @@ export function useChatSession(
       saved && scenarios.some((s) => s.id === saved) ? saved : defaultScenarioId;
     setScenario((prev) => (prev === next ? prev : next));
     setThinkingState(loadThinking(urlConvId));
+    setEffortChoice(loadEffort(urlConvId));
   }, [urlConvId, scenarios, defaultScenarioId]);
 
   // Смена сценария пользователем — запоминаем её за этим чатом. У ещё не
@@ -166,6 +182,18 @@ export function useChatSession(
     const current = convIdRef.current;
     if (current) saveThinking(current, on);
   }, []);
+
+  // Выбор глубины — тоже за этим чатом. Настройка в ЛК при этом не меняется:
+  // она задаёт значение по умолчанию для диалогов, где выбор не делали.
+  const setEffort = useCallback((value: string) => {
+    setEffortChoice(value);
+    const current = convIdRef.current;
+    if (current) saveEffort(current, value);
+  }, []);
+
+  // Действующая глубина: выбор в этом диалоге, иначе значение из настроек.
+  const effort =
+    effortChoice ?? EFFORT_BY_DEPTH[settings.reasoning_depth] ?? "medium";
 
   // Идущий (или только что дописанный) ответ этого диалога из реестра. При
   // возврате в чат подписка находит его живым и тред продолжается с того же
@@ -508,6 +536,7 @@ export function useChatSession(
         // Сценарий, выбранный до первой отправки, закрепляем за новым чатом.
         saveScenario(id, scenarioId);
         saveThinking(id, thinking);
+        saveEffort(id, effort);
         router.replace(`/${mode}?c=${id}`);
       }
 
@@ -519,14 +548,15 @@ export function useChatSession(
         fd.append("content", text);
         fd.append("scenario_id", scenarioId);
         if (thinking) fd.append("thinking", "1");
+        fd.append("effort", effort);
         for (const f of files) fd.append("files", f);
         body = fd;
       } else {
-        body = { content: text, scenario_id: scenarioId, thinking };
+        body = { content: text, scenario_id: scenarioId, thinking, effort };
       }
       await runStream(id, body);
     },
-    [create, liveStreaming, mode, router, runStream, sending],
+    [create, effort, liveStreaming, mode, router, runStream, sending],
   );
 
   // «Повторить» после сбоя: бэк отвечает на последний сохранённый вопрос, не
@@ -536,8 +566,8 @@ export function useChatSession(
     if (!id || sending || liveStreaming) return;
     setSending(true);
     dropReply(id); // старое сообщение с ошибкой убираем — его заменит новый ответ
-    runStream(id, { retry: true, scenario_id: scenarioId, thinking });
-  }, [liveStreaming, runStream, scenarioId, sending, thinking]);
+    runStream(id, { retry: true, scenario_id: scenarioId, thinking, effort });
+  }, [effort, liveStreaming, runStream, scenarioId, sending, thinking]);
 
   // Остановить генерацию (кнопка «Стоп» на месте отправки). Если стрим начал
   // не этот экран (страницу перезагрузили) — просто просим бэк остановиться,
@@ -594,6 +624,8 @@ export function useChatSession(
     setScenarioId,
     thinking,
     setThinking,
+    effort,
+    setEffort,
     threadRef,
     handleSubmit,
     stop,

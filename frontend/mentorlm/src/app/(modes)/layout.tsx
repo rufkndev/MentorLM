@@ -18,7 +18,7 @@ import { SettingsDialog } from "@/components/mainapp/settings";
 import { TABS, type TabId } from "@/components/mainapp/settings/config";
 import { SettingsProvider } from "@/components/mainapp/SettingsProvider";
 import { SubscriptionProvider } from "@/components/mainapp/SubscriptionProvider";
-import { VerifyEmailBanner } from "@/components/mainapp/VerifyEmailBanner";
+import { AppBanners } from "@/components/mainapp/AppBanners";
 import { sidebarCopy } from "@/content/app";
 
 /* Открывает диалог настроек, если в адресе есть ?settings=<вкладка>, и сразу
@@ -95,9 +95,10 @@ export default function ModesLayout({
 
       {/* Область контента активного режима */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Напоминание о неподтверждённой почте — в потоке, а не поверх:
-            плавающая плашка перекрыла бы композер или меню аккаунта. */}
-        <VerifyEmailBanner />
+        {/* Полоса-напоминание (демо Plus, срок демо, подтверждение почты) — в
+            потоке, а не поверх: плавающая плашка перекрыла бы композер или
+            меню аккаунта. Очередь между сообщениями — внутри AppBanners. */}
+        <AppBanners />
         <main className="relative flex-1">{children}</main>
       </div>
 

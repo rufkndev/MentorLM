@@ -22,7 +22,11 @@ import {
   type UsageWindow,
 } from "@/components/mainapp/SubscriptionProvider";
 import { ApiError, useApi } from "@/hooks/useApi";
-import { billingPlans, subscriptionTabCopy as t } from "@/content/billing";
+import {
+  billingPlans,
+  subscriptionTabCopy as t,
+  trialCopy,
+} from "@/content/billing";
 import { priceOf, usePlanPrices } from "@/hooks/usePlanPrices";
 
 // Точная дата и время, когда лимит начнёт восстанавливаться — в локальной зоне
@@ -115,6 +119,42 @@ function formatPeriodEnd(iso: string | null): string | null {
   });
 }
 
+// Конец пробного периода — с временем: он живёт часами, и без «в 18:40» дата
+// не отвечает на единственный вопрос, который человек задаёт.
+function formatTrialEnd(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// Пробный период вместо блока автопродления: списаний не будет, отключать
+// нечего, и стандартный блок сказал бы «Автопродление отключено» с кнопкой
+// «включить» — то есть предложил бы то, чего для триала не существует.
+function TrialNote() {
+  const { sub } = useSubscription();
+  const until = formatTrialEnd(sub?.trial_ends_at ?? null);
+
+  return (
+    <div className="rounded-2xl border border-line bg-paper-2/30 p-5">
+      <p className="text-[13px] font-medium text-ink">{trialCopy.activeTitle}</p>
+      {until && (
+        <p className="mt-1 text-[12.5px] text-ink-soft">
+          {trialCopy.activeUntil(until)}
+        </p>
+      )}
+      <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
+        {trialCopy.activeNote}
+      </p>
+    </div>
+  );
+}
+
 // Управление автопродлением и привязанной картой.
 function AutoRenewControls() {
   const api = useApi();
@@ -125,7 +165,16 @@ function AutoRenewControls() {
   // На включение подтверждения нет: это не опасное действие.
   const [confirming, setConfirming] = useState(false);
 
-  if (!sub || sub.status === "none" || sub.plan === "free") return null;
+  // Пробный тариф сюда не попадает: у него нет ни карты, ни списаний — вместо
+  // этого блока показывается TrialNote (см. вызов ниже).
+  if (
+    !sub ||
+    sub.status === "none" ||
+    sub.plan === "free" ||
+    sub.plan === "trial"
+  ) {
+    return null;
+  }
 
   const until = formatPeriodEnd(sub.current_period_end);
 
@@ -262,7 +311,7 @@ function AutoRenewControls() {
 }
 
 export function SubscriptionTab() {
-  const { sub, usage, plan, isTop, refreshUsage } = useSubscription();
+  const { sub, usage, plan, isTop, isTrial, refreshUsage } = useSubscription();
 
   // Расход перечитываем при открытии вкладки: пользователь заходит сюда именно
   // затем, чтобы увидеть актуальный остаток, а не цифры на момент загрузки
@@ -275,7 +324,12 @@ export function SubscriptionTab() {
   const periodEnd = formatPeriodEnd(sub?.current_period_end ?? null);
   // Апселл показываем только тем, кому есть куда расти: на Pro — ничего, на
   // Plus — Pro, на Free — Plus. Пока тариф не загружен (plan === null) — молчим.
-  const upsellId = plan === "plus" ? "pro" : plan === "free" ? "plus" : null;
+  const upsellId =
+    plan === "plus"
+      ? "pro"
+      : plan === "free" || plan === "trial"
+        ? "plus"
+        : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
   const prices = usePlanPrices();
 
@@ -319,7 +373,7 @@ export function SubscriptionTab() {
 
       {/* Управление списаниями — сразу под тарифом, до апселла: отказ не
           должен быть спрятан за предложением купить больше. */}
-      <AutoRenewControls />
+      {isTrial ? <TrialNote /> : <AutoRenewControls />}
 
       {/* На верхнем тарифе апселла нет — вместо него подтверждение статуса. */}
       {isTop && (

@@ -35,6 +35,7 @@ from .payments import (
 )
 from .plans import active_subscription
 from .serializers import CheckoutSerializer, PaymentSerializer
+from .trial import TrialError, start_trial, trial_label
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +91,54 @@ class PlanPricesView(APIView):
                     for plan in (Plan.FREE, Plan.PLUS, Plan.PRO)
                 ]
             }
+        )
+
+
+class TrialView(APIView):
+    """POST /api/billing/trial/ — включить суточный триал Plus.
+
+    Под `EmailVerified` не ради формальности: без подтверждения адреса число
+    триалов на одного человека ничем не ограничено, а сам продукт работает и на
+    неподтверждённой почте. Здесь же подтверждение получает смысл для
+    пользователя — оно открывает демо, а не просто «нужно нам».
+
+    Идемпотентно по замыслу: повторный вызов при живом триале отдаёт 200 с теми
+    же датами, поэтому фронту не нужно различать «включил» и «уже включён».
+    """
+
+    permission_classes = [EmailVerified]
+    # Про чек и списания здесь говорить нельзя: их не будет. Причина требования
+    # другая — без подтверждённого адреса бесплатных суток можно набрать сколько
+    # угодно, и это единственное, что стоит между демо и списком адресов.
+    verified_email_message = (
+        "Подтвердите почту — после этого включим пробный доступ. "
+        "Ссылка уже отправлена на указанный при регистрации адрес."
+    )
+    # Выдача одна на аккаунт, так что лимит здесь — только от залипшей кнопки
+    # и перебора: осмысленных повторов быть не может.
+    throttle_scope = "trial"
+
+    def post(self, request):
+        """Выдать триал; вернуть срок его окончания."""
+        try:
+            sub, created = start_trial(request.user)
+        except TrialError as exc:
+            # 409: запрос корректен, но состояние аккаунта его не допускает —
+            # триал уже брали или действует платная подписка.
+            return Response(
+                {"code": exc.code, "message": exc.message},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        # 201 — создали этим запросом, 200 — триал уже шёл (повторное нажатие).
+        return Response(
+            {
+                "plan": sub.plan,
+                "plan_label": trial_label(),
+                "trial_ends_at": sub.current_period_end.isoformat(),
+                "current_period_end": sub.current_period_end.isoformat(),
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
 
 

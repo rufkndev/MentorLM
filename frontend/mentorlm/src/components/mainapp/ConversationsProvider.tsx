@@ -21,6 +21,7 @@ import {
 import { useApi } from "@/hooks/useApi";
 import {
   dropMessages,
+  dropEffort,
   dropScenario,
   dropThinking,
   loadConversationList,
@@ -143,6 +144,7 @@ export function ConversationsProvider({ children }: { children: ReactNode }) {
       dropMessages(userId, id); // чистим кэш сообщений удалённого чата
       dropScenario(id); // и его сценарий — чат больше не откроют
       dropThinking(id);
+      dropEffort(id);
       api.delete(`/api/conversations/${id}/`).catch(() => refresh());
     },
     [api, refresh, userId],

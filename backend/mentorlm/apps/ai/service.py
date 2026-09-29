@@ -27,11 +27,17 @@ from .scenarios import get_scenario
 
 @dataclass
 class AIStream:
-    """Результат запуска генерации: поток текста, выбранная модель и usage."""
+    """Результат запуска генерации: поток текста, выбранная модель и usage.
+
+    `model` и `effort` — то, чем на самом деле отвечаем после всех слоёв
+    согласования (зажатие тира тарифом, деградация, настройки). Вьюха пишет их
+    в журнал расхода: без этого в ledger попадало бы не то, за что мы заплатили.
+    """
 
     deltas: Iterator[str]
     model: str
     usage: dict
+    effort: str = ""
 
 
 def run_conversation_stream(
@@ -41,6 +47,8 @@ def run_conversation_stream(
     *,
     degrade: bool = False,
     thinking: bool = False,
+    plan: str = "",
+    effort: str = "",
 ) -> AIStream:
     """Подготовить и запустить потоковую генерацию ответа для диалога.
 
@@ -48,17 +56,23 @@ def run_conversation_stream(
     модели и без веб-поиска, чтобы дать несколько запросов вместо жёсткого блока.
     `thinking=True` — пользователь попросил обдумать ответ; доступность по тарифу
     и остатку квоты уже проверил guard, здесь значение только передаётся дальше.
+    `plan` — тариф, чью квоту проверил guard; передаётся, чтобы лимиты ответа и
+    списание расхода относились к одному тарифу даже если подписка истечёт
+    посреди стрима. `effort` — усилие рассуждения из переключателя в композере.
     `usage` провайдер заполняет по ходу стрима — читать ПОСЛЕ того, как поток
     deltas полностью исчерпан.
     """
     mode = get_mode(conversation.mode)
     user_settings = user.settings
-    plan_limits = limits_for(effective_plan(user))
+    plan = plan or effective_plan(user)
+    plan_limits = limits_for(plan)
 
     # Сценарий задаёт базу и границы параметров генерации, настройки юзера —
     # мягкий сдвиг внутри них. Ни промпт, ни параметры клиент подменить не может.
     scenario = get_scenario(conversation.mode, scenario_id)
-    prefs = resolve_preferences(mode, scenario, user_settings)
+    prefs = resolve_preferences(
+        mode, scenario, user_settings, plan=plan, effort_override=effort
+    )
 
     # Деградация: дешёвая модель режима вместо выбранной.
     model = mode.degrade_model if degrade else prefs.model
@@ -98,4 +112,6 @@ def run_conversation_stream(
     deltas = get_provider(mode.provider).stream(
         system=system, history=history, params=params, usage=usage
     )
-    return AIStream(deltas=deltas, model=model, usage=usage)
+    return AIStream(
+        deltas=deltas, model=model, usage=usage, effort=prefs.reasoning_effort
+    )

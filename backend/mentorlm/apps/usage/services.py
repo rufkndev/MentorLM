@@ -27,6 +27,8 @@ def record_usage(
     degraded: bool = False,
     thinking: bool = False,
     thinking_tokens: int = 0,
+    plan: str | None = None,
+    effort: str = "",
 ) -> int:
     """Списать фактический расход после успешного ответа; вернуть стоимость в µ$.
 
@@ -35,9 +37,21 @@ def record_usage(
     вызовов (фоновая память): деньги списываем, но запросом пользователя это не
     считаем. `thinking_tokens` на стоимость не влияет: провайдеры уже включили
     их в `tokens_out`, и это разбивка для аналитики.
+
+    `plan` — тариф, по правилам которого ответ был разрешён. Передавать его
+    ЯВНО там, где он известен: за 900 секунд «Исследовать» действующий тариф
+    может успеть измениться (истечь триал), и расход должен остаться за тем
+    тарифом, который его разрешил, — иначе он попадёт в окно нового. Если не
+    передан, считаем действующий на момент записи.
     """
     if not (tokens_in or tokens_out or web_search_calls):
         return 0
+
+    if plan is None:
+        # Ленивый импорт: apps.billing грузится позже apps.usage.
+        from apps.billing.plans import effective_plan
+
+        plan = effective_plan(user)
 
     billable = usage_cost(tokens_in, tokens_out, web_search_calls, model=model)
 
@@ -47,6 +61,8 @@ def record_usage(
         mode=mode,
         scenario=scenario or "",
         model=model,
+        plan=plan or "",
+        effort=effort or "",
         tokens_in=tokens_in,
         tokens_out=tokens_out,
         web_search_calls=web_search_calls,

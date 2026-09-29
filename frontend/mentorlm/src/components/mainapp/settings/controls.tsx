@@ -7,7 +7,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ChevronDown, Trash2, type LucideIcon } from "lucide-react";
+import { ChevronDown, Lock, Trash2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 // раскладка
@@ -111,29 +111,43 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   options,
+  locked,
+  onLocked,
 }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string; icon?: LucideIcon }[];
+  /** Значения, недоступные тарифу: показываем с замком, но не прячем — человек
+   *  должен видеть, что возможность есть, и куда за ней идти. */
+  locked?: readonly T[];
+  /** Клик по заблокированному значению: вместо смены — показать апселл. */
+  onLocked?: (v: T) => void;
 }) {
   return (
     <div className="flex rounded-lg bg-paper-2/60 p-0.5">
       {options.map((o) => {
         const Icon = o.icon;
         const active = value === o.value;
+        const isLocked = locked?.includes(o.value) ?? false;
         return (
           <button
             key={o.value}
             type="button"
-            onClick={() => onChange(o.value)}
+            onClick={() => (isLocked ? onLocked?.(o.value) : onChange(o.value))}
+            aria-disabled={isLocked}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12.5px] transition-colors",
               active
                 ? "bg-surface text-ink shadow-[0_1px_2px_rgba(9,15,31,0.08)] dark:shadow-none dark:ring-1 dark:ring-white/10"
-                : "text-muted hover:text-ink"
+                : "text-muted hover:text-ink",
+              isLocked && "opacity-55"
             )}
           >
-            {Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />}
+            {isLocked ? (
+              <Lock className="h-3 w-3" strokeWidth={2} />
+            ) : (
+              Icon && <Icon className="h-3.5 w-3.5" strokeWidth={1.7} />
+            )}
             {o.label}
           </button>
         );

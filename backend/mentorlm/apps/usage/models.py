@@ -72,6 +72,21 @@ class UsageEvent(models.Model):
     mode = models.CharField(max_length=20, choices=Conversation.Mode.choices)
     scenario = models.CharField(max_length=50, blank=True)
     model = models.CharField(max_length=50, blank=True)
+    # Тариф, по правилам которого ответ был разрешён (значения billing.Plan;
+    # без choices и без импорта billing — этот модуль грузится раньше него).
+    #
+    # Нужен не для отчётности, а для квот: расход суточного триала в 7 раз
+    # превышает всю недельную норму Free, и без этой метки человек выходил бы из
+    # триала заблокированным на Free почти на неделю. Окна исключают trial-строки
+    # из расчёта для остальных тарифов — billing.guard._ledger.
+    #
+    # Пустая строка — событие, записанное до появления поля: триалов тогда не
+    # существовало, поэтому такие строки считаются всегда.
+    plan = models.CharField(max_length=20, blank=True, default="")
+    # Усилие рассуждения ("low" | "medium" | "high"), с которым считался ответ.
+    # Оно кратно меняет число выходных токенов, поэтому без этой колонки нельзя
+    # ответить, сколько нам стоит сама возможность его поднимать.
+    effort = models.CharField(max_length=10, blank=True, default="")
     tokens_in = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
     web_search_calls = models.PositiveSmallIntegerField(default=0)

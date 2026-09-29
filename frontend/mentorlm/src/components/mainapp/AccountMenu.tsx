@@ -69,7 +69,7 @@ export function AccountMenu({
   onOpenSettings: (tab?: TabId) => void;
 }) {
   const { user, logout } = useAuth();
-  const { sub, usage, plan, isPaid } = useSubscription();
+  const { sub, usage, plan, isPaid, isTrial } = useSubscription();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -165,7 +165,12 @@ export function AccountMenu({
                   <span
                     className={cn(
                       "inline-block h-1.5 w-1.5 rounded-full",
-                      isPaid ? "bg-[var(--brand-primary)]" : "bg-[var(--brand-muted)]",
+                      // Пробный тариф подсвечиваем как платный: возможности у
+                      // человека сейчас те же, и точка рядом с «Пробный Plus»
+                      // не должна выглядеть как «у тебя ничего нет».
+                      isPaid || isTrial
+                        ? "bg-[var(--brand-primary)]"
+                        : "bg-[var(--brand-muted)]",
                     )}
                     aria-hidden
                   />
@@ -197,8 +202,9 @@ export function AccountMenu({
               </div>
             )}
 
-            {/* ── Апселл: только тем, кому есть куда расти ───────────────── */}
-            {plan === "free" && (
+            {/* ── Апселл: только тем, кому есть куда расти ─────────────────
+                Пробный тариф включаем: он и есть главный повод оформить Plus. */}
+            {(plan === "free" || plan === "trial") && (
               <Link
                 href="/billing"
                 onClick={() => setOpen(false)}

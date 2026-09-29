@@ -180,11 +180,18 @@ export function SidebarFooter({
 }: {
   onOpenSettings: () => void;
 }) {
-  // Апселл — только тем, кому есть куда расти: Free → Plus, Plus → Pro, на Pro
-  // его нет вовсе. Пока тариф не загружен (plan === null) кнопку не рисуем,
-  // чтобы платному пользователю не мигало «перейти на тариф».
+  // Апселл — только тем, кому есть куда расти: Free и пробный → Plus,
+  // Plus → Pro, на Pro его нет вовсе. Пробный тариф здесь особенно важен: это
+  // момент, когда человек видит возможности Plus и решает, платить ли, — и
+  // терять его было бы худшей из возможных экономий. Пока тариф не загружен
+  // (plan === null) кнопку не рисуем, чтобы платному не мигало «перейти».
   const { plan } = useSubscription();
-  const upsellId = plan === "free" ? "plus" : plan === "plus" ? "pro" : null;
+  const upsellId =
+    plan === "free" || plan === "trial"
+      ? "plus"
+      : plan === "plus"
+        ? "pro"
+        : null;
   const upsell = billingPlans.find((p) => p.id === upsellId);
   // Цена — с бэкенда: она же спишется. См. hooks/usePlanPrices.
   const prices = usePlanPrices();

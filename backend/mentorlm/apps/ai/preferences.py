@@ -114,17 +114,24 @@ DEFAULTS = {
 # ── Продуктовый тир модели → реальный id ──────────────────────────────────────
 
 
-def resolve_model(mode: ModeConfig, user_settings) -> str:
+def resolve_model(mode: ModeConfig, user_settings, plan: str = "") -> str:
     """Реальный id модели по тиру юзера; неизвестный тир — стандартная модель.
 
     Карта «режим → тир → модель» живёт в каталоге (`billing.limits.MODES`), там
     же, где цены. Импорт ленивый: этот модуль грузится из `apps.users.models`,
     раньше приложения billing (подробнее — в `ai.registry._modes`).
+
+    Тир, недоступный тарифу, ЗАЖИМАЕТСЯ до разрешённого, а не вызывает отказ:
+    это сохранённая настройка, и человек мог выбрать её на другом тарифе. Отказ
+    на каждом сообщении за старую галочку читался бы как поломка продукта, а не
+    как ограничение (подробнее — в докстроке `billing.guard.preflight`).
     """
-    from apps.billing.limits import mode_models
+    from apps.billing.limits import clamp_tier, mode_models
 
     cfg = mode_models(mode.id)
     tier = getattr(user_settings, cfg.tier_field, "") or "default"
+    if plan:
+        tier = clamp_tier(plan, tier)
     return cfg.model(tier) or mode.model
 
 
@@ -280,9 +287,20 @@ class ResolvedPreferences:
 
 
 def resolve_preferences(
-    mode: ModeConfig, scenario: ScenarioConfig, user_settings
+    mode: ModeConfig,
+    scenario: ScenarioConfig,
+    user_settings,
+    *,
+    plan: str = "",
+    effort_override: str = "",
 ) -> ResolvedPreferences:
-    """Свести настройки пользователя со сценарием по правилам согласования."""
+    """Свести настройки пользователя со сценарием по правилам согласования.
+
+    `effort_override` — усилие рассуждения, выбранное переключателем в композере.
+    Он относится к одному диалогу, поэтому побеждает настройку «Глубина
+    проработки», которая задаёт лишь значение по умолчанию. Значения совпадают
+    со шкалой сценариев один-в-один, поэтому это подстановка, а не сдвиг.
+    """
     creativity = getattr(user_settings, "creativity", DEFAULTS["creativity"])
     length_pref = getattr(
         user_settings, "response_length_preference",
@@ -293,11 +311,17 @@ def resolve_preferences(
         user_settings, "context_depth", DEFAULTS["context_depth"]
     )
 
+    effort = (
+        effort_override
+        if effort_override in _EFFORT_LEVELS
+        else _resolve_effort(scenario, depth)
+    )
+
     return ResolvedPreferences(
-        model=resolve_model(mode, user_settings),
+        model=resolve_model(mode, user_settings, plan),
         temperature=_resolve_temperature(scenario, creativity),
         response_length=_resolve_length(scenario, length_pref),
-        reasoning_effort=_resolve_effort(scenario, depth),
+        reasoning_effort=effort,
         context_messages=_resolve_context_messages(scenario, context_depth),
         persona=_persona(user_settings),
     )

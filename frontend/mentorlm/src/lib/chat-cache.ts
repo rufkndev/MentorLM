@@ -36,6 +36,7 @@ const idxKey = (uid: string) => `mlm.${VERSION}.${uid}.msgidx`;
 
 const scenariosKey = `mlm.${VERSION}.scenarios`;
 const thinkingKey = `mlm.${VERSION}.thinking`;
+const effortKey = `mlm.${VERSION}.effort`;
 const MAX_CACHED_PREFS = 200;
 
 // Читает карту «id диалога → значение» (или пустую при любой проблеме).
@@ -116,6 +117,23 @@ export function saveThinking(conversationId: string, on: boolean): void {
 
 export function dropThinking(conversationId: string): void {
   dropFromMap(thinkingKey, conversationId);
+}
+
+// Глубина проработки — свойство диалога по тем же причинам, что сценарий и
+// размышление: разбирая одну задачу, человек выставляет её один раз. Значение
+// по умолчанию задаёт настройка «Глубина проработки» в ЛК, поэтому здесь
+// возвращаем null, если для диалога ничего не выбрано, — «спроси настройку».
+export function loadEffort(conversationId: string | null): string | null {
+  if (!conversationId) return null;
+  return readMap(effortKey)[conversationId] ?? null;
+}
+
+export function saveEffort(conversationId: string, effort: string): void {
+  writeMap(effortKey, conversationId, effort);
+}
+
+export function dropEffort(conversationId: string): void {
+  dropFromMap(effortKey, conversationId);
 }
 
 // ── Список диалогов ─────────────────────────────────────────────────────────

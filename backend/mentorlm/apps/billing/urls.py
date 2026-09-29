@@ -10,12 +10,17 @@ from .views import (
     PlanPricesView,
     SubscriptionCancelView,
     SubscriptionResumeView,
+    TrialView,
 )
 from .webhooks import WebhookView
 
 urlpatterns = [
     # Цены тарифов — публично: страница /billing открыта и без входа.
     path("billing/plans/", PlanPricesView.as_view(), name="billing-plans"),
+
+    # Суточное демо Plus. Требует подтверждённой почты — иначе число триалов
+    # на одного человека ничем не ограничено (см. apps/billing/trial.py).
+    path("billing/trial/", TrialView.as_view(), name="billing-trial"),
 
     # Оформление и история.
     path("billing/checkout/", CheckoutView.as_view(), name="billing-checkout"),

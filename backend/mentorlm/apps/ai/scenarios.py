@@ -50,6 +50,10 @@ class ScenarioConfig:
     answer_format: AnswerFormat = "default"
     audience_level: AudienceLevel = "student"
     interaction_style: InteractionStyle = "direct"
+    # База усилия рассуждения у ВСЕХ сценариев — "medium", и поднимать её в
+    # пресете не нужно: "high" удорожает ответ на 25-40% всем и всегда, включая
+    # тех, кому хватило бы обычного. Глубину выбирает человек переключателем в
+    # композере (и настройкой «Глубина проработки» как значением по умолчанию).
     reasoning_effort: ReasoningEffort = "medium"
     quality_checks: tuple[QualityCheck, ...] = ()
 
@@ -104,7 +108,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="work_report",
             audience_level="student",
             interaction_style="direct",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("clarity", "limitations"),
         ),
         "text": _s(
@@ -151,7 +155,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="code_solution",
             audience_level="student",
             interaction_style="direct",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("edge_cases", "limitations"),
             code_principles=("simplicity", "yagni", "explicit"),
             comment_style="minimal",
@@ -171,7 +175,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="refactor_plan",
             audience_level="advanced",
             interaction_style="direct",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("edge_cases", "tests"),
             code_principles=("simplicity", "single_purpose", "explicit"),
             comment_style="minimal",
@@ -212,7 +216,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="code_review",
             audience_level="advanced",
             interaction_style="strict_review",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("edge_cases", "security", "tests"),
             code_principles=("simplicity", "yagni", "fail_fast"),
             comment_style="minimal",
@@ -252,7 +256,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="test_suite",
             audience_level="student",
             interaction_style="direct",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("edge_cases", "tests"),
             code_principles=("explicit", "single_purpose"),
             comment_style="docstring",
@@ -292,7 +296,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="research_report",
             audience_level="student",
             interaction_style="step_by_step",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("sources", "limitations"),
         ),
         "overview": _s(
@@ -330,7 +334,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="comparison",
             audience_level="student",
             interaction_style="direct",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("sources", "limitations"),
         ),
         "facts": _s(
@@ -347,7 +351,7 @@ SCENARIOS: dict[str, dict[str, ScenarioConfig]] = {
             answer_format="fact_check",
             audience_level="student",
             interaction_style="strict_fact_check",
-            reasoning_effort="high",
+            reasoning_effort="medium",
             quality_checks=("sources", "limitations"),
         ),
     },

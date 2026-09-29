@@ -208,7 +208,12 @@ def start_checkout(user, plan: str, *, auto_renew: bool, ip: str | None = None) 
     # Смена тарифа отличается от первой покупки только пометкой: по принятому
     # правилу оплачивается полная цена и период начинается заново, поэтому
     # сумма и срок считаются одинаково.
-    kind = Payment.Kind.UPGRADE if current else Payment.Kind.INITIAL
+    #
+    # Бесплатная подписка (суточный триал) сменой тарифа не считается: платить с
+    # неё не «переходят», это первый платёж человека. Проверяем ценой, а не
+    # именем тарифа, — тогда следующий бесплатный тариф не потребует правки.
+    paid_now = current is not None and plan_price(current.plan) > 0
+    kind = Payment.Kind.UPGRADE if paid_now else Payment.Kind.INITIAL
 
     payment = Payment.objects.create(
         user=user,

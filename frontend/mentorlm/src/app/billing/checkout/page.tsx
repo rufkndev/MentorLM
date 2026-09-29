@@ -198,7 +198,7 @@ function formatUntil(iso: string | null): string {
 // Сводка плана, согласия и переход на форму оплаты.
 function CheckoutShell({ plan }: { plan: BillingPlan }) {
   const api = useApi();
-  const { sub, isPaid } = useSubscription();
+  const { sub, isPaid, isTrial } = useSubscription();
   // Цена с бэкенда: именно она будет списана. Пока ответ не пришёл — запасная
   // из контента, чтобы карточка не мигала пустотой.
   const price = priceOf(plan.id, plan.price, usePlanPrices());
@@ -212,6 +212,9 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
   // Смена тарифа: текущий период закроется, новый начнётся сегодня. Показываем
   // это до оплаты, а не после — иначе сгоревший остаток станет сюрпризом.
   const isUpgrade = isPaid && sub != null && sub.plan !== plan.id;
+  // Пробный период закрывается так же, но говорить о нём нужно иначе: он
+  // ничего не стоил, и «сгорит остаток оплаченных дней» здесь было бы ложью.
+  const isTrialReplaced = isTrial && sub != null;
 
   async function pay() {
     if (!acceptOffer) {
@@ -310,6 +313,24 @@ function CheckoutShell({ plan }: { plan: BillingPlan }) {
             ))}
           </ul>
         </div>
+
+        {/* Пробный период: он закроется, оплаченный месяц начнётся сегодня */}
+        {isTrialReplaced && (
+          <div className="mt-4 flex gap-2.5 rounded-2xl border border-[#e08a1e]/35 bg-[#e08a1e]/[0.08] px-4 py-3.5">
+            <AlertTriangle
+              className="mt-0.5 h-4 w-4 flex-none text-[#c2761a]"
+              strokeWidth={1.9}
+            />
+            <div>
+              <p className="text-[13px] font-medium text-ink">
+                {t.trialWarning.title}
+              </p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-ink-soft">
+                {t.trialWarning.text(formatUntil(sub.current_period_end))}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Смена тарифа: остаток текущего периода не переносится */}
         {isUpgrade && (

@@ -20,7 +20,12 @@ import {
 } from "react";
 import { useApi } from "@/hooks/useApi";
 
-export type Plan = "free" | "plus" | "pro";
+/**
+ * Тарифы. `trial` — суточное демо Plus: тариф настоящий, со своими лимитами и
+ * квотой, но бесплатный и одноразовый. Он НЕ платный (`isPaid` его не включает),
+ * поэтому апселл на нём показывается — это главный момент для перехода.
+ */
+export type Plan = "free" | "trial" | "plus" | "pro";
 
 export type SubscriptionInfo = {
   plan: Plan;
@@ -47,8 +52,22 @@ export type SubscriptionInfo = {
   canceled_at: string | null;
   allow_web_search: boolean;
   allow_memory: boolean;
+  /**
+   * Доступность возможностей берём ИЗ ЭТИХ ФЛАГОВ, а не из названия тарифа:
+   * иначе каждый новый тариф пришлось бы дописывать в каждое условие
+   * интерфейса, и он неизбежно где-то разошёлся бы с бэкендом.
+   */
+  allow_thinking: boolean;
   context_messages: number;
   max_attachments: number;
+  /** Тиры модели, которыми тариф может отвечать; остальные в настройках под замком. */
+  allowed_tiers: string[];
+  /** Можно ли включить суточное демо Plus: не брали и сейчас нет подписки. */
+  trial_available: boolean;
+  /** Демо уже брали — второй раз не дадим. */
+  trial_used: boolean;
+  /** Когда заканчивается идущее демо; null — оно не идёт. */
+  trial_ends_at: string | null;
 };
 
 // Одна операция в истории платежей (GET /api/billing/payments/).
@@ -127,6 +146,8 @@ type SubscriptionContextValue = {
   isPaid: boolean;
   /** Верхний тариф — расти некуда, апселла нет вообще. */
   isTop: boolean;
+  /** Идёт суточное демо Plus. Не платный тариф, но и не Free. */
+  isTrial: boolean;
   /** Перечитать тариф и расход. Промис — чтобы страница возврата с оплаты
    *  могла дождаться нового тарифа до перехода в приложение. */
   refresh: () => Promise<void>;
@@ -206,8 +227,11 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       sub,
       usage,
       plan,
+      // Намеренно без "trial": `isPaid` читают решения про деньги (смена
+      // тарифа на оформлении, нужен ли апселл), а демо ничего не оплачено.
       isPaid: plan === "plus" || plan === "pro",
       isTop: plan === "pro",
+      isTrial: plan === "trial",
       refresh,
       refreshUsage,
       applyModeUsage,
@@ -230,6 +254,7 @@ const EMPTY: SubscriptionContextValue = {
   plan: null,
   isPaid: false,
   isTop: false,
+  isTrial: false,
   refresh: async () => {},
   refreshUsage: () => {},
   applyModeUsage: () => {},

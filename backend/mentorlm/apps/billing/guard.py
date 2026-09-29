@@ -26,9 +26,9 @@ from .limits import (
     RATE_PER_MIN,
     degrade_requests,
     limits_for,
-    mode_models,
     quota_for,
 )
+from .models import Plan
 from .plans import effective_plan
 
 
@@ -135,7 +135,25 @@ def clear_stop(user) -> None:
 # ── Расход по скользящим окнам ────────────────────────────────────────────────
 
 
-def _window_usage(user, mode: str, now) -> dict[str, int]:
+def _ledger(user, mode: str, plan: str):
+    """События расхода, которые считаются квоте этого тарифа.
+
+    Единственное исключение — триал: его суточный бюджет в разы превышает
+    недельную норму Free, и, оставаясь в скользящем 7-дневном окне, он выходил
+    бы человеку блокировкой на почти неделю сразу после демо. Поэтому расход,
+    сделанный на триале, не учитывается в окнах никакого другого тарифа.
+
+    Обратное правило («считать только события текущего тарифа») ввести нельзя:
+    оно превратило бы любую смену тарифа в обнуление счётчика, то есть в
+    бесплатный способ обойти лимит.
+    """
+    qs = UsageEvent.objects.filter(user=user, mode=mode)
+    if plan != Plan.TRIAL:
+        qs = qs.exclude(plan=Plan.TRIAL)
+    return qs
+
+
+def _window_usage(user, mode: str, now, plan: str) -> dict[str, int]:
     """Расход режима по каждому окну (µ$) — одним запросом.
 
     Фильтруем по самому длинному окну (идёт по индексу user+mode+created_at),
@@ -148,16 +166,16 @@ def _window_usage(user, mode: str, now) -> dict[str, int]:
         )
         for key, (delta, _) in QUOTA_WINDOWS.items()
     }
-    return UsageEvent.objects.filter(
-        user=user, mode=mode, created_at__gte=now - longest
+    return _ledger(user, mode, plan).filter(
+        created_at__gte=now - longest
     ).aggregate(**aggs)
 
 
-def _window_reset(user, mode: str, window: str, now):
+def _window_reset(user, mode: str, window: str, now, plan: str):
     """Когда окно начнёт восстанавливаться: самое старое событие в нём + длина окна."""
     delta, _ = QUOTA_WINDOWS[window]
-    oldest = UsageEvent.objects.filter(
-        user=user, mode=mode, created_at__gte=now - delta
+    oldest = _ledger(user, mode, plan).filter(
+        created_at__gte=now - delta
     ).aggregate(m=Min("created_at"))["m"]
     return (oldest + delta) if oldest else (now + delta)
 
@@ -201,13 +219,15 @@ def mode_usage_report(user, mode: str, *, plan: str | None = None, now=None) -> 
     plan = plan or effective_plan(user)
     now = now or timezone.now()
     quota = quota_for(plan, mode)
-    used = _window_usage(user, mode, now)
+    used = _window_usage(user, mode, now, plan)
 
     windows = {}
     tightest, top_pct = None, -1
     for window, (_, human) in QUOTA_WINDOWS.items():
         limit = quota.limit(window)
-        resets_at = _window_reset(user, mode, window, now) if used[window] else now
+        resets_at = (
+            _window_reset(user, mode, window, now, plan) if used[window] else now
+        )
         view = _window_view(used[window], limit, resets_at, human)
         windows[window] = view
         if view["used_pct"] > top_pct:
@@ -229,14 +249,20 @@ THINKING_MIN_REMAINING = 0.10
 
 @dataclass(frozen=True)
 class Decision:
-    """Что решил preflight: чем отвечать и с размышлением ли.
+    """Что решил preflight: чем отвечать, с размышлением ли и по какому тарифу.
 
     `thinking` — уже согласованное значение: тариф разрешает, квота позволяет и
     это не деградация. Вьюхе остаётся просто передать его дальше.
+
+    `plan` — тариф, по правилам которого ответ разрешён. Его нужно донести до
+    записи расхода: ответ «Исследовать» пишется до 900 секунд, и за это время
+    суточный триал может истечь — расход обязан остаться за тем тарифом, чью
+    квоту мы проверили, а не за тем, который стал действующим к концу стрима.
     """
 
     degrade: bool
     thinking: bool
+    plan: str
 
 
 def preflight(
@@ -250,24 +276,18 @@ def preflight(
     """Проверить лимиты перед запросом и вернуть решение.
 
     `degrade` — квота исчерпана, но остались grace-запросы: отвечаем на дешёвой
-    модели. Жёсткий провал (недоступный тир, запрошенное размышление на
-    бесплатном тарифе, rate limit, длинный ввод, исчерпанные квота и grace) —
-    LimitExceeded.
+    модели. Жёсткий провал (запрошенное размышление на бесплатном тарифе, rate
+    limit, длинный ввод, исчерпанные квота и grace) — LimitExceeded.
+
+    Тир модели здесь НЕ проверяется: недоступный тарифу тир молча зажимается до
+    разрешённого (`limits.clamp_tier`, применяется в ai.preferences). Тир — это
+    сохранённая настройка, а не действие: человек мог выбрать «Максимальную» на
+    Plus и уйти на Free, и отказ на каждом сообщении за старую галочку выглядел
+    бы поломкой. Апселл живёт там, где тир выбирают, — в настройках.
     """
     plan = effective_plan(user)
     limits = limits_for(plan)
     now = timezone.now()
-
-    # Доступность тира модели тарифу — апселл на «Максимальную».
-    chosen_tier = getattr(user.settings, mode_models(mode).tier_field, "default")
-    if chosen_tier not in limits["allowed_tiers"]:
-        raise LimitExceeded(
-            "feature_locked",
-            "Максимальная модель доступна на платных тарифах. "
-            "Выберите стандартную модель в настройках или перейдите на тариф выше.",
-            status=402,
-            tier=chosen_tier,
-        )
 
     # Размышление — платная возможность. Проверяем здесь, а не на клиенте:
     # кнопку можно и не нажимать, а поле в запросе подделать ничего не стоит.
@@ -312,17 +332,19 @@ def preflight(
     # режима — limits.degrade_requests), и только когда кончились и они —
     # жёсткий блок до восстановления окна.
     quota = quota_for(plan, mode)
-    used = _window_usage(user, mode, now)
+    used = _window_usage(user, mode, now, plan)
     decision = "allow"
     for window, (delta, human) in QUOTA_WINDOWS.items():
         limit = quota.limit(window)
         if limit is None or used[window] < limit:  # безлимит или квота есть
             continue
-        grace_used = UsageEvent.objects.filter(
-            user=user, mode=mode, degraded=True, created_at__gte=now - delta
-        ).count()
+        grace_used = (
+            _ledger(user, mode, plan)
+            .filter(degraded=True, created_at__gte=now - delta)
+            .count()
+        )
         if grace_used >= degrade_requests(mode):
-            resets_at = _window_reset(user, mode, window, now)
+            resets_at = _window_reset(user, mode, window, now, plan)
             raise LimitExceeded(
                 "mode_quota_exceeded",
                 f"Лимит режима {MODE_LABEL.get(mode, '')} исчерпан "
@@ -349,4 +371,6 @@ def preflight(
                 allow_thinking = False
                 break
 
-    return Decision(degrade=decision == "degrade", thinking=allow_thinking)
+    return Decision(
+        degrade=decision == "degrade", thinking=allow_thinking, plan=plan
+    )

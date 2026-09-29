@@ -74,9 +74,15 @@ class Plan(models.TextChoices):
 
     Этим enum'ом ключуются тарифные словари (limits.PLAN_LIMITS) и хранится
     план подписки.
+
+    TRIAL — суточное демо возможностей Plus, которое пользователь включает сам
+    (billing.trial). Тариф настоящий: у него свои лимиты и своя квота. Но он не
+    продаётся, поэтому его цена обязана остаться нулём — на этом держится то,
+    что планировщик не пишет о нём писем о продлении (billing_tick._PAID_PLANS).
     """
 
     FREE = "free", "Бесплатный"
+    TRIAL = "trial", "Пробный Plus"
     PLUS = "plus", "Plus"
     PRO = "pro", "Pro"
 
@@ -178,6 +184,18 @@ class Subscription(models.Model):
             models.Index(fields=["user", "status"]),
             # выборка планировщика: кого пора уведомить и с кого пора списать
             models.Index(fields=["auto_renew", "current_period_end"]),
+        ]
+        constraints = [
+            # Один триал на аккаунт — на уровне БД, а не только в коде: это
+            # последний рубеж против двух одновременных нажатий кнопки.
+            # Условие обязательно: строк plus/pro у пользователя штатно
+            # несколько (при смене тарифа старые гасятся, новая создаётся), и
+            # безусловный unique(user, plan) сломал бы оплату.
+            models.UniqueConstraint(
+                fields=["user", "plan"],
+                condition=models.Q(plan="trial"),
+                name="one_trial_per_user",
+            ),
         ]
 
     def __str__(self) -> str:

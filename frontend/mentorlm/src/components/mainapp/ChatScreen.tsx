@@ -54,6 +54,8 @@ function ChatScreenInner({
     scenarioId,
     thinking,
     setThinking,
+    effort,
+    setEffort,
     setScenarioId,
     threadRef,
     handleSubmit,
@@ -87,6 +89,8 @@ function ChatScreenInner({
                 onScenarioChange={setScenarioId}
                 thinking={thinking}
                 onThinkingChange={setThinking}
+                effort={effort}
+                onEffortChange={setEffort}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}
@@ -131,6 +135,8 @@ function ChatScreenInner({
                 onScenarioChange={setScenarioId}
                 thinking={thinking}
                 onThinkingChange={setThinking}
+                effort={effort}
+                onEffortChange={setEffort}
                 onSubmit={handleSubmit}
                 placeholder={placeholder}
                 disabled={sending}

@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from apps.billing.guard import mode_usage_report
 from apps.billing.limits import limits_for
 from apps.billing.plans import active_subscription, effective_plan
+from apps.billing.trial import trial_state
 
 from .models import UserSettings
 from .serializers import (
@@ -141,9 +142,17 @@ class SubscriptionView(APIView):
                 ),
                 "allow_web_search": limits["allow_web_search"],
                 "allow_memory": limits["allow_memory"],
+                # Клиент обязан узнавать доступность возможности отсюда, а не
+                # выводить её из названия тарифа: иначе каждый новый тариф
+                # пришлось бы дописывать в каждое условие интерфейса заново.
+                "allow_thinking": limits["allow_thinking"],
                 "context_messages": limits["context_messages"],
                 "max_attachments": limits["max_attachments"],
                 "allowed_tiers": sorted(limits["allowed_tiers"]),
+                # Состояние суточного демо: можно ли включить, включали ли,
+                # когда заканчивается. Едет здесь, а не отдельным запросом —
+                # этот эндпоинт и так грузится один раз на всё приложение.
+                **trial_state(user),
                 "quotas": {
                     mode: {"burst": q.burst, "week": q.week}
                     for mode, q in limits["quotas"].items()

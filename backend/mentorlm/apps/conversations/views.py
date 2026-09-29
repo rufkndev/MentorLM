@@ -156,6 +156,9 @@ def _pump_deltas(deltas, inbox: queue.Queue, cancel: threading.Event) -> None:
 # оставаться в чате, пока пользователь не перейдёт на тариф выше.
 PERSISTED_LIMIT_CODES = {"mode_quota_exceeded", "feature_locked"}
 
+# Допустимые значения клиентского поля `effort` — шкала ai.preferences.
+EFFORT_LEVELS = frozenset({"low", "medium", "high"})
+
 
 def _save_user_message(conversation, content: str, extracted) -> Message:
     """Сохранить вопрос пользователя с вложениями; первый задаёт заголовок чата.
@@ -224,6 +227,12 @@ class MessageCreateView(APIView):
             "true",
             "on",
         )
+        # Усилие рассуждения из переключателя в композере. Неизвестное значение
+        # молча игнорируем (как и scenario_id): дальше подставится настройка
+        # пользователя, а отказывать в ответе из-за формы поля нечестно.
+        effort = str(request.data.get("effort", "")).lower()
+        if effort not in EFFORT_LEVELS:
+            effort = ""
 
         if retry:
             last_user = (
@@ -336,7 +345,10 @@ class MessageCreateView(APIView):
             # guard мог снять размышление сам — на деградации или когда от
             # окна квоты остались последние проценты.
             thinking = decision.thinking
-            can_upgrade = effective_plan(user) != Plan.PRO
+            # Тариф фиксируем тем, чью квоту проверил guard: ответ «Исследовать»
+            # пишется до 900 секунд, и суточный триал может истечь по ходу.
+            plan = decision.plan
+            can_upgrade = plan != Plan.PRO
 
             # Вопрос сохраняем только после успешного preflight. При «повторить»
             # он уже в диалоге — второй раз не создаём.
@@ -356,8 +368,13 @@ class MessageCreateView(APIView):
                 user,
                 degrade=degraded,
                 thinking=thinking,
+                plan=plan,
+                effort=effort,
             )
             model = ai.model
+            # Усилие, с которым реально считается ответ: клиентское поле могло
+            # быть пустым, и тогда его дала настройка пользователя.
+            effort = ai.effort
         except Exception:
             # Любая ошибка до старта стрима — снять лок, иначе повиснет до TTL.
             release_generation_lock(user)
@@ -505,6 +522,8 @@ class MessageCreateView(APIView):
                         degraded=degraded,
                         thinking=thinking,
                         thinking_tokens=usage.get("thinking_tokens", 0),
+                        plan=plan,
+                        effort=effort,
                     )
                     if not client_gone:
                         # Расход отдаём прямо здесь: он уже списан, и сайдбар
