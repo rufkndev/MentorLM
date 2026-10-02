@@ -67,7 +67,13 @@ def _optional_params(params: GenParams) -> dict:
     """
     table = _EFFORT_THINKING if params.thinking else _EFFORT
     optional: dict = {
-        "output_config": {"effort": table.get(params.reasoning_effort, "medium")}
+        "output_config": {"effort": table.get(params.reasoning_effort, "medium")},
+        # Кэш промптов: метка ставится на последний блок запроса и движется
+        # вместе с диалогом, поэтому следующий ход читает из кэша всё до
+        # прошлого вопроса — историю и вложения — по 0.1× цены ввода. TTL 5
+        # минут, каждое чтение его продлевает. Опциональна: если её не примут,
+        # ответ уйдёт без кэша, а не упадёт.
+        "cache_control": {"type": "ephemeral"},
     }
     if params.thinking:
         # display="omitted": ход рассуждения пользователю не показываем, но
@@ -113,7 +119,15 @@ class AnthropicProvider:
             final = stream.get_final_message()
 
         if final.usage is not None:
-            usage["prompt_tokens"] = final.usage.input_tokens
+            # У Anthropic input_tokens — только НЕкэшированный ввод, а у нас
+            # prompt_tokens — весь ввод (как у OpenAI): кэш складываем обратно,
+            # а его долю передаём отдельно — billing.usage_cost посчитает её по
+            # цене кэша.
+            cache_read = getattr(final.usage, "cache_read_input_tokens", 0) or 0
+            cache_write = getattr(final.usage, "cache_creation_input_tokens", 0) or 0
+            usage["prompt_tokens"] = final.usage.input_tokens + cache_read + cache_write
+            usage["cache_read_tokens"] = cache_read
+            usage["cache_write_tokens"] = cache_write
             usage["completion_tokens"] = final.usage.output_tokens
             # Токены размышления уже входят в output_tokens — это разбивка для
             # аналитики, а не отдельная статья расхода.

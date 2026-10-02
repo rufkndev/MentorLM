@@ -11,8 +11,14 @@
 Единица расхода — МИКРО-ДОЛЛАР ($·1e-6), целыми числами (float копил бы ошибку
 при суммировании ledger'а):
 
-    cost_µ$ = tokens_in * price_in + tokens_out * price_out
+    cost_µ$ = (tokens_in - cache_read - cache_write) * price_in
+            + cache_read * price_cache_read + cache_write * price_cache_write
+            + tokens_out * price_out
             + web_search_calls * WEB_SEARCH_CALL_COST
+
+`tokens_in` — весь ввод запроса, включая ту часть, что провайдер взял из кэша
+промптов (`cache_read`) или записал в него (`cache_write`). Кэш списывается по
+своей цене, а не по полной: квота пользователя — это наш реальный расход.
 
 Цена в $/1M токенов численно равна µ$ за токен, поэтому формула сразу даёт µ$.
 Квоты авторуются в долларах и переводятся в те же µ$ (`_plan_quotas`).
@@ -33,31 +39,41 @@ from .models import Plan
 
 
 class ModelPrice(NamedTuple):
-    """Цена модели в $/1M токенов. NamedTuple — распаковывается как кортеж."""
+    """Цена модели в $/1M токенов.
+
+    `cache_read` — ввод, взятый из кэша промптов (у обоих провайдеров ~0.1×
+    обычного). `cache_write` — ввод, записанный в кэш: у Anthropic это 1.25×
+    за 5-минутный кэш, у OpenAI записи как отдельной статьи нет — ставим цену
+    обычного ввода, токенов записи оттуда всё равно не приходит.
+    """
 
     input: float
     output: float
+    cache_read: float
+    cache_write: float
 
 
 # Каждая модель, которую система может вызвать. Добавить модель = одна строка.
 # ⚠️ Сверять с прайсом провайдеров. Модели, которой здесь нет, не может быть в
 # MODES: это ломает старт (checks.py), а не считается молча по DEFAULT_PRICE.
+# Порядок полей: ввод, вывод, чтение кэша, запись в кэш.
 MODELS: dict[str, ModelPrice] = {
-    # OpenAI — режимы «Общий» и «Исследовать» (сверено с прайсом, август 2026)
-    "gpt-5.6-sol": ModelPrice(5.00, 30.00),
-    "gpt-5.6-terra": ModelPrice(2.00, 12.00),
-    "gpt-5.6-luna": ModelPrice(0.20, 1.20),
-    "gpt-5-nano": ModelPrice(0.05, 0.40),
-    # Anthropic — режим «Код»
-    "claude-opus-5": ModelPrice(5.00, 25.00),
-    "claude-sonnet-5": ModelPrice(3.00, 15.00),
-    "claude-haiku-4-5": ModelPrice(1.00, 5.00),
+    # OpenAI — режимы «Общий» и «Исследовать» (сверено с прайсом, октябрь 2026)
+    "gpt-5.6-sol": ModelPrice(4.00, 20.00, 0.40, 4.00),
+    "gpt-5.6-terra": ModelPrice(2.00, 12.00, 0.20, 2.00),
+    "gpt-5.6-luna": ModelPrice(0.20, 1.20, 0.02, 0.20),
+    "gpt-5-nano": ModelPrice(0.05, 0.40, 0.005, 0.05),
+    # Anthropic — режим «Код» (сверено с прайсом, октябрь 2026; запись — 5 мин)
+    "claude-opus-5": ModelPrice(5.00, 25.00, 0.50, 6.25),
+    "claude-sonnet-5": ModelPrice(2.00, 10.00, 0.20, 2.50),
+    "claude-haiku-4-5": ModelPrice(1.00, 5.00, 0.10, 1.25),
 }
 
 # Цена для модели, которой в каталоге уже нет: в ledger'е остаются события,
 # записанные до того, как модель убрали. Держать не ниже самой дорогой строки
-# MODELS — иначе «неизвестная модель» окажется выгоднее известных.
-DEFAULT_PRICE = ModelPrice(5.00, 30.00)
+# MODELS по каждому полю — иначе «неизвестная модель» окажется выгоднее
+# известных. Кэш у неё без скидки: чтение по цене обычного ввода.
+DEFAULT_PRICE = ModelPrice(5.00, 30.00, 5.00, 6.25)
 
 # Продуктовые тиры настройки «Модель ИИ»; подписи — ai.preferences.MODEL_TIER_CHOICES.
 TIERS = ("default", "fast", "quality")
@@ -171,10 +187,25 @@ def usage_cost(
     web_search_calls: int = 0,
     *,
     model: str = "",
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> int:
-    """Себестоимость запроса в µ$ — единица, в которой считаются квоты."""
-    price_in, price_out = MODELS.get(model, DEFAULT_PRICE)
-    token_cost = tokens_in * price_in + tokens_out * price_out
+    """Себестоимость запроса в µ$ — единица, в которой считаются квоты.
+
+    `tokens_in` — весь ввод, включая кэшированную часть; кэш вычитается из него
+    и считается по своей цене. Если провайдер насчитал кэша больше, чем ввода
+    (не должно быть), ввод поднимаем до суммы кэша — так не уйдём в минус.
+    """
+    price = MODELS.get(model, DEFAULT_PRICE)
+    cache_read_tokens = max(0, cache_read_tokens)
+    cache_write_tokens = max(0, cache_write_tokens)
+    uncached = max(0, tokens_in - cache_read_tokens - cache_write_tokens)
+    token_cost = (
+        uncached * price.input
+        + cache_read_tokens * price.cache_read
+        + cache_write_tokens * price.cache_write
+        + tokens_out * price.output
+    )
     return round(token_cost) + web_search_calls * WEB_SEARCH_CALL_COST
 
 
@@ -193,6 +224,13 @@ MAX_INPUT_TOKENS = 100_000  # потолок ввода — reject до вызо
 # места, а не зависеть от того, на каком языке написано сообщение.
 MAX_MESSAGE_CHARS = 400_000
 MAX_CONTEXT_MESSAGES = 30  # абсолютный потолок длины предыстории
+# Шаг, которым обрезается предыстория длиннее потолка (6 сообщений = 3 хода).
+# Кэш промптов работает по совпадающему началу запроса: окно, сдвигающееся на
+# одно сообщение каждый ход, меняло бы начало каждый раз, и длинный диалог шёл
+# бы по полной цене. Ступенчатое окно держит начало 3 хода подряд; цена — в
+# среднем модель видит чуть меньше старых сообщений (при потолке 10: 6/8/10).
+# Окно никогда не длиннее потолка, см. ai.context._history_window.
+CONTEXT_TRIM_STEP = 6
 
 # Wall-clock таймаут генерации, по режимам: «нормальная» длина ответа у них
 # отличается на порядок, а «Исследовать» молчит минутами, пока модель ходит по

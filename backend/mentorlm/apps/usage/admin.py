@@ -53,6 +53,7 @@ class UsageEventAdmin(admin.ModelAdmin):
         "scenario",
         "model",
         "tokens_in",
+        "cache_read_tokens",
         "tokens_out",
         "web_search_calls",
         "billable_tokens",

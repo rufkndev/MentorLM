@@ -24,6 +24,9 @@ class GenParams:
     # Потолок длины ответа: предохранитель от runaway-генерации, а не цель —
     # желаемую длину задаём промптом.
     max_output_tokens: int = 16384
+    # Ключ кэша промптов (OpenAI `prompt_cache_key`): один на диалог. Anthropic
+    # его не принимает — там кэш включается меткой `cache_control`.
+    cache_key: str = ""
 
 
 class LLMProvider(Protocol):

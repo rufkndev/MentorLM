@@ -31,6 +31,23 @@ def effort_for(params) -> str:
     return _EFFORT_THINKING.get(params.reasoning_effort, "high")
 
 
+def cache_options(params) -> dict:
+    """Необязательные опции кэша промптов OpenAI для Chat и Responses.
+
+    Кэш у OpenAI включён всегда и без наценки за запись; эти две опции только
+    поднимают долю попаданий. `prompt_cache_key` — ключ диалога: его запросы
+    делят начало (system + история), и по ключу OpenAI направляет их туда, где
+    это начало уже лежит. `prompt_cache_retention="24h"` держит кэш до суток
+    вместо минут простоя — студент, вернувшийся к диалогу через час, всё ещё
+    попадает в кэш. Обе передаются через снятие по 400: модель, которая их не
+    знает, ответит и без них.
+    """
+    return {
+        "prompt_cache_key": params.cache_key or None,
+        "prompt_cache_retention": "24h",
+    }
+
+
 def create_with_optional(
     create: Callable[..., Any],
     base_kwargs: dict,

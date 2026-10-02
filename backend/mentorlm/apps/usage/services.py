@@ -29,6 +29,8 @@ def record_usage(
     thinking_tokens: int = 0,
     plan: str | None = None,
     effort: str = "",
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
 ) -> int:
     """Списать фактический расход после успешного ответа; вернуть стоимость в µ$.
 
@@ -37,6 +39,10 @@ def record_usage(
     вызовов (фоновая память): деньги списываем, но запросом пользователя это не
     считаем. `thinking_tokens` на стоимость не влияет: провайдеры уже включили
     их в `tokens_out`, и это разбивка для аналитики.
+
+    `tokens_in` — весь ввод; `cache_read_tokens` / `cache_write_tokens` — его
+    часть, прочитанная из кэша промптов или записанная в него. Они считаются по
+    ценам кэша, поэтому пользователь платит квотой ровно наш реальный расход.
 
     `plan` — тариф, по правилам которого ответ был разрешён. Передавать его
     ЯВНО там, где он известен: за 900 секунд «Исследовать» действующий тариф
@@ -53,7 +59,14 @@ def record_usage(
 
         plan = effective_plan(user)
 
-    billable = usage_cost(tokens_in, tokens_out, web_search_calls, model=model)
+    billable = usage_cost(
+        tokens_in,
+        tokens_out,
+        web_search_calls,
+        model=model,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
+    )
 
     UsageEvent.objects.create(
         user=user,
@@ -64,6 +77,8 @@ def record_usage(
         plan=plan or "",
         effort=effort or "",
         tokens_in=tokens_in,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
         tokens_out=tokens_out,
         web_search_calls=web_search_calls,
         billable_tokens=billable,

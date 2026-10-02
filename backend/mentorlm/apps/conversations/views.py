@@ -517,6 +517,8 @@ class MessageCreateView(APIView):
                         conversation=conversation,
                         model=model,
                         tokens_in=usage.get("prompt_tokens", 0),
+                        cache_read_tokens=usage.get("cache_read_tokens", 0),
+                        cache_write_tokens=usage.get("cache_write_tokens", 0),
                         tokens_out=tokens_out,
                         web_search_calls=usage.get("web_search_calls", 0),
                         degraded=degraded,

@@ -61,14 +61,22 @@ def _check_models_priced() -> list[Error | Warning]:
 
     # DEFAULT_PRICE — цена модели, которую из каталога убрали. Если она ниже
     # реальных, «забыть модель» становится способом считать расход дешевле.
+    # Сравниваем по каждому полю, включая цены кэша.
     if limits.MODELS:
-        top_in = max(price.input for price in limits.MODELS.values())
-        top_out = max(price.output for price in limits.MODELS.values())
-        if limits.DEFAULT_PRICE.input < top_in or limits.DEFAULT_PRICE.output < top_out:
+        top = limits.ModelPrice(
+            *(
+                max(getattr(price, field) for price in limits.MODELS.values())
+                for field in limits.ModelPrice._fields
+            )
+        )
+        if any(
+            getattr(limits.DEFAULT_PRICE, field) < getattr(top, field)
+            for field in limits.ModelPrice._fields
+        ):
             out.append(
                 Warning(
                     f"DEFAULT_PRICE {tuple(limits.DEFAULT_PRICE)} ниже самой "
-                    f"дорогой модели каталога ({top_in}, {top_out}).",
+                    f"дорогой модели каталога {tuple(top)}.",
                     hint=(
                         "Модель, убранная из MODELS, окажется дешевле оставшихся. "
                         "Поднимите DEFAULT_PRICE до потолка каталога."
@@ -77,6 +85,28 @@ def _check_models_priced() -> list[Error | Warning]:
                     id="billing.W001",
                 )
             )
+
+    # Кэш промптов дешевле обычного ввода при чтении и не дешевле при записи.
+    # Перепутанные поля сделали бы кэшированный ввод дороже некэшированного (и
+    # кэш стал бы штрафом для пользователя) или бесплатным (и дырой в квоте).
+    wrong = sorted(
+        name
+        for name, price in limits.MODELS.items()
+        if not 0 < price.cache_read <= price.input <= price.cache_write
+    )
+    if wrong:
+        out.append(
+            Error(
+                "Цены кэша не в порядке 0 < cache_read ≤ input ≤ cache_write: "
+                + ", ".join(wrong),
+                hint=(
+                    "Порядок полей ModelPrice: ввод, вывод, чтение кэша, запись "
+                    "в кэш. У OpenAI записи нет — ставьте её равной вводу."
+                ),
+                obj="apps.billing.limits.MODELS",
+                id="billing.E011",
+            )
+        )
     return out
 
 

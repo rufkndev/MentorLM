@@ -19,7 +19,7 @@ from apps.billing.limits import WEB_SEARCH_CALLS_PER_ANSWER
 
 from ..context import count_tokens
 from ._clients import openai_client
-from ._openai import effort_for
+from ._openai import cache_options, effort_for
 from .base import GenParams
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,8 @@ class OpenAIResearchProvider:
             tools=tools,
             max_output_tokens=params.max_output_tokens,
         )
-        # reasoning понимают не все модели, max_tool_calls — не все версии API.
+        # reasoning понимают не все модели, max_tool_calls и опции кэша — не все
+        # версии API.
         # Приём тот же, что в _openai.create_with_optional, но вызов идёт на
         # __enter__ контекст-менеджера, поэтому цикл здесь свой.
         optional = {}
@@ -121,6 +122,9 @@ class OpenAIResearchProvider:
             optional["reasoning"] = {"effort": effort_for(params)}
         if searching:
             optional["max_tool_calls"] = WEB_SEARCH_CALLS_PER_ANSWER
+        optional.update(
+            {k: v for k, v in cache_options(params).items() if v is not None}
+        )
 
         while True:
             try:
@@ -227,7 +231,13 @@ class OpenAIResearchProvider:
             if getattr(item, "type", "") == "web_search_call"
         )
         if final.usage is not None:
+            # input_tokens уже включает кэшированный ввод; его доля — отдельно,
+            # по цене кэша (billing.usage_cost).
             usage["prompt_tokens"] = final.usage.input_tokens
+            input_details = getattr(final.usage, "input_tokens_details", None)
+            usage["cache_read_tokens"] = (
+                getattr(input_details, "cached_tokens", 0) or 0
+            )
             usage["completion_tokens"] = final.usage.output_tokens
             # Токены рассуждения уже входят в output_tokens — это разбивка
             # для аналитики, а не отдельная статья расхода.

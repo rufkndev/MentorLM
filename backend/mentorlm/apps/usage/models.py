@@ -87,7 +87,14 @@ class UsageEvent(models.Model):
     # Оно кратно меняет число выходных токенов, поэтому без этой колонки нельзя
     # ответить, сколько нам стоит сама возможность его поднимать.
     effort = models.CharField(max_length=10, blank=True, default="")
+    # Весь ввод запроса, включая взятое из кэша промптов и записанное в него.
     tokens_in = models.PositiveIntegerField(default=0)
+    # Из tokens_in: прочитано из кэша промптов / записано в него. Кэш стоит
+    # иначе, чем обычный ввод (billing.limits.usage_cost), поэтому без этих
+    # колонок billable_tokens нельзя было бы проверить, а долю попаданий в кэш —
+    # увидеть.
+    cache_read_tokens = models.PositiveIntegerField(default=0)
+    cache_write_tokens = models.PositiveIntegerField(default=0)
     tokens_out = models.PositiveIntegerField(default=0)
     web_search_calls = models.PositiveSmallIntegerField(default=0)
     # Историческое имя: стоимость запроса в µ$ — единица, в которой идут квоты.

@@ -10,7 +10,7 @@ from typing import Iterator
 
 from ..context import count_tokens
 from ._clients import openai_client
-from ._openai import create_with_optional, effort_for
+from ._openai import cache_options, create_with_optional, effort_for
 from .base import GenParams
 
 
@@ -40,20 +40,29 @@ class OpenAIChatProvider:
             stream_options={"include_usage": True},
         )
         # temperature и reasoning_effort взаимоисключающи в зависимости от
-        # модели — отдаём оба и снимаем непринятое по ответу 400.
+        # модели — отдаём оба и снимаем непринятое по ответу 400. Опции кэша
+        # промптов тоже необязательны: без них ответ просто дороже.
         stream = create_with_optional(
             client.chat.completions.create,
             base_kwargs,
             {
                 "temperature": params.temperature,
                 "reasoning_effort": effort_for(params),
+                **cache_options(params),
             },
             BadRequestError,
         )
 
         for chunk in stream:
             if chunk.usage is not None:
+                # prompt_tokens у OpenAI уже включает кэшированный ввод; его
+                # долю передаём отдельно — billing.usage_cost посчитает её по
+                # цене кэша. Записи в кэш как статьи расхода здесь нет.
                 usage["prompt_tokens"] = chunk.usage.prompt_tokens
+                prompt_details = getattr(chunk.usage, "prompt_tokens_details", None)
+                usage["cache_read_tokens"] = (
+                    getattr(prompt_details, "cached_tokens", 0) or 0
+                )
                 usage["completion_tokens"] = chunk.usage.completion_tokens
                 # Токены рассуждения уже входят в completion_tokens — это
                 # разбивка для аналитики, а не отдельная статья расхода.

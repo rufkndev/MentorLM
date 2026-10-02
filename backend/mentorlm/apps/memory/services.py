@@ -21,8 +21,14 @@ logger = logging.getLogger(__name__)
 
 # Сколько фактов подмешивать в промпт при разных значениях `memory_use`.
 _INJECT_CAP = {"auto": 8, "always": 12}
-# Сколько последних сообщений диалога отдаём экстрактору как контекст.
-_EXTRACT_CONTEXT_MESSAGES = 6
+# Как часто извлекать факты: после первого ответа диалога и затем после каждого
+# третьего. Новые факты всё равно попадают только в следующие диалоги
+# (build_memory_block, `before`), так что звать экстрактор после каждого ответа
+# значило платить втрое за тот же результат.
+_EXTRACT_EVERY_REPLIES = 3
+# Сколько последних сообщений диалога отдаём экстрактору как контекст: ровно
+# ходы с прошлого извлечения (вопрос + ответ на каждый).
+_EXTRACT_CONTEXT_MESSAGES = 2 * _EXTRACT_EVERY_REPLIES
 # Сколько символов диалога отдаём экстрактору: на сообщение и суммарно.
 _EXTRACT_MAX_CHARS_PER_MESSAGE = 2000
 _EXTRACT_MAX_CHARS = 8000
@@ -57,8 +63,17 @@ _SCOPE_GUIDANCE = {
 
 # ── Чтение: факты в системный промпт ──────────────────────────────────────────
 
-def build_memory_block(user_settings) -> str:
+def build_memory_block(user_settings, *, before=None) -> str:
     """Блок «что известно о пользователе» для промпта; при memory_use=off — пусто.
+
+    `before` — момент начала диалога: берём только факты, известные до него.
+    Блок стоит в системном промпте, то есть в самом начале запроса, и любое его
+    изменение сбрасывает кэш промптов для всей истории. А фоновое извлечение
+    добавляет факты прямо по ходу диалога — без этой границы каждый новый факт
+    делал бы следующий ход полностью некэшированным. Факты из текущего диалога
+    модель и так видит в самой переписке, а в следующий диалог они попадут.
+    Удалённый или исправленный пользователем факт исчезает сразу — это стоит
+    одного промаха кэша, зато память не живёт дольше, чем ей разрешили.
 
     Заодно отмечает факты использованными — для будущего отбора по свежести.
     """
@@ -68,10 +83,11 @@ def build_memory_block(user_settings) -> str:
         return ""
 
     user = user_settings.user
+    facts_qs = UserMemoryFact.objects.filter(user=user)
+    if before is not None:
+        facts_qs = facts_qs.filter(created_at__lt=before)
     facts = list(
-        UserMemoryFact.objects.filter(user=user)
-        .order_by("-created_at")
-        .values_list("id", "content")[:cap]
+        facts_qs.order_by("-created_at").values_list("id", "content")[:cap]
     )
     if not facts:
         return ""
@@ -113,12 +129,30 @@ def extract_facts_in_background(user, conversation) -> None:
         return
     if not getattr(user.settings, "auto_memory", False):
         return
+    if not _extraction_due(conversation):
+        return
     thread = threading.Thread(
         target=_extract_and_store,
         args=(user.id, conversation.id, conversation.mode),
         daemon=True,
     )
     thread.start()
+
+
+def _extraction_due(conversation) -> bool:
+    """Пора ли извлекать факты: после 1-го ответа диалога и каждого 3-го.
+
+    Первый ответ — потому что в начале диалога человек чаще всего говорит, кто
+    он и что ему нужно, а короткие диалоги из одного-двух ходов — частый случай.
+    """
+    from apps.conversations.models import Message
+
+    replies = Message.objects.filter(
+        conversation=conversation,
+        role=Message.Role.ASSISTANT,
+        kind=Message.Kind.TEXT,
+    ).count()
+    return replies == 1 or (replies > 0 and replies % _EXTRACT_EVERY_REPLIES == 0)
 
 
 def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
@@ -132,8 +166,12 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
         if not getattr(user_settings, "auto_memory", False):
             return
 
+        # Только переписка: уведомления о лимитах писал не пользователь, и они
+        # вытесняли бы из окна реальные ходы.
         recent = list(
-            Message.objects.filter(conversation_id=conversation_id)
+            Message.objects.filter(
+                conversation_id=conversation_id, kind=Message.Kind.TEXT
+            )
             .order_by("-created_at")[:_EXTRACT_CONTEXT_MESSAGES]
         )
         recent.reverse()
@@ -144,7 +182,7 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
             UserMemoryFact.objects.filter(user=user).values_list("content", flat=True)
         )
 
-        raw_facts, tokens_in, tokens_out = _call_extractor(
+        raw_facts, tokens_in, tokens_out, cache_read = _call_extractor(
             recent, existing, user_settings
         )
         _store_new_facts(user, conversation_id, raw_facts, existing)
@@ -160,6 +198,7 @@ def _extract_and_store(user_id: int, conversation_id: int, mode: str) -> None:
                 model=MEMORY_MODEL,
                 tokens_in=tokens_in,
                 tokens_out=tokens_out,
+                cache_read_tokens=cache_read,
                 scenario="memory:extract",
                 conversation=None,
                 count_as_request=False,
@@ -200,8 +239,11 @@ def _render_dialogue(recent_messages) -> str:
 
 def _call_extractor(
     recent_messages, existing_facts, user_settings
-) -> tuple[list[str], int, int]:
-    """Запросить у дешёвой модели новые факты; вернуть (факты, токены_в, токены_из)."""
+) -> tuple[list[str], int, int, int]:
+    """Запросить у дешёвой модели новые факты.
+
+    Возвращает (факты, токены ввода, токены вывода, из них ввода из кэша).
+    """
     # Тот же клиент, что у режимов: через него приходят прокси, таймауты и
     # ретраи. Свой OpenAI(...) здесь означал бы поход мимо прокси — то есть
     # тихий отказ памяти на проде, ведь ошибки этого потока только логируются.
@@ -271,7 +313,9 @@ def _call_extractor(
     usage = getattr(resp, "usage", None)
     tokens_in = int(getattr(usage, "prompt_tokens", 0) or 0)
     tokens_out = int(getattr(usage, "completion_tokens", 0) or 0)
-    return [f for f in facts if isinstance(f, str)], tokens_in, tokens_out
+    prompt_details = getattr(usage, "prompt_tokens_details", None)
+    cache_read = int(getattr(prompt_details, "cached_tokens", 0) or 0)
+    return [f for f in facts if isinstance(f, str)], tokens_in, tokens_out, cache_read
 
 
 def _store_new_facts(user, conversation_id, raw_facts, existing_facts) -> None:

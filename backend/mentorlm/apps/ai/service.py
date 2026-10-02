@@ -78,8 +78,12 @@ def run_conversation_stream(
     model = mode.degrade_model if degrade else prefs.model
 
     # Глобальная память — платная фича: нужен и тариф, и включённая настройка.
+    # Только факты, известные к началу диалога: тогда системный промпт не
+    # меняется от хода к ходу и история читается из кэша промптов.
     memory_block = (
-        build_memory_block(user_settings) if plan_limits["allow_memory"] else ""
+        build_memory_block(user_settings, before=conversation.created_at)
+        if plan_limits["allow_memory"]
+        else ""
     )
     system = build_system_prompt(conversation.mode, scenario, prefs, memory_block)
 
@@ -107,6 +111,9 @@ def run_conversation_stream(
         thinking=thinking,
         # Потолок длины ответа — глобальный runaway-предохранитель.
         max_output_tokens=MAX_OUTPUT_TOKENS,
+        # Запросы одного диалога делят начало (system + история) — по ключу
+        # OpenAI направляет их туда, где это начало уже лежит в кэше.
+        cache_key=f"mlm-conv-{conversation.pk}",
     )
     usage: dict = {}
     deltas = get_provider(mode.provider).stream(

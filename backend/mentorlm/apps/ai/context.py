@@ -56,13 +56,41 @@ def build_context(conversation, *, max_messages: int) -> list[dict]:
     )
     if not qs:
         return []
-    previous = qs[-max_messages - 1:-1] if max_messages > 0 else []
+    previous = _history_window(qs[:-1], max_messages)
     return _normalize(
         [
             {"role": msg.role, "content": _content_with_attachments(msg)}
             for msg in (*previous, qs[-1])
         ]
     )
+
+
+def _history_window(prior: list, max_messages: int) -> list:
+    """Какие из прошлых сообщений отдать модели — не больше `max_messages`.
+
+    Короткая предыстория уходит целиком. Длинная обрезается СТУПЕНЯМИ по
+    `CONTEXT_TRIM_STEP` сообщений, а не по одному: кэш промптов у провайдеров
+    работает по совпадающему началу запроса, и окно, сдвигающееся на сообщение
+    каждый ход, делало бы промах на каждом ходе длинного диалога. Начало окна
+    стоит на кратном шагу индексе и сдвигается раз в шаг, а длина окна при этом
+    лежит в (max_messages − шаг, max_messages] — потолок тарифа не нарушается.
+
+    Индексы стабильны, потому что сообщения в диалог только дописываются
+    (повтор удаляет лишь хвост после последнего вопроса).
+    """
+    if max_messages <= 0:
+        return []
+    if len(prior) <= max_messages:
+        return list(prior)
+    from apps.billing.limits import CONTEXT_TRIM_STEP
+
+    # Чётный шаг — чтобы окно начиналось с вопроса, а не с ответа (ответ в
+    # начале _normalize всё равно отбросил бы); не больше самого окна — иначе
+    # при маленьком потолке окно могло бы опустеть.
+    step = max(1, min(CONTEXT_TRIM_STEP, max_messages - max_messages % 2))
+    overflow = len(prior) - max_messages
+    start = -(-overflow // step) * step  # overflow, округлённый вверх до шага
+    return list(prior[start:])
 
 
 def _normalize(history: list[dict]) -> list[dict]:
